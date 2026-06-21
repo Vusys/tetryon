@@ -82,6 +82,49 @@ final readonly class Browser
         return $this->click($button);
     }
 
+    public function doubleClick(string $target): self
+    {
+        $this->driver->doubleClickElement($this->actionable($target));
+
+        return $this;
+    }
+
+    public function rightClick(string $target): self
+    {
+        $this->driver->rightClickElement($this->actionable($target));
+
+        return $this;
+    }
+
+    public function hover(string $target): self
+    {
+        $this->driver->hoverElement($this->resolveWaiting($target));
+
+        return $this;
+    }
+
+    public function pressKey(string $key): self
+    {
+        $this->driver->pressKeys($key);
+
+        return $this;
+    }
+
+    public function choose(string $field, string $value): self
+    {
+        $css = sprintf('[type="radio"][name=%s][value=%s]', $this->cssQuote($field), $this->cssQuote($value));
+        $this->driver->clickElement($this->actionable($css));
+
+        return $this;
+    }
+
+    public function upload(string $field, string $path): self
+    {
+        $this->driver->setFiles($this->resolveWaiting($field), $path);
+
+        return $this;
+    }
+
     public function fill(string $field, string $value): self
     {
         $element = $this->actionable($field);
@@ -382,5 +425,10 @@ final readonly class Browser
         $text = $this->driver->evaluateScript('document.body ? document.body.innerText : ""');
 
         return is_string($text) ? $text : '';
+    }
+
+    private function cssQuote(string $value): string
+    {
+        return '"'.addcslashes($value, '"\\').'"';
     }
 }

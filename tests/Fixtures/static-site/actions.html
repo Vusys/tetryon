@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Actions</title>
+</head>
+<body>
+    <label><input type="radio" name="plan" value="free"> Free</label>
+    <label><input type="radio" name="plan" value="pro"> Pro</label>
+    <button
+        data-testid="show"
+        onclick="document.querySelector('[data-testid=planout]').textContent =
+            'plan:' + (document.querySelector('input[name=plan]:checked') || {}).value"
+    >Show plan</button>
+    <div data-testid="planout"></div>
+
+    <input
+        type="file"
+        data-testid="avatar"
+        onchange="document.querySelector('[data-testid=fileout]').textContent =
+            'file:' + (this.files[0] ? this.files[0].name : '')"
+    >
+    <div data-testid="fileout"></div>
+
+    <button
+        data-testid="dbl"
+        ondblclick="document.querySelector('[data-testid=dblout]').textContent = 'double'"
+    >Double me</button>
+    <div data-testid="dblout"></div>
+
+    <div
+        data-testid="ctx"
+        oncontextmenu="event.preventDefault(); document.querySelector('[data-testid=ctxout]').textContent = 'context'"
+    >Right click me</div>
+    <div data-testid="ctxout"></div>
+
+    <div
+        data-testid="hov"
+        onmouseover="document.querySelector('[data-testid=hovout]').textContent = 'hovered'"
+    >Hover me</div>
+    <div data-testid="hovout"></div>
+
+    <input
+        data-testid="keyin"
+        onkeydown="if (event.key === 'Enter') document.querySelector('[data-testid=keyout]').textContent = 'enter'"
+    >
+    <div data-testid="keyout"></div>
+</body>
+</html>
