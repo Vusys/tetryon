@@ -6,6 +6,8 @@ namespace Vusys\Tetryon\PHPUnit;
 
 use PHPUnit\Framework\Assert;
 use Vusys\Tetryon\Core\Config\Configuration;
+use Vusys\Tetryon\Core\NaturalLanguage\StepParser;
+use Vusys\Tetryon\Core\NaturalLanguage\UnknownStepException;
 use Vusys\Tetryon\Core\Selector\ElementNotFoundException;
 use Vusys\Tetryon\Core\Selector\ElementReference;
 use Vusys\Tetryon\Core\Selector\SelectorResolver;
@@ -182,6 +184,40 @@ final readonly class Browser
         $value = $this->driver->callFunctionOn($this->resolveWaiting($field), 'function(){ return this.value; }');
 
         return is_string($value) ? $value : '';
+    }
+
+    // ── Natural language ────────────────────────────────────────────────────
+
+    /**
+     * Run a natural-language step ("I fill \"Email\" with \"x\"") by parsing it
+     * to a fluent call. A convenience layer over the same API — see
+     * {@see Scenario} for the given/when/then form.
+     */
+    public function step(string $sentence): self
+    {
+        $step = StepParser::parse($sentence);
+        $first = $step->arguments[0] ?? '';
+        $second = $step->arguments[1] ?? '';
+
+        match ($step->action) {
+            'visit' => $this->visit($first),
+            'fill' => $this->fill($first, $second),
+            'type' => $this->type($first, $second),
+            'clear' => $this->clear($first),
+            'press' => $this->press($first),
+            'click' => $this->click($first),
+            'check' => $this->check($first),
+            'uncheck' => $this->uncheck($first),
+            'select' => $this->select($first, $second),
+            'pressKey' => $this->pressKey($first),
+            'assertSee' => $this->assertSee($first),
+            'assertDontSee' => $this->assertDontSee($first),
+            'assertPathIs' => $this->assertPathIs($first),
+            'assertTitleIs' => $this->assertTitleIs($first),
+            default => throw UnknownStepException::for($sentence),
+        };
+
+        return $this;
     }
 
     // ── Explicit waits (throw on timeout) ───────────────────────────────────
