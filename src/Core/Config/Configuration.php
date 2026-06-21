@@ -23,6 +23,7 @@ final readonly class Configuration
         public Timeouts $timeouts = new Timeouts,
         public Viewport $viewport = new Viewport,
         public array $selectorTestAttributes = ['data-testid', 'data-test', 'data-cy'],
+        public string $artifactsPath = 'tests/Browser/Artifacts',
     ) {
         if (filter_var($baseUrl, FILTER_VALIDATE_URL) === false) {
             throw new InvalidArgumentException("Configured base_url \"{$baseUrl}\" is not a valid URL.");
@@ -30,7 +31,7 @@ final readonly class Configuration
     }
 
     /**
-     * @param  array{base_url?: string, headless?: bool, firefox_binary?: string|null, timeout?: array{default?: int, navigation?: int, assertion?: int}, viewport?: array{width?: int, height?: int}, selectors?: array{test_attributes?: list<string>}}  $config
+     * @param  array{base_url?: string, headless?: bool, firefox_binary?: string|null, timeout?: array{default?: int, navigation?: int, assertion?: int}, viewport?: array{width?: int, height?: int}, selectors?: array{test_attributes?: list<string>}, artifacts?: array{path?: string}}  $config
      */
     public static function fromArray(array $config): self
     {
@@ -41,6 +42,7 @@ final readonly class Configuration
             timeouts: Timeouts::fromArray($config['timeout'] ?? []),
             viewport: Viewport::fromArray($config['viewport'] ?? []),
             selectorTestAttributes: $config['selectors']['test_attributes'] ?? ['data-testid', 'data-test', 'data-cy'],
+            artifactsPath: $config['artifacts']['path'] ?? 'tests/Browser/Artifacts',
         );
     }
 
@@ -50,6 +52,7 @@ final readonly class Configuration
             baseUrl: self::env('TETRYON_BASE_URL') ?? 'http://127.0.0.1:8000',
             headless: self::boolEnv('TETRYON_HEADLESS', true),
             firefoxBinary: self::env('TETRYON_FIREFOX_BINARY'),
+            artifactsPath: self::env('TETRYON_ARTIFACTS_PATH') ?? 'tests/Browser/Artifacts',
         );
     }
 

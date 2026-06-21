@@ -5,17 +5,21 @@ declare(strict_types=1);
 namespace Vusys\Tetryon\PHPUnit;
 
 use PHPUnit\Framework\Attributes\After;
+use PHPUnit\Framework\TestCase;
 use Vusys\Tetryon\Core\Config\Configuration;
 use Vusys\Tetryon\Firefox\FirefoxBiDiDriver;
 use Vusys\Tetryon\Firefox\LaunchOptions;
 
 /**
  * Gives any PHPUnit test a fluent {@see Browser} via `$this->browser()`, and
- * tears the browser down after each test. The escape hatch for tests that
- * cannot extend {@see BrowserTestCase}.
+ * tears the browser down after each test — capturing failure diagnostics first
+ * if the test did not pass. The escape hatch for tests that cannot extend
+ * {@see BrowserTestCase}.
  *
- * Override {@see browserConfiguration()} to point at a different base URL or
- * Firefox binary.
+ * Override {@see browserConfiguration()} to point at a different base URL,
+ * Firefox binary, or artifact path.
+ *
+ * @phpstan-require-extends TestCase
  */
 trait InteractsWithBrowser
 {
@@ -23,13 +27,15 @@ trait InteractsWithBrowser
 
     private ?Browser $tetryonBrowser = null;
 
+    private ?Configuration $tetryonConfiguration = null;
+
     protected function browser(): Browser
     {
         if ($this->tetryonBrowser instanceof Browser) {
             return $this->tetryonBrowser;
         }
 
-        $configuration = $this->browserConfiguration();
+        $configuration = $this->tetryonConfiguration = $this->browserConfiguration();
         $this->tetryonDriver = new FirefoxBiDiDriver(new LaunchOptions(
             headless: $configuration->headless,
             binary: $configuration->firefoxBinary,
@@ -47,8 +53,28 @@ trait InteractsWithBrowser
     #[After]
     protected function stopTetryonBrowser(): void
     {
-        $this->tetryonDriver?->stop();
+        $driver = $this->tetryonDriver;
+        $configuration = $this->tetryonConfiguration;
+
+        if ($driver instanceof FirefoxBiDiDriver && $configuration instanceof Configuration && $this->browserTestFailed()) {
+            $report = new FailureArtifacts($configuration->artifactsPath)
+                ->capture($driver, $configuration, static::class.'::'.$this->name());
+            fwrite(STDERR, $report."\n");
+        }
+
+        $driver?->stop();
         $this->tetryonDriver = null;
         $this->tetryonBrowser = null;
+        $this->tetryonConfiguration = null;
+    }
+
+    private function browserTestFailed(): bool
+    {
+        $status = $this->status();
+        if ($status->isError()) {
+            return true;
+        }
+
+        return (bool) $status->isFailure();
     }
 }

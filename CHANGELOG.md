@@ -34,5 +34,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the configured timeout elapses — so tests never need a manual `sleep()`.
   Explicit `waitForText` / `waitUntilMissing` / `waitForUrl` / `waitForLocation`
   are available too. Backed by an injectable-clock `Waiter` (unit-tested).
+- **Failure diagnostics.** When a browser test fails, Tetryon captures a
+  screenshot, the page HTML, the current URL, console logs, the BiDi command
+  trace, browser stderr, and the viewport into a per-test artifact directory
+  (`tests/Browser/Artifacts` by default), and prints a report pointing at
+  them. Good errors are the product.
 
 [Unreleased]: https://github.com/Vusys/tetryon/commits/master
