@@ -10,6 +10,7 @@ use stdClass;
 use Throwable;
 use Vusys\Tetryon\Firefox\Bidi\BiDiConnection;
 use Vusys\Tetryon\Firefox\Bidi\BiDiTrace;
+use Vusys\Tetryon\Firefox\Bidi\InputActions;
 use Vusys\Tetryon\Firefox\Bidi\RemoteValue;
 use Vusys\Tetryon\Firefox\Bidi\WebSocketClient;
 use Vusys\Tetryon\Firefox\Exception\BiDiException;
@@ -64,6 +65,41 @@ final class FirefoxBiDiDriver
             'context' => $this->context(),
             'url' => $url,
             'wait' => 'complete',
+        ]);
+        $this->collectConsole();
+    }
+
+    public function locate(string $css): ElementReference
+    {
+        $result = $this->connection()->send('browsingContext.locateNodes', [
+            'context' => $this->context(),
+            'locator' => ['type' => 'css', 'value' => $css],
+        ]);
+
+        $nodes = $result['nodes'] ?? null;
+        if (is_array($nodes)
+            && isset($nodes[0])
+            && is_array($nodes[0])
+            && is_string($nodes[0]['sharedId'] ?? null)
+        ) {
+            return new ElementReference($nodes[0]['sharedId']);
+        }
+
+        throw new BiDiException("No element matched the CSS selector \"{$css}\".");
+    }
+
+    public function click(string $css): void
+    {
+        $this->clickElement($this->locate($css));
+        $this->collectConsole();
+    }
+
+    public function type(string $css, string $text): void
+    {
+        $this->clickElement($this->locate($css)); // focus the field first
+        $this->connection()->send('input.performActions', [
+            'context' => $this->context(),
+            'actions' => [InputActions::typeText($text)],
         ]);
         $this->collectConsole();
     }
@@ -152,6 +188,14 @@ final class FirefoxBiDiDriver
             $this->bidi = null;
             $this->context = null;
         }
+    }
+
+    private function clickElement(ElementReference $element): void
+    {
+        $this->connection()->send('input.performActions', [
+            'context' => $this->context(),
+            'actions' => [InputActions::clickElement($element->sharedId)],
+        ]);
     }
 
     private function collectConsole(): void

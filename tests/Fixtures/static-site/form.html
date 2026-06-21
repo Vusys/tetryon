@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Form</title>
+</head>
+<body>
+    <label for="name">Name</label>
+    <input data-testid="name" id="name">
+    <button
+        data-testid="save"
+        onclick="document.querySelector('[data-testid=result]').textContent = 'Saved: ' + document.getElementById('name').value"
+    >Save</button>
+    <div data-testid="result"></div>
+</body>
+</html>

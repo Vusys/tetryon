@@ -72,4 +72,22 @@ final class FirefoxBiDiDriverSmokeTest extends TestCase
 
         self::assertStringContainsString('browsingContext.navigate', (string) $this->driver->trace());
     }
+
+    public function test_it_types_into_a_field_and_clicks_a_button(): void
+    {
+        $server = $this->server ?? self::fail('Static-site server did not start.');
+
+        $this->driver = new FirefoxBiDiDriver(new LaunchOptions(headless: true));
+        $this->driver->start();
+        $this->driver->navigate($server->baseUrl.'/form.html');
+
+        $this->driver->type('[data-testid=name]', 'Bryan');
+        $this->driver->click('[data-testid=save]');
+
+        // The DOM only updates if real input + click events fired.
+        self::assertSame(
+            'Saved: Bryan',
+            $this->driver->evaluateScript('document.querySelector("[data-testid=result]").textContent'),
+        );
+    }
 }
