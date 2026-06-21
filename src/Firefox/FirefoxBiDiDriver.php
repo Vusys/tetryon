@@ -8,6 +8,9 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use stdClass;
 use Throwable;
+use Vusys\Tetryon\Core\Selector\ElementReference;
+use Vusys\Tetryon\Core\Selector\Locator;
+use Vusys\Tetryon\Core\Selector\NodeLocator;
 use Vusys\Tetryon\Firefox\Bidi\BiDiConnection;
 use Vusys\Tetryon\Firefox\Bidi\BiDiTrace;
 use Vusys\Tetryon\Firefox\Bidi\InputActions;
@@ -22,7 +25,7 @@ use Vusys\Tetryon\Firefox\Exception\FirefoxException;
  * layers build on: navigate, evaluate JS, screenshot, and collect console
  * output. Diagnostics (command trace, browser stderr) are first-class.
  */
-final class FirefoxBiDiDriver
+final class FirefoxBiDiDriver implements NodeLocator
 {
     private ?FirefoxProcess $process = null;
 
@@ -88,39 +91,70 @@ final class FirefoxBiDiDriver
         $this->collectConsole();
     }
 
-    public function locate(string $css): ElementReference
+    /**
+     * @return list<ElementReference>
+     */
+    public function locateAll(Locator $locator): array
     {
         $result = $this->connection()->send('browsingContext.locateNodes', [
             'context' => $this->context(),
-            'locator' => ['type' => 'css', 'value' => $css],
+            'locator' => $locator->bidi,
         ]);
 
         $nodes = $result['nodes'] ?? null;
-        if (is_array($nodes)
-            && isset($nodes[0])
-            && is_array($nodes[0])
-            && is_string($nodes[0]['sharedId'] ?? null)
-        ) {
-            return new ElementReference($nodes[0]['sharedId']);
+        if (! is_array($nodes)) {
+            return [];
         }
 
-        throw new BiDiException("No element matched the CSS selector \"{$css}\".");
+        $references = [];
+        foreach ($nodes as $node) {
+            if (! is_array($node)) {
+                continue;
+            }
+            if (! is_string($node['sharedId'] ?? null)) {
+                continue;
+            }
+            $value = $node['value'] ?? null;
+            $localName = is_array($value) && is_string($value['localName'] ?? null) ? $value['localName'] : null;
+            $references[] = new ElementReference($node['sharedId'], $localName);
+        }
+
+        return $references;
     }
 
-    public function click(string $css): void
+    public function locate(string $css): ElementReference
     {
-        $this->clickElement($this->locate($css));
+        return $this->locateAll(Locator::css('css', $css))[0]
+            ?? throw new BiDiException("No element matched the CSS selector \"{$css}\".");
+    }
+
+    public function clickElement(ElementReference $element): void
+    {
+        $this->connection()->send('input.performActions', [
+            'context' => $this->context(),
+            'actions' => [InputActions::clickElement($element->sharedId)],
+        ]);
         $this->collectConsole();
     }
 
-    public function type(string $css, string $text): void
+    public function typeInto(ElementReference $element, string $text): void
     {
-        $this->clickElement($this->locate($css)); // focus the field first
+        $this->clickElement($element); // focus the field first
         $this->connection()->send('input.performActions', [
             'context' => $this->context(),
             'actions' => [InputActions::typeText($text)],
         ]);
         $this->collectConsole();
+    }
+
+    public function click(string $css): void
+    {
+        $this->clickElement($this->locate($css));
+    }
+
+    public function type(string $css, string $text): void
+    {
+        $this->typeInto($this->locate($css), $text);
     }
 
     public function evaluateScript(string $expression): mixed
@@ -220,14 +254,6 @@ final class FirefoxBiDiDriver
             }
             usleep(20_000);
         }
-    }
-
-    private function clickElement(ElementReference $element): void
-    {
-        $this->connection()->send('input.performActions', [
-            'context' => $this->context(),
-            'actions' => [InputActions::clickElement($element->sharedId)],
-        ]);
     }
 
     private function collectConsole(): void

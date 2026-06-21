@@ -6,6 +6,8 @@ namespace Vusys\Tetryon\PHPUnit;
 
 use PHPUnit\Framework\Assert;
 use Vusys\Tetryon\Core\Config\Configuration;
+use Vusys\Tetryon\Core\Selector\SelectorResolver;
+use Vusys\Tetryon\Core\Selector\SelectorStrategy;
 use Vusys\Tetryon\Firefox\FirefoxBiDiDriver;
 
 /**
@@ -15,10 +17,18 @@ use Vusys\Tetryon\Firefox\FirefoxBiDiDriver;
  */
 final readonly class Browser
 {
+    private SelectorResolver $resolver;
+
     public function __construct(
         private FirefoxBiDiDriver $driver,
         private Configuration $configuration,
-    ) {}
+    ) {
+        $this->resolver = new SelectorResolver(
+            $driver,
+            new SelectorStrategy,
+            $configuration->selectorTestAttributes,
+        );
+    }
 
     public function visit(string $pathOrUrl): self
     {
@@ -46,6 +56,18 @@ final readonly class Browser
         $this->driver->traverseHistory(1);
 
         return $this;
+    }
+
+    public function click(string $target): self
+    {
+        $this->driver->clickElement($this->resolver->resolve($target));
+
+        return $this;
+    }
+
+    public function press(string $button): self
+    {
+        return $this->click($button);
     }
 
     public function currentUrl(): string
