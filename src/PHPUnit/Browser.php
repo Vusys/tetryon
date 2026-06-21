@@ -253,7 +253,7 @@ final readonly class Browser
         );
     }
 
-    public function waitForLocation(string $path): self
+    public function waitForPath(string $path): self
     {
         return $this->awaitOrThrow(
             $this->configuration->timeouts->navigation,

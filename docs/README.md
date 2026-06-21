@@ -25,6 +25,8 @@ Node, Selenium, ChromeDriver, or Dusk-style setup.
 - [Diagnostics](diagnostics.md) — failure artifacts, `tetryon doctor`, logging.
 - [Laravel](laravel.md) — service provider, `tetryon:install`, `loginAs()`.
 - [Continuous integration](ci.md) — running the Browser suite in CI.
+- [Compatibility](compatibility.md) — supported PHP/PHPUnit/Firefox/OS, the
+  public API, and versioning.
 - [Troubleshooting](troubleshooting.md) — common problems.
 
 ## The shape of a test

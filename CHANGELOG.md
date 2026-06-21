@@ -6,7 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Renamed `Browser::waitForLocation()` to `waitForPath()`, for consistency with
+  `assertPathIs()` / `currentPath()` (pre-1.0 API review).
+
 ### Added
+
+- **Compatibility & supported-surface docs** (`docs/compatibility.md`):
+  supported PHP/PHPUnit/Firefox/OS, the public API vs internals, and the
+  pre-1.0 versioning policy.
 
 - Project scaffolding: Composer package `vusys/tetryon`, PHPStan level 9, Pint,
   Rector, Infection, PHPUnit 12/13 config, CI matrix, Dependabot, CodeRabbit,
