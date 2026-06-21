@@ -1,0 +1,52 @@
+name: Browser
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  firefox:
+    runs-on: ubuntu-latest
+    name: "Firefox / PHP ${{ matrix.php }}"
+    # A github-actions Dependabot bump changes no PHP and no test, so the
+    # browser matrix is irrelevant — actionlint (in tests.yml) covers it.
+    if: ${{ !startsWith(github.head_ref, 'dependabot/github_actions/') }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.4', '8.5']
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mbstring
+          coverage: none
+          tools: composer:v2
+
+      - name: Install Firefox
+        uses: browser-actions/setup-firefox@0bc507ddf224827e3b1af68e014d5e42ab93e795 # v1.7.2
+
+      - name: Configure Composer authentication
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: composer config --global --auth github-oauth.github.com "$GH_TOKEN"
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-interaction --no-progress
+
+      - name: Show Firefox version
+        run: firefox --version
+
+      - name: Run browser tests
+        run: vendor/bin/phpunit --testsuite Browser
+        env:
+          TETRYON_HEADLESS: true
