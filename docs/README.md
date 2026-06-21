@@ -23,6 +23,7 @@ Node, Selenium, ChromeDriver, or Dusk-style setup.
 - [Assertions](assertions.md) — the `assert*` methods.
 - [Configuration](configuration.md) — base URL, timeouts, viewport, artifacts.
 - [Diagnostics](diagnostics.md) — failure artifacts, `tetryon doctor`, logging.
+- [Laravel](laravel.md) — service provider, `tetryon:install`, `loginAs()`.
 - [Continuous integration](ci.md) — running the Browser suite in CI.
 - [Troubleshooting](troubleshooting.md) — common problems.
 

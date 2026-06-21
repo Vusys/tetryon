@@ -45,10 +45,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `TETRYON_DEBUG` to stream the log to stderr (via the bundled `StreamLogger`),
   override `browserLogger()` to plug in your own, and read `$browser->trace()`
   to inspect what the browser did.
-- **Laravel integration (v0.4, in progress).** An auto-discovered
-  `TetryonServiceProvider` that merges the package config and publishes
-  `config/tetryon.php` (tag `tetryon-config`). Laravel remains optional — the
-  core never requires it.
+- **Laravel integration (v0.4).** Auto-discovered `TetryonServiceProvider`
+  (merges + publishes `config/tetryon.php`), the `tetryon:install` /
+  `tetryon:doctor` / `tetryon:serve` artisan commands, a self-booting
+  `Laravel\BrowserTestCase` (factories, DB, and `$this->browser()` wired from
+  `config('tetryon')`), and `loginAs()` via a session-aware route registered
+  only in local/testing. Laravel remains optional — the core never requires it.
 - **Natural-language steps (v0.3).** A small, deterministic grammar that lives
   inside PHPUnit — `$browser->step('I fill "Email" with "x"')` and
   `$this->scenario()->given(...)->when(...)->then(...)` compile to the same

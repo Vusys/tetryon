@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Vusys\Tetryon\Tests\Unit\Laravel;
 
+use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Application;
+use Illuminate\Routing\Route;
+use Illuminate\Routing\Router;
 use Illuminate\Support\ServiceProvider;
 use Orchestra\Testbench\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -36,5 +39,30 @@ final class TetryonServiceProviderTest extends TestCase
 
         self::assertNotEmpty($published);
         self::assertContains('tetryon.php', array_map(basename(...), array_values($published)));
+    }
+
+    public function test_it_registers_the_artisan_commands(): void
+    {
+        $app = $this->app;
+        self::assertNotNull($app);
+
+        $commands = array_keys($app->make(Kernel::class)->all());
+
+        self::assertContains('tetryon:install', $commands);
+        self::assertContains('tetryon:doctor', $commands);
+        self::assertContains('tetryon:serve', $commands);
+    }
+
+    public function test_it_registers_the_testing_login_route(): void
+    {
+        $app = $this->app;
+        self::assertNotNull($app);
+
+        $uris = array_map(
+            static fn (Route $route): string => $route->uri(),
+            $app->make(Router::class)->getRoutes()->getRoutes(),
+        );
+
+        self::assertContains('_tetryon/login/{userId}/{guard?}', $uris);
     }
 }
