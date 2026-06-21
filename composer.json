@@ -1,0 +1,80 @@
+{
+    "name": "vusys/tetryon",
+    "description": "PHP-native browser testing for PHPUnit. Firefox-first, WebDriver BiDi, no Node, no Selenium, no ChromeDriver.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": [
+        "phpunit",
+        "browser-testing",
+        "firefox",
+        "webdriver",
+        "bidi",
+        "end-to-end",
+        "e2e",
+        "testing",
+        "laravel"
+    ],
+    "authors": [
+        {
+            "name": "Bryan",
+            "email": "bryan@vuii.co.uk",
+            "role": "Maintainer"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/Vusys/tetryon/issues",
+        "source": "https://github.com/Vusys/tetryon"
+    },
+    "require": {
+        "php": "^8.3",
+        "ext-json": "*"
+    },
+    "require-dev": {
+        "infection/infection": "^0.29",
+        "laravel/pint": "^1.18",
+        "phpstan/phpstan": "^2.0",
+        "phpunit/phpunit": "^12.0",
+        "rector/rector": "^2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Vusys\\Tetryon\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Vusys\\Tetryon\\Tests\\": "tests/"
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "infection/extension-installer": true
+        }
+    },
+    "scripts": {
+        "analyse": "phpstan analyse",
+        "analyze": "@analyse",
+        "rector": "rector process",
+        "rector:check": "rector process --dry-run",
+        "pint": "pint",
+        "pint:check": "pint --test",
+        "check": [
+            "@pint:check",
+            "@rector:check",
+            "@analyse"
+        ],
+        "test": "phpunit",
+        "test:browser": "phpunit --testsuite Browser",
+        "test:coverage": "XDEBUG_MODE=coverage phpunit --coverage-text",
+        "test:coverage-html": "XDEBUG_MODE=coverage phpunit --coverage-html=build/coverage",
+        "infection": "infection --threads=max"
+    },
+    "scripts-descriptions": {
+        "check": "Run every non-test gate (Pint --test, Rector --dry-run, PHPStan level 9) in one go. Halts on the first failure. Approximates CI's static-analysis lane — pass this locally before pushing.",
+        "test:browser": "Run the Firefox-backed Browser suite. Requires a Firefox install and a reachable base URL (see TETRYON_BASE_URL).",
+        "infection": "Run mutation testing locally. Defaults to all cores; pass `--threads=N` to limit."
+    }
+}

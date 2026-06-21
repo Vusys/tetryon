@@ -1,0 +1,2 @@
+# Firefox-backed PHPUnit browser tests live here (the `Browser` test suite).
+# Populated from v0.2 onward. Run with: vendor/bin/phpunit --testsuite Browser

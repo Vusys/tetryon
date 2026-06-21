@@ -1,0 +1,55 @@
+# CodeRabbit configuration.
+# Docs: https://docs.coderabbit.ai/guides/configure-coderabbit
+#
+# Goals here:
+#   - Terse, signal-only reviews (chill profile, no poems).
+#   - Skip vendor / build / generated content.
+#   - Tell CodeRabbit about the project's conventions so it doesn't
+#     re-flag intentional choices on every PR.
+
+language: en-GB
+
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: true
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - master
+  path_filters:
+    - '!vendor/**'
+    - '!build/**'
+    - '!composer.lock'
+  path_instructions:
+    - path: 'src/**'
+      instructions: |
+        PHP 8.3+ browser-testing library for PHPUnit. CI runs PHPStan
+        level 9, Pint, and Rector — assume all three pass before review.
+        Inline @phpstan-ignore comments and PHPStan baseline entries are
+        explicitly disallowed (see CLAUDE.md); flag any that creep in.
+        The package is Firefox-only and PHPUnit-only for v1 — flag any
+        Chrome/CDP/Playwright/Selenium/Node code paths, and any framework
+        (e.g. Laravel) coupling that leaks into the Core or Firefox
+        namespaces. The public API must avoid encouraging sleep()/manual
+        waits; auto-wait is the contract. Pre-1.0, so backwards-compat
+        breaks are acceptable when called out.
+    - path: 'tests/**'
+      instructions: |
+        PHPUnit 12/13. The Unit suite is pure PHP (no browser); the
+        Browser suite drives a real Firefox over WebDriver BiDi and is
+        opt-in (needs Firefox + TETRYON_BASE_URL). Concrete types in test
+        helpers are intentional so PHPStan can resolve methods without
+        ignore-comments.
+    - path: '.github/workflows/**'
+      instructions: |
+        Static-analysis + Unit matrix (PHP 8.3/8.4/8.5 × PHPUnit 12/13).
+        Browser tests run in a separate Firefox-provisioned workflow.
+        Actions are pinned to commit SHAs on purpose — keep them pinned.
+
+chat:
+  auto_reply: true

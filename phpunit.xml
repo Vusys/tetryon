@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+         defaultTestSuite="Unit">
+    <!--
+        The Unit suite is the default: pure-PHP tests with no browser, safe
+        to run anywhere. The Browser suite drives a real Firefox over
+        WebDriver BiDi and needs Firefox installed plus a reachable base
+        URL, so it is opt-in. Run it by passing the `testsuite Browser`
+        CLI flag (the literal double-dash before `testsuite` is omitted
+        here because XML comments cannot contain it).
+    -->
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Browser">
+            <directory>tests/Browser</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>src</directory>
+        </include>
+    </source>
+    <php>
+        <env name="TETRYON_BASE_URL" value="http://127.0.0.1:8000"/>
+        <env name="TETRYON_HEADLESS" value="true"/>
+    </php>
+</phpunit>

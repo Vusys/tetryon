@@ -1,0 +1,12 @@
+/vendor
+/composer.lock
+/.phpunit.cache
+/.phpunit.result.cache
+/build
+.DS_Store
+
+# Browser test artifacts (screenshots, HTML snapshots, console logs)
+/tests/Browser/Artifacts
+
+# Claude Code local agent dir
+/.claude
