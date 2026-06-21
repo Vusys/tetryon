@@ -29,5 +29,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and assertions (`assertSee`/`assertDontSee`/`assertUrlIs`/`assertPathIs`/
   `assertTitleIs`/`assertValue`/`assertVisible`/`assertMissing`/
   `assertTextNear`). Configured via `Configuration` (env or array).
+- **Auto-waiting.** Every action waits for its target to be actionable
+  (present, visible, enabled) and every assertion retries until it passes or
+  the configured timeout elapses — so tests never need a manual `sleep()`.
+  Explicit `waitForText` / `waitUntilMissing` / `waitForUrl` / `waitForLocation`
+  are available too. Backed by an injectable-clock `Waiter` (unit-tested).
 
 [Unreleased]: https://github.com/Vusys/tetryon/commits/master

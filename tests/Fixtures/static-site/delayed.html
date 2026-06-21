@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Delayed</title>
+</head>
+<body>
+    <button
+        data-testid="go"
+        onclick="setTimeout(function () {
+            document.getElementById('msg').textContent = 'Loaded!';
+            document.getElementById('late').style.display = 'block';
+            var b = document.createElement('button');
+            b.textContent = 'Second action';
+            b.setAttribute('data-testid', 'second');
+            b.addEventListener('click', function () {
+                document.querySelector('[data-testid=out]').textContent = 'clicked second';
+            });
+            document.body.appendChild(b);
+        }, 400)"
+    >Go</button>
+
+    <div id="msg"></div>
+    <div id="late" style="display:none">Now visible</div>
+    <div data-testid="out"></div>
+</body>
+</html>

@@ -7,14 +7,21 @@ namespace Vusys\Tetryon\PHPUnit;
 use PHPUnit\Framework\Assert;
 use Vusys\Tetryon\Core\Config\Configuration;
 use Vusys\Tetryon\Core\Selector\ElementNotFoundException;
+use Vusys\Tetryon\Core\Selector\ElementReference;
 use Vusys\Tetryon\Core\Selector\SelectorResolver;
 use Vusys\Tetryon\Core\Selector\SelectorStrategy;
+use Vusys\Tetryon\Core\Support\TimeoutException;
+use Vusys\Tetryon\Core\Support\Waiter;
 use Vusys\Tetryon\Firefox\FirefoxBiDiDriver;
 
 /**
  * The fluent, user-facing browser API. Wraps the Firefox driver and turns its
  * primitives into the readable verbs and assertions a PHPUnit test calls.
- * Assertions delegate to PHPUnit so failures appear as normal test failures.
+ *
+ * Auto-waiting is the contract: every action waits for its target to be
+ * actionable, and every assertion retries until it passes or the timeout
+ * elapses — so tests never need a manual `sleep()`. Assertions delegate to
+ * PHPUnit so failures appear as normal test failures.
  */
 final readonly class Browser
 {
@@ -30,6 +37,8 @@ final readonly class Browser
             $configuration->selectorTestAttributes,
         );
     }
+
+    // ── Navigation ──────────────────────────────────────────────────────────
 
     public function visit(string $pathOrUrl): self
     {
@@ -59,9 +68,11 @@ final readonly class Browser
         return $this;
     }
 
+    // ── Actions (auto-wait for the element to be actionable) ────────────────
+
     public function click(string $target): self
     {
-        $this->driver->clickElement($this->resolver->resolve($target));
+        $this->driver->clickElement($this->actionable($target));
 
         return $this;
     }
@@ -73,7 +84,7 @@ final readonly class Browser
 
     public function fill(string $field, string $value): self
     {
-        $element = $this->resolver->resolve($field);
+        $element = $this->actionable($field);
         $this->driver->callFunctionOn($element, 'function(){ this.value = ""; }');
         $this->driver->typeInto($element, $value);
 
@@ -82,7 +93,7 @@ final readonly class Browser
 
     public function type(string $field, string $value): self
     {
-        $this->driver->typeInto($this->resolver->resolve($field), $value);
+        $this->driver->typeInto($this->actionable($field), $value);
 
         return $this;
     }
@@ -90,7 +101,7 @@ final readonly class Browser
     public function clear(string $field): self
     {
         $this->driver->callFunctionOn(
-            $this->resolver->resolve($field),
+            $this->actionable($field),
             'function(){ this.value = ""; this.dispatchEvent(new Event("input", { bubbles: true })); }',
         );
 
@@ -100,7 +111,7 @@ final readonly class Browser
     public function select(string $field, string $value): self
     {
         $this->driver->callFunctionOn(
-            $this->resolver->resolve($field),
+            $this->actionable($field),
             'function(v){ this.value = v; this.dispatchEvent(new Event("change", { bubbles: true })); }',
             $value,
         );
@@ -110,24 +121,66 @@ final readonly class Browser
 
     public function check(string $field): self
     {
-        $this->driver->callFunctionOn($this->resolver->resolve($field), 'function(){ if (!this.checked) this.click(); }');
+        $this->driver->callFunctionOn($this->actionable($field), 'function(){ if (!this.checked) this.click(); }');
 
         return $this;
     }
 
     public function uncheck(string $field): self
     {
-        $this->driver->callFunctionOn($this->resolver->resolve($field), 'function(){ if (this.checked) this.click(); }');
+        $this->driver->callFunctionOn($this->actionable($field), 'function(){ if (this.checked) this.click(); }');
 
         return $this;
     }
 
     public function value(string $field): string
     {
-        $value = $this->driver->callFunctionOn($this->resolver->resolve($field), 'function(){ return this.value; }');
+        $value = $this->driver->callFunctionOn($this->resolveWaiting($field), 'function(){ return this.value; }');
 
         return is_string($value) ? $value : '';
     }
+
+    // ── Explicit waits (throw on timeout) ───────────────────────────────────
+
+    public function waitForText(string $text): self
+    {
+        return $this->awaitOrThrow(
+            $this->configuration->timeouts->default,
+            fn (): bool => str_contains($this->visibleText(), $text),
+            "Timed out waiting to see \"{$text}\".",
+        );
+    }
+
+    public function waitUntilMissing(string $text): self
+    {
+        return $this->awaitOrThrow(
+            $this->configuration->timeouts->default,
+            fn (): bool => ! str_contains($this->visibleText(), $text),
+            "Timed out waiting for \"{$text}\" to disappear.",
+        );
+    }
+
+    public function waitForLocation(string $path): self
+    {
+        return $this->awaitOrThrow(
+            $this->configuration->timeouts->navigation,
+            fn (): bool => $this->currentPath() === $path,
+            "Timed out waiting for the path to become \"{$path}\".",
+        );
+    }
+
+    public function waitForUrl(string $url): self
+    {
+        $expected = $this->configuration->resolveUrl($url);
+
+        return $this->awaitOrThrow(
+            $this->configuration->timeouts->navigation,
+            fn (): bool => $this->currentUrl() === $expected,
+            "Timed out waiting for the URL to become \"{$expected}\".",
+        );
+    }
+
+    // ── Queries ─────────────────────────────────────────────────────────────
 
     public function currentUrl(): string
     {
@@ -146,37 +199,36 @@ final readonly class Browser
         return $this->driver->title();
     }
 
+    // ── Assertions (retry until they pass or the timeout elapses) ───────────
+
     public function assertSee(string $text): self
     {
-        Assert::assertStringContainsString(
-            $text,
-            $this->visibleText(),
-            "Expected to see \"{$text}\" on the page.",
-        );
+        $this->retry(fn (): bool => str_contains($this->visibleText(), $text));
+        Assert::assertStringContainsString($text, $this->visibleText(), "Expected to see \"{$text}\" on the page.");
 
         return $this;
     }
 
     public function assertDontSee(string $text): self
     {
-        Assert::assertStringNotContainsString(
-            $text,
-            $this->visibleText(),
-            "Did not expect to see \"{$text}\" on the page.",
-        );
+        $this->retry(fn (): bool => ! str_contains($this->visibleText(), $text));
+        Assert::assertStringNotContainsString($text, $this->visibleText(), "Did not expect to see \"{$text}\" on the page.");
 
         return $this;
     }
 
     public function assertUrlIs(string $url): self
     {
-        Assert::assertSame($this->configuration->resolveUrl($url), $this->currentUrl());
+        $expected = $this->configuration->resolveUrl($url);
+        $this->retry(fn (): bool => $this->currentUrl() === $expected);
+        Assert::assertSame($expected, $this->currentUrl());
 
         return $this;
     }
 
     public function assertPathIs(string $path): self
     {
+        $this->retry(fn (): bool => $this->currentPath() === $path);
         Assert::assertSame($path, $this->currentPath());
 
         return $this;
@@ -184,6 +236,7 @@ final readonly class Browser
 
     public function assertTitleIs(string $title): self
     {
+        $this->retry(fn (): bool => $this->title() === $title);
         Assert::assertSame($title, $this->title());
 
         return $this;
@@ -191,6 +244,7 @@ final readonly class Browser
 
     public function assertValue(string $field, string $expected): self
     {
+        $this->retry(fn (): bool => $this->value($field) === $expected);
         Assert::assertSame($expected, $this->value($field), "Field \"{$field}\" had an unexpected value.");
 
         return $this;
@@ -198,31 +252,77 @@ final readonly class Browser
 
     public function assertVisible(string $target): self
     {
-        Assert::assertTrue($this->isVisible($target), "Expected \"{$target}\" to be visible.");
+        $this->retry(fn (): bool => $this->isVisibleNow($target));
+        Assert::assertTrue($this->isVisibleNow($target), "Expected \"{$target}\" to be visible.");
 
         return $this;
     }
 
     public function assertMissing(string $target): self
     {
-        Assert::assertFalse($this->isVisible($target), "Expected \"{$target}\" to be missing or hidden.");
+        $this->retry(fn (): bool => ! $this->isVisibleNow($target));
+        Assert::assertFalse($this->isVisibleNow($target), "Expected \"{$target}\" to be missing or hidden.");
 
         return $this;
     }
 
     public function assertTextNear(string $near, string $text): self
     {
-        $found = $this->driver->evaluateScript($this->textNearScript($near, $text));
-        Assert::assertTrue($found === true, "Expected to see \"{$text}\" near \"{$near}\".");
+        $script = $this->textNearScript($near, $text);
+        $this->retry(fn (): bool => $this->driver->evaluateScript($script) === true);
+        Assert::assertTrue(
+            $this->driver->evaluateScript($script) === true,
+            "Expected to see \"{$text}\" near \"{$near}\".",
+        );
 
         return $this;
     }
 
-    private function isVisible(string $target): bool
+    // ── Internals ───────────────────────────────────────────────────────────
+
+    private function actionable(string $target): ElementReference
+    {
+        $element = $this->resolveWaiting($target);
+        $this->wait(
+            $this->configuration->timeouts->default,
+            fn (): bool => $this->driver->callFunctionOn(
+                $element,
+                'function(){ const r = this.getBoundingClientRect(); const s = getComputedStyle(this);'
+                .' return !this.disabled && !!(r.width || r.height)'
+                .' && s.visibility !== "hidden" && s.display !== "none"; }',
+            ) === true,
+        );
+
+        return $element;
+    }
+
+    private function resolveWaiting(string $target): ElementReference
+    {
+        $element = null;
+        $this->wait($this->configuration->timeouts->default, function () use ($target, &$element): bool {
+            $element = $this->resolveNow($target);
+
+            return $element instanceof ElementReference;
+        });
+
+        // On timeout, resolve once more so the rich ElementNotFoundException (with
+        // its attempt list) surfaces instead of a bare null.
+        return $element ?? $this->resolver->resolve($target);
+    }
+
+    private function resolveNow(string $target): ?ElementReference
     {
         try {
-            $element = $this->resolver->resolve($target);
+            return $this->resolver->resolve($target);
         } catch (ElementNotFoundException) {
+            return null;
+        }
+    }
+
+    private function isVisibleNow(string $target): bool
+    {
+        $element = $this->resolveNow($target);
+        if (! $element instanceof ElementReference) {
             return false;
         }
 
@@ -231,6 +331,34 @@ final readonly class Browser
             'function(){ const r = this.getBoundingClientRect(); const s = getComputedStyle(this);'
             .' return !!(r.width || r.height) && s.visibility !== "hidden" && s.display !== "none"; }',
         ) === true;
+    }
+
+    /**
+     * @param  callable(): bool  $condition
+     */
+    private function retry(callable $condition): void
+    {
+        $this->wait($this->configuration->timeouts->assertion, $condition);
+    }
+
+    /**
+     * @param  callable(): bool  $condition
+     */
+    private function awaitOrThrow(int $timeoutMs, callable $condition, string $message): self
+    {
+        if (! $this->wait($timeoutMs, $condition)) {
+            throw new TimeoutException($message);
+        }
+
+        return $this;
+    }
+
+    /**
+     * @param  callable(): bool  $condition
+     */
+    private function wait(int $timeoutMs, callable $condition): bool
+    {
+        return new Waiter($timeoutMs)->until($condition);
     }
 
     private function textNearScript(string $near, string $text): string
