@@ -30,7 +30,7 @@ holds:
 ->waitForText('Loaded')
 ->waitUntilMissing('Loading…')
 ->waitForUrl('/dashboard')      // resolved against base_url
-->waitForLocation('/dashboard') // path only
+->waitForPath('/dashboard')     // path only
 ```
 
 ## Timeouts
@@ -41,7 +41,7 @@ Timeouts are configured in milliseconds and default to:
 | --- | --- | --- |
 | `default` | 5000 | actions and element resolution |
 | `assertion` | 5000 | assertion retries |
-| `navigation` | 15000 | `waitForUrl` / `waitForLocation` |
+| `navigation` | 15000 | `waitForUrl` / `waitForPath` |
 
 Override them via config (see [Configuration](configuration.md)):
 
