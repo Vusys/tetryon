@@ -40,6 +40,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   trace, browser stderr, and the viewport into a per-test artifact directory
   (`tests/Browser/Artifacts` by default), and prints a report pointing at
   them. Good errors are the product.
+- **First-class logging.** The BiDi layer logs every command/response/event to
+  an optional PSR-3 logger and records a structured command trace. Set
+  `TETRYON_DEBUG` to stream the log to stderr (via the bundled `StreamLogger`),
+  override `browserLogger()` to plug in your own, and read `$browser->trace()`
+  to inspect what the browser did.
 - **`tetryon doctor` CLI.** `vendor/bin/tetryon doctor` runs preflight checks
   — PHP, required extensions, Firefox, a real headless launch + BiDi handshake,
   and a writable artifact directory — and prints a report with fix hints,
