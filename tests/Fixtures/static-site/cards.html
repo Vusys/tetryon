@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Cards</title>
+</head>
+<body>
+    <div data-testid="card-ada">
+        <h3>Ada Lovelace</h3>
+        <button
+            data-testid="edit"
+            onclick="document.querySelector('[data-testid=out]').textContent = 'editing ada'"
+        >Edit</button>
+    </div>
+
+    <div data-testid="card-alan">
+        <h3>Alan Turing</h3>
+        <button
+            data-testid="edit"
+            onclick="document.querySelector('[data-testid=out]').textContent = 'editing alan'"
+        >Edit</button>
+    </div>
+
+    <div data-testid="out"></div>
+</body>
+</html>

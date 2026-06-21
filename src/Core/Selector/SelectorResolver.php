@@ -22,15 +22,24 @@ final readonly class SelectorResolver
         private NodeLocator $nodeLocator,
         private SelectorStrategy $strategy = new SelectorStrategy,
         ?array $testAttributes = null,
+        private ?ElementReference $root = null,
     ) {
         $this->testAttributes = $testAttributes ?? ['data-testid', 'data-test', 'data-cy'];
+    }
+
+    /**
+     * A copy of this resolver scoped to the descendants of the given element.
+     */
+    public function within(ElementReference $root): self
+    {
+        return new self($this->nodeLocator, $this->strategy, $this->testAttributes, $root);
     }
 
     public function resolve(string $target): ElementReference
     {
         $attempts = [];
         foreach ($this->strategy->candidates($target, $this->testAttributes) as $candidate) {
-            $matches = $this->nodeLocator->locateAll($candidate);
+            $matches = $this->nodeLocator->locateAll($candidate, $this->root);
             $attempts[] = new ResolutionAttempt($candidate->description, count($matches));
 
             $picked = $this->preferControl($matches);

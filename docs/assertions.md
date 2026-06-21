@@ -57,6 +57,23 @@ $assertHeader = static fn (Browser $b) => $b->assertVisible('Logo')->assertSee('
 $this->browser()->visit('/')->tap($assertHeader);
 ```
 
+## Scoping with `within()`
+
+`within('@container', fn ($b) => …)` scopes both element resolution **and**
+text assertions to inside one element — so identical elements in sibling
+components are disambiguated. The outer chain continues unscoped after the
+callback returns.
+
+```php
+$this->browser()
+    ->visit('/users')
+    ->within('@user-card-42', function (Browser $browser) {
+        // 'Edit' and 'Ada' are resolved/asserted only inside this card,
+        // even if other cards contain the same text.
+        $browser->assertSee('Ada')->press('Edit');
+    });
+```
+
 ## Example
 
 ```php

@@ -13,6 +13,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`Browser::within($target, $callback)`** — run a callback against a browser
+  scoped to inside a container element, so element resolution *and* text
+  assertions only match within it (sibling components with identical text are
+  disambiguated). Backed by BiDi `startNodes`; the selector engine's generated
+  XPath is now relative (`.//`) so it scopes correctly and still matches
+  document-wide when unscoped.
 - **Compatibility & supported-surface docs** (`docs/compatibility.md`):
   supported PHP/PHPUnit/Firefox/OS, the public API vs internals, and the
   pre-1.0 versioning policy.

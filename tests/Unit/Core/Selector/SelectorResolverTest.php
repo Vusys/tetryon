@@ -49,6 +49,27 @@ final class SelectorResolverTest extends TestCase
         }
     }
 
+    public function test_within_passes_the_root_to_the_locator(): void
+    {
+        $recorder = new class implements NodeLocator
+        {
+            public ?ElementReference $within = null;
+
+            public function locateAll(Locator $locator, ?ElementReference $within = null): array
+            {
+                $this->within = $within;
+
+                return [new ElementReference('child')];
+            }
+        };
+        $root = new ElementReference('container');
+
+        $element = new SelectorResolver($recorder)->within($root)->resolve('anything');
+
+        self::assertSame('child', $element->sharedId);
+        self::assertSame($root, $recorder->within);
+    }
+
     /**
      * A NodeLocator that returns the given nodes only for the named strategy.
      *
@@ -66,7 +87,7 @@ final class SelectorResolverTest extends TestCase
                 private array $nodes,
             ) {}
 
-            public function locateAll(Locator $locator): array
+            public function locateAll(Locator $locator, ?ElementReference $within = null): array
             {
                 return $locator->description === $this->description ? $this->nodes : [];
             }

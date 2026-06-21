@@ -77,7 +77,7 @@ final class SelectorStrategyTest extends TestCase
         $link = $this->byDescription('Say "hi"', 'link text');
 
         // With a double quote in the target, the XPath literal switches to single quotes.
-        self::assertSame('//a[normalize-space()=\'Say "hi"\']', $link->bidi['value']);
+        self::assertSame('.//a[normalize-space()=\'Say "hi"\']', $link->bidi['value']);
     }
 
     /**
