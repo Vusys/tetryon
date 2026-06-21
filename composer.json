@@ -3,6 +3,9 @@
     "description": "PHP-native browser testing for PHPUnit. Firefox-first, WebDriver BiDi, no Node, no Selenium, no ChromeDriver.",
     "type": "library",
     "license": "MIT",
+    "bin": [
+        "bin/tetryon"
+    ],
     "keywords": [
         "phpunit",
         "browser-testing",
