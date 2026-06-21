@@ -44,7 +44,8 @@ final class FirefoxBiDiDriverSmokeTest extends TestCase
 
     public function test_it_drives_a_real_firefox_end_to_end(): void
     {
-        $base = $this->server?->baseUrl ?? self::fail('Static-site server did not start.');
+        $server = $this->server ?? self::fail('Static-site server did not start.');
+        $base = $server->baseUrl;
 
         $this->driver = new FirefoxBiDiDriver(new LaunchOptions(headless: true));
         $this->driver->start();
