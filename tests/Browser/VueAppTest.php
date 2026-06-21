@@ -4,48 +4,13 @@ declare(strict_types=1);
 
 namespace Vusys\Tetryon\Tests\Browser;
 
-use Override;
-use Vusys\Tetryon\Core\Config\Configuration;
-use Vusys\Tetryon\Firefox\Exception\FirefoxBinaryNotFoundException;
-use Vusys\Tetryon\Firefox\FirefoxBinary;
-use Vusys\Tetryon\PHPUnit\BrowserTestCase;
-use Vusys\Tetryon\Tests\Support\StaticSiteServer;
-
 /**
  * Drives a real Vue 3 single-page app (served as static files, no build step)
  * to prove Tetryon handles client-side rendering — reactive updates, async
- * data, form validation, and client-side view switching — with no manual waits.
+ * data, and form validation — with no manual waits.
  */
-final class VueAppTest extends BrowserTestCase
+final class VueAppTest extends StaticSiteTestCase
 {
-    private ?StaticSiteServer $server = null;
-
-    #[Override]
-    protected function setUp(): void
-    {
-        try {
-            new FirefoxBinary()->locate(getenv('TETRYON_FIREFOX_BINARY') ?: null);
-        } catch (FirefoxBinaryNotFoundException) {
-            self::markTestSkipped('Firefox is not installed; skipping Vue app test.');
-        }
-
-        $this->server = StaticSiteServer::start(__DIR__.'/../Fixtures/static-site');
-    }
-
-    #[Override]
-    protected function tearDown(): void
-    {
-        $this->server?->stop();
-    }
-
-    #[Override]
-    protected function browserConfiguration(): Configuration
-    {
-        $baseUrl = $this->server instanceof StaticSiteServer ? $this->server->baseUrl : 'http://127.0.0.1:8000';
-
-        return new Configuration(baseUrl: $baseUrl);
-    }
-
     public function test_reactivity_async_and_form_validation(): void
     {
         $this->browser()

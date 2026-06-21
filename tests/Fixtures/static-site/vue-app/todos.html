@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Tetryon Vue Todos</title>
+</head>
+<body>
+    <div id="app">
+        <form @submit.prevent="add">
+            <label for="todo">New todo</label>
+            <input id="todo" data-testid="new-todo" v-model="draft">
+            <button data-testid="add" type="submit" :disabled="draft.trim() === ''">Add</button>
+        </form>
+
+        <ul data-testid="list">
+            <li v-for="(todo, i) in todos" :key="i" :data-testid="'todo-' + i">
+                <input type="checkbox" v-model="todo.done" :data-testid="'done-' + i">
+                <span :style="{ textDecoration: todo.done ? 'line-through' : 'none' }">{{ todo.text }}</span>
+                <button @click="remove(i)" :data-testid="'remove-' + i">Remove</button>
+            </li>
+        </ul>
+
+        <p data-testid="remaining">{{ remaining }} remaining</p>
+    </div>
+
+    <script src="vue.global.prod.js"></script>
+    <script src="todos.js"></script>
+</body>
+</html>
