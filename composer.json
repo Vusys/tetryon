@@ -37,6 +37,7 @@
     "require-dev": {
         "infection/infection": "^0.29 || ^0.33",
         "laravel/pint": "^1.18",
+        "orchestra/testbench": "^9.0 || ^10.0",
         "phpstan/phpstan": "^2.0",
         "phpunit/phpunit": "^12.0 || ^13.0",
         "rector/rector": "^2.0"
@@ -50,6 +51,16 @@
         "psr-4": {
             "Vusys\\Tetryon\\Tests\\": "tests/"
         }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Vusys\\Tetryon\\Laravel\\TetryonServiceProvider"
+            ]
+        }
+    },
+    "suggest": {
+        "laravel/framework": "For the Laravel integration: service provider, config publishing, tetryon:* artisan commands, and Laravel\\BrowserTestCase."
     },
     "minimum-stability": "stable",
     "prefer-stable": true,
