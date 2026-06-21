@@ -12,6 +12,7 @@ use Vusys\Tetryon\Core\Selector\SelectorResolver;
 use Vusys\Tetryon\Core\Selector\SelectorStrategy;
 use Vusys\Tetryon\Core\Support\TimeoutException;
 use Vusys\Tetryon\Core\Support\Waiter;
+use Vusys\Tetryon\Firefox\Bidi\BiDiTrace;
 use Vusys\Tetryon\Firefox\FirefoxBiDiDriver;
 
 /**
@@ -240,6 +241,15 @@ final readonly class Browser
     public function title(): string
     {
         return $this->driver->title();
+    }
+
+    /**
+     * The recent BiDi command trace — useful for debugging or asserting on what
+     * the browser actually did.
+     */
+    public function trace(): BiDiTrace
+    {
+        return $this->driver->trace();
     }
 
     // ── Assertions (retry until they pass or the timeout elapses) ───────────

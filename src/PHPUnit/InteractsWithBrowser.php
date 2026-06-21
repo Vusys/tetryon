@@ -6,7 +6,10 @@ namespace Vusys\Tetryon\PHPUnit;
 
 use PHPUnit\Framework\Attributes\After;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use Vusys\Tetryon\Core\Config\Configuration;
+use Vusys\Tetryon\Core\Support\StreamLogger;
 use Vusys\Tetryon\Firefox\FirefoxBiDiDriver;
 use Vusys\Tetryon\Firefox\LaunchOptions;
 
@@ -36,10 +39,10 @@ trait InteractsWithBrowser
         }
 
         $configuration = $this->tetryonConfiguration = $this->browserConfiguration();
-        $this->tetryonDriver = new FirefoxBiDiDriver(new LaunchOptions(
-            headless: $configuration->headless,
-            binary: $configuration->firefoxBinary,
-        ));
+        $this->tetryonDriver = new FirefoxBiDiDriver(
+            new LaunchOptions(headless: $configuration->headless, binary: $configuration->firefoxBinary),
+            $this->browserLogger(),
+        );
         $this->tetryonDriver->start();
 
         return $this->tetryonBrowser = new Browser($this->tetryonDriver, $configuration);
@@ -48,6 +51,19 @@ trait InteractsWithBrowser
     protected function browserConfiguration(): Configuration
     {
         return Configuration::fromEnvironment();
+    }
+
+    /**
+     * The PSR-3 logger the browser logs BiDi traffic to. Silent by default;
+     * set TETRYON_DEBUG to stream the command log to stderr, or override.
+     */
+    protected function browserLogger(): LoggerInterface
+    {
+        $debug = getenv('TETRYON_DEBUG');
+
+        return in_array($debug, [false, '', '0'], true)
+            ? new NullLogger
+            : new StreamLogger(STDERR);
     }
 
     #[After]
