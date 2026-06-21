@@ -10,10 +10,10 @@ It is **Firefox-first** and **PHPUnit-first**. You run your app however you
 like; Tetryon drives the browser.
 
 > [!NOTE]
-> **Status: pre-1.0, no tagged release yet.** The API below ships and is
-> exercised against real Firefox on Linux and macOS in CI — including a real
-> Vue 3 single-page app — but it may still change before 1.0. Follow the
-> [milestones](https://github.com/Vusys/tetryon/milestones).
+> **Status: 0.1.0 — beta, pre-1.0.** The API below ships and is exercised
+> against real Firefox on Linux and macOS in CI — including a real Vue 3
+> single-page app — but it may still change before 1.0. See
+> [compatibility](docs/compatibility.md).
 
 ## The test you want to write
 

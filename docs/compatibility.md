@@ -1,8 +1,8 @@
 # Compatibility & supported surface
 
-Tetryon is **beta** and **pre-1.0**: there is no tagged release yet, and the
-public API may still change before 1.0 (changes are called out in the
-[changelog](../CHANGELOG.md)). The supported surface is deliberately narrow.
+Tetryon is **beta** and **pre-1.0** (current release: 0.1.0): the public API may
+still change before 1.0, and changes are called out in the
+[changelog](../CHANGELOG.md). The supported surface is deliberately narrow.
 
 ## Supported
 
