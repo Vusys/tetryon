@@ -85,6 +85,19 @@ final readonly class Browser
         return $this->click($button);
     }
 
+    /**
+     * Run a callback with this browser, then continue the chain. Handy for
+     * grouping assertions or extracting reusable, named assertion helpers.
+     *
+     * @param  callable(self): void  $callback
+     */
+    public function tap(callable $callback): self
+    {
+        $callback($this);
+
+        return $this;
+    }
+
     public function doubleClick(string $target): self
     {
         $this->driver->doubleClickElement($this->actionable($target));

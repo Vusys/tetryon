@@ -36,6 +36,27 @@ PHPUnit failure, and a flaky-by-timing assertion just waits.
 ->assertValue('Email', 'bryan@example.com');
 ```
 
+## Grouping with `tap()`
+
+`tap()` hands your callback the browser and returns it, so you can group related
+assertions or extract reusable, named helpers without breaking the chain:
+
+```php
+$this->browser()
+    ->visit('/dashboard')
+    ->tap(function (Browser $browser) {
+        $browser->assertSee('Revenue')
+            ->assertVisible('Export')
+            ->assertDontSee('Error');
+    })
+    ->press('Refresh');
+
+// reuse a named assertion block:
+$assertHeader = static fn (Browser $b) => $b->assertVisible('Logo')->assertSee('Welcome');
+
+$this->browser()->visit('/')->tap($assertHeader);
+```
+
 ## Example
 
 ```php
