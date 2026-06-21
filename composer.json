@@ -30,7 +30,7 @@
         "ext-json": "*"
     },
     "require-dev": {
-        "infection/infection": "^0.29",
+        "infection/infection": "^0.29 || ^0.33",
         "laravel/pint": "^1.18",
         "phpstan/phpstan": "^2.0",
         "phpunit/phpunit": "^12.0 || ^13.0",
