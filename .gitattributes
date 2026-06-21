@@ -1,0 +1,19 @@
+# Keep the published Composer archive lean: dev-only paths are excluded from
+# `composer require` downloads (they stay in the git repo).
+/tests            export-ignore
+/docs             export-ignore
+/.github          export-ignore
+/.gitattributes   export-ignore
+/.gitignore       export-ignore
+/.editorconfig    export-ignore
+/.coderabbit.yaml export-ignore
+/phpunit.xml      export-ignore
+/phpstan.neon     export-ignore
+/rector.php       export-ignore
+/infection.json5  export-ignore
+/CLAUDE.md        export-ignore
+/start.md         export-ignore
+/CONTRIBUTING.md  export-ignore
+
+# Treat the vendored Vue build as a binary blob in diffs.
+/tests/Fixtures/static-site/vue-app/vue.global.prod.js -diff

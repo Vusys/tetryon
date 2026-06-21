@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Tetryon Vue App</title>
+</head>
+<body>
+    <div id="app">
+        <nav>
+            <button data-testid="nav-home" @click="view = 'home'">Home</button>
+            <button data-testid="nav-about" @click="view = 'about'">About</button>
+        </nav>
+
+        <section v-if="view === 'home'" data-testid="home-view">
+            <h1>Home</h1>
+
+            <button data-testid="increment" @click="count++">Increment</button>
+            <p v-if="count > 0" data-testid="count">Clicked {{ count }} times</p>
+
+            <button data-testid="load" @click="loadUsers">Load users</button>
+            <ul data-testid="users">
+                <li v-for="user in users" :key="user">{{ user }}</li>
+            </ul>
+
+            <form @submit.prevent="signUp">
+                <label for="email">Email</label>
+                <input id="email" data-testid="email" v-model="email">
+                <p v-if="emailError" data-testid="email-error">{{ emailError }}</p>
+                <button data-testid="signup" type="submit">Sign up</button>
+            </form>
+            <p v-if="welcome" data-testid="welcome">{{ welcome }}</p>
+        </section>
+
+        <section v-else data-testid="about-view">
+            <h1>About</h1>
+            <p>About this app — a tiny Vue SPA for Tetryon.</p>
+        </section>
+    </div>
+
+    <script src="vue.global.prod.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
