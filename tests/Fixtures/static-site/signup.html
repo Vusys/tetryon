@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Sign up</title>
+</head>
+<body>
+    <h1 id="banner">Create your account</h1>
+
+    <label for="email">Email</label>
+    <input id="email" data-testid="email">
+
+    <label><input type="checkbox" id="remember"> Remember me</label>
+
+    <label for="country">Country</label>
+    <select id="country">
+        <option value="">--</option>
+        <option value="uk">United Kingdom</option>
+        <option value="us">United States</option>
+    </select>
+
+    <p>Status: <strong>Active</strong></p>
+
+    <div id="secret" style="display:none">hidden text</div>
+
+    <button
+        data-testid="submit"
+        onclick="document.querySelector('[data-testid=out]').textContent =
+            'email=' + document.getElementById('email').value +
+            ';remember=' + document.getElementById('remember').checked +
+            ';country=' + document.getElementById('country').value"
+    >Submit</button>
+
+    <div data-testid="out"></div>
+</body>
+</html>

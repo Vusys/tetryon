@@ -172,6 +172,35 @@ final class FirefoxBiDiDriver implements NodeLocator
         return RemoteValue::toPhp($result['result'] ?? null);
     }
 
+    /**
+     * Call a JS function with the element bound as `this`, returning its value.
+     *
+     * @param  string  ...$arguments  string arguments forwarded to the function
+     */
+    public function callFunctionOn(ElementReference $element, string $functionDeclaration, string ...$arguments): mixed
+    {
+        $localValues = array_map(
+            static fn (string $argument): array => ['type' => 'string', 'value' => $argument],
+            $arguments,
+        );
+
+        $result = $this->connection()->send('script.callFunction', [
+            'functionDeclaration' => $functionDeclaration,
+            'this' => ['sharedId' => $element->sharedId],
+            'arguments' => array_values($localValues),
+            'target' => ['context' => $this->context()],
+            'awaitPromise' => true,
+        ]);
+
+        if (($result['type'] ?? null) === 'exception') {
+            throw new BiDiException('Element function threw: '.$this->exceptionText($result));
+        }
+
+        $this->collectConsole();
+
+        return RemoteValue::toPhp($result['result'] ?? null);
+    }
+
     public function currentUrl(): string
     {
         $url = $this->evaluateScript('window.location.href');
