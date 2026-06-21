@@ -19,6 +19,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   event buffering, a structured command trace, and PSR-3 logging. The
   `FirefoxBiDiDriver` exposes navigate / evaluate JS / screenshot / console
   capture. Proven end-to-end against real Firefox in an opt-in Browser suite
-  plus a Firefox CI workflow.
+  plus a Firefox CI workflow (Linux + macOS).
+- **PHPUnit browser API (v0.2).** `BrowserTestCase` + `InteractsWithBrowser`
+  trait expose a fluent `$this->browser()`: navigation (`visit`/`back`/
+  `forward`/`refresh`), a human-readable selector engine (test attributes →
+  label → accessible name → placeholder → button/link text → name → id →
+  visible text, with `@`/css/xpath escape hatches), interaction
+  (`click`/`press`/`fill`/`type`/`clear`/`select`/`check`/`uncheck`/`value`),
+  and assertions (`assertSee`/`assertDontSee`/`assertUrlIs`/`assertPathIs`/
+  `assertTitleIs`/`assertValue`/`assertVisible`/`assertMissing`/
+  `assertTextNear`). Configured via `Configuration` (env or array).
 
 [Unreleased]: https://github.com/Vusys/tetryon/commits/master
