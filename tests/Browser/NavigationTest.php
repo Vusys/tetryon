@@ -35,6 +35,7 @@ final class NavigationTest extends BrowserTestCase
         $this->server?->stop();
     }
 
+    #[\Override]
     protected function browserConfiguration(): Configuration
     {
         $baseUrl = $this->server instanceof StaticSiteServer ? $this->server->baseUrl : 'http://127.0.0.1:8000';

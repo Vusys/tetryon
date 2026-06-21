@@ -74,12 +74,12 @@ final class ConfigurationTest extends TestCase
             self::assertSame('http://localhost:1234', $config->baseUrl);
             self::assertFalse($config->headless);
         } finally {
-            self::restoreEnv('TETRYON_BASE_URL', $originalUrl);
-            self::restoreEnv('TETRYON_HEADLESS', $originalHeadless);
+            $this->restoreEnv('TETRYON_BASE_URL', $originalUrl);
+            $this->restoreEnv('TETRYON_HEADLESS', $originalHeadless);
         }
     }
 
-    private static function restoreEnv(string $key, string|false $original): void
+    private function restoreEnv(string $key, string|false $original): void
     {
         if ($original === false) {
             putenv($key);
