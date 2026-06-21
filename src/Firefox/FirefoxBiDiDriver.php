@@ -69,6 +69,25 @@ final class FirefoxBiDiDriver
         $this->collectConsole();
     }
 
+    public function reload(): void
+    {
+        $this->connection()->send('browsingContext.reload', [
+            'context' => $this->context(),
+            'wait' => 'complete',
+        ]);
+        $this->collectConsole();
+    }
+
+    public function traverseHistory(int $delta): void
+    {
+        $this->connection()->send('browsingContext.traverseHistory', [
+            'context' => $this->context(),
+            'delta' => $delta,
+        ]);
+        $this->awaitDocumentReady();
+        $this->collectConsole();
+    }
+
     public function locate(string $css): ElementReference
     {
         $result = $this->connection()->send('browsingContext.locateNodes', [
@@ -187,6 +206,19 @@ final class FirefoxBiDiDriver
             $this->socket = null;
             $this->bidi = null;
             $this->context = null;
+        }
+    }
+
+    private function awaitDocumentReady(): void
+    {
+        // browsingContext.traverseHistory does not wait for the load, so settle
+        // briefly on readyState. A full actionable-wait arrives with auto-wait.
+        $deadline = microtime(true) + 3.0;
+        while (microtime(true) < $deadline) {
+            if ($this->evaluateScript('document.readyState') === 'complete') {
+                return;
+            }
+            usleep(20_000);
         }
     }
 
