@@ -27,7 +27,8 @@
     },
     "require": {
         "php": "^8.4",
-        "ext-json": "*"
+        "ext-json": "*",
+        "psr/log": "^3.0"
     },
     "require-dev": {
         "infection/infection": "^0.29 || ^0.33",
