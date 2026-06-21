@@ -11,7 +11,7 @@ permissions:
 jobs:
   firefox:
     runs-on: ${{ matrix.os }}
-    name: "Firefox / ${{ matrix.os }} / PHP ${{ matrix.php }}"
+    name: "Firefox / ${{ matrix.os }} / PHP ${{ matrix.php }} / PHPUnit ${{ matrix.phpunit }}"
     # A github-actions Dependabot bump changes no PHP and no test, so the
     # browser matrix is irrelevant — actionlint (in tests.yml) covers it.
     if: ${{ !startsWith(github.head_ref, 'dependabot/github_actions/') }}
@@ -19,13 +19,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Linux on both supported PHP versions; one macOS cell to prove the
-        # macOS launch path (Firefox app-bundle locator, BiDi connect). macOS
-        # minutes bill ~10x, so keep it to a single representative cell.
+        # Linux on both supported PHP versions, and the browser suite on both
+        # PHPUnit 12 and 13. One macOS cell proves the macOS launch path
+        # (Firefox app-bundle locator, BiDi connect); macOS minutes bill ~10x
+        # so it stays a single representative cell.
         include:
-          - { os: ubuntu-latest, php: '8.4' }
-          - { os: ubuntu-latest, php: '8.5' }
-          - { os: macos-latest, php: '8.4' }
+          - { os: ubuntu-latest, php: '8.4', phpunit: '13.0' }
+          - { os: ubuntu-latest, php: '8.5', phpunit: '13.0' }
+          - { os: ubuntu-latest, php: '8.4', phpunit: '12.0' }
+          - { os: macos-latest, php: '8.4', phpunit: '13.0' }
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -45,6 +47,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: composer config --global --auth github-oauth.github.com "$GH_TOKEN"
+
+      # Pin the matrix PHPUnit version. Infection caps PHPUnit at ^12 on its
+      # 0.29 line, so drop it (the browser suite doesn't need it) before pinning.
+      - name: Pin PHPUnit version
+        run: |
+          composer remove --dev --no-update infection/infection
+          composer require --dev --no-update "phpunit/phpunit:^${{ matrix.phpunit }}"
 
       - name: Install dependencies
         run: composer update --prefer-dist --no-interaction --no-progress
