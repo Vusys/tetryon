@@ -36,6 +36,7 @@
     },
     "require-dev": {
         "infection/infection": "^0.29 || ^0.33",
+        "larastan/larastan": "^3.0",
         "laravel/pint": "^1.18",
         "orchestra/testbench": "^9.0 || ^10.0",
         "phpstan/phpstan": "^2.0",

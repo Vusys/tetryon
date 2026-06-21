@@ -63,12 +63,12 @@ jobs:
       # The test job only runs PHPUnit, so strip the dev-only tools before
       # pinning the matrix PHPUnit version. Infection 0.29 caps PHPUnit at
       # ^12 (its sebastian/diff pin collides with PHPUnit 13), which would
-      # otherwise make the PHPUnit 13 cells unresolvable. Pint, PHPStan and
-      # Rector aren't needed to run tests either — they get exercised in the
-      # static-analysis job against the unpinned composer.json.
+      # otherwise make the PHPUnit 13 cells unresolvable. Pint, PHPStan,
+      # Rector and Larastan (which requires PHPStan) aren't needed to run
+      # tests — they run in the static-analysis job against composer.json.
       - name: Pin matrix versions
         run: |
-          composer remove --dev --no-update infection/infection laravel/pint phpstan/phpstan rector/rector
+          composer remove --dev --no-update infection/infection larastan/larastan laravel/pint phpstan/phpstan rector/rector
           composer require --dev --no-update "phpunit/phpunit:^${{ matrix.phpunit }}"
 
       - name: Install dependencies
