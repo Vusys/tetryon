@@ -6,6 +6,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-06-22
+
+First tagged release. Beta and pre-1.0 — the public API may still change before
+1.0 (see [`docs/compatibility.md`](docs/compatibility.md)). Browser testing with
+PHPUnit 12/13 and Firefox on Linux and macOS, over WebDriver BiDi, with a
+first-class Laravel integration.
+
 ### Changed
 
 - Renamed `Browser::waitForLocation()` to `waitForPath()`, for consistency with
@@ -76,4 +83,5 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and a writable artifact directory — and prints a report with fix hints,
   exiting non-zero if anything is wrong.
 
-[Unreleased]: https://github.com/Vusys/tetryon/commits/master
+[Unreleased]: https://github.com/Vusys/tetryon/compare/v0.1.0...master
+[0.1.0]: https://github.com/Vusys/tetryon/releases/tag/v0.1.0
