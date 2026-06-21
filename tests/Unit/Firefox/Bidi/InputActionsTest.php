@@ -53,4 +53,40 @@ final class InputActionsTest extends TestCase
     {
         self::assertSame([], InputActions::typeText('')['actions']);
     }
+
+    public function test_double_click_issues_two_press_release_pairs(): void
+    {
+        $actions = InputActions::doubleClickElement('abc')['actions'];
+
+        $types = array_map(static fn (array $action): mixed => $action['type'], $actions);
+        self::assertSame(
+            ['pointerMove', 'pointerDown', 'pointerUp', 'pointerDown', 'pointerUp'],
+            $types,
+        );
+    }
+
+    public function test_right_click_uses_the_secondary_button(): void
+    {
+        $actions = InputActions::contextClickElement('abc')['actions'];
+
+        self::assertSame('pointerDown', $actions[1]['type']);
+        self::assertSame(2, $actions[1]['button']);
+        self::assertSame(2, $actions[2]['button']);
+    }
+
+    public function test_hover_only_moves(): void
+    {
+        $actions = InputActions::hoverElement('abc')['actions'];
+
+        self::assertCount(1, $actions);
+        self::assertSame('pointerMove', $actions[0]['type']);
+    }
+
+    public function test_press_keys_emits_keydown_and_keyup_per_key(): void
+    {
+        self::assertSame([
+            ['type' => 'keyDown', 'value' => "\u{E007}"],
+            ['type' => 'keyUp', 'value' => "\u{E007}"],
+        ], InputActions::pressKeys(["\u{E007}"])['actions']);
+    }
 }

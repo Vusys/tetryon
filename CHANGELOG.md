@@ -25,7 +25,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `forward`/`refresh`), a human-readable selector engine (test attributes →
   label → accessible name → placeholder → button/link text → name → id →
   visible text, with `@`/css/xpath escape hatches), interaction
-  (`click`/`press`/`fill`/`type`/`clear`/`select`/`check`/`uncheck`/`value`),
+  (`click`/`press`/`doubleClick`/`rightClick`/`hover`/`fill`/`type`/`clear`/
+  `select`/`check`/`uncheck`/`choose`/`upload`/`pressKey`/`value`),
   and assertions (`assertSee`/`assertDontSee`/`assertUrlIs`/`assertPathIs`/
   `assertTitleIs`/`assertValue`/`assertVisible`/`assertMissing`/
   `assertTextNear`). Configured via `Configuration` (env or array).

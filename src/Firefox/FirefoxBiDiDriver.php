@@ -14,6 +14,7 @@ use Vusys\Tetryon\Core\Selector\NodeLocator;
 use Vusys\Tetryon\Firefox\Bidi\BiDiConnection;
 use Vusys\Tetryon\Firefox\Bidi\BiDiTrace;
 use Vusys\Tetryon\Firefox\Bidi\InputActions;
+use Vusys\Tetryon\Firefox\Bidi\Keys;
 use Vusys\Tetryon\Firefox\Bidi\RemoteValue;
 use Vusys\Tetryon\Firefox\Bidi\WebSocketClient;
 use Vusys\Tetryon\Firefox\Exception\BiDiException;
@@ -130,19 +131,42 @@ final class FirefoxBiDiDriver implements NodeLocator
 
     public function clickElement(ElementReference $element): void
     {
-        $this->connection()->send('input.performActions', [
-            'context' => $this->context(),
-            'actions' => [InputActions::clickElement($element->sharedId)],
-        ]);
-        $this->collectConsole();
+        $this->performActions(InputActions::clickElement($element->sharedId));
+    }
+
+    public function doubleClickElement(ElementReference $element): void
+    {
+        $this->performActions(InputActions::doubleClickElement($element->sharedId));
+    }
+
+    public function rightClickElement(ElementReference $element): void
+    {
+        $this->performActions(InputActions::contextClickElement($element->sharedId));
+    }
+
+    public function hoverElement(ElementReference $element): void
+    {
+        $this->performActions(InputActions::hoverElement($element->sharedId));
     }
 
     public function typeInto(ElementReference $element, string $text): void
     {
         $this->clickElement($element); // focus the field first
-        $this->connection()->send('input.performActions', [
+        $this->performActions(InputActions::typeText($text));
+    }
+
+    public function pressKeys(string ...$keys): void
+    {
+        $values = array_map(Keys::resolve(...), $keys);
+        $this->performActions(InputActions::pressKeys(array_values($values)));
+    }
+
+    public function setFiles(ElementReference $element, string ...$paths): void
+    {
+        $this->connection()->send('input.setFiles', [
             'context' => $this->context(),
-            'actions' => [InputActions::typeText($text)],
+            'element' => ['sharedId' => $element->sharedId],
+            'files' => array_values($paths),
         ]);
         $this->collectConsole();
     }
@@ -155,6 +179,18 @@ final class FirefoxBiDiDriver implements NodeLocator
     public function type(string $css, string $text): void
     {
         $this->typeInto($this->locate($css), $text);
+    }
+
+    /**
+     * @param  array{type: string, id: string, actions: list<array<string, mixed>>}  $source
+     */
+    private function performActions(array $source): void
+    {
+        $this->connection()->send('input.performActions', [
+            'context' => $this->context(),
+            'actions' => [$source],
+        ]);
+        $this->collectConsole();
     }
 
     public function evaluateScript(string $expression): mixed
