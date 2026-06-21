@@ -12,7 +12,10 @@ namespace Vusys\Tetryon\Core\Selector;
 interface NodeLocator
 {
     /**
+     * Run one locator and return every matching node, optionally scoped to the
+     * descendants of `$within`.
+     *
      * @return list<ElementReference>
      */
-    public function locateAll(Locator $locator): array;
+    public function locateAll(Locator $locator, ?ElementReference $within = null): array;
 }

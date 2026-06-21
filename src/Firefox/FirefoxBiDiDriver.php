@@ -95,12 +95,17 @@ final class FirefoxBiDiDriver implements NodeLocator
     /**
      * @return list<ElementReference>
      */
-    public function locateAll(Locator $locator): array
+    public function locateAll(Locator $locator, ?ElementReference $within = null): array
     {
-        $result = $this->connection()->send('browsingContext.locateNodes', [
+        $params = [
             'context' => $this->context(),
             'locator' => $locator->bidi,
-        ]);
+        ];
+        if ($within instanceof ElementReference) {
+            $params['startNodes'] = [['sharedId' => $within->sharedId]];
+        }
+
+        $result = $this->connection()->send('browsingContext.locateNodes', $params);
 
         $nodes = $result['nodes'] ?? null;
         if (! is_array($nodes)) {

@@ -33,8 +33,10 @@ final readonly class Browser
     public function __construct(
         private FirefoxBiDiDriver $driver,
         private Configuration $configuration,
+        ?SelectorResolver $resolver = null,
+        private ?ElementReference $scope = null,
     ) {
-        $this->resolver = new SelectorResolver(
+        $this->resolver = $resolver ?? new SelectorResolver(
             $driver,
             new SelectorStrategy,
             $configuration->selectorTestAttributes,
@@ -94,6 +96,21 @@ final readonly class Browser
     public function tap(callable $callback): self
     {
         $callback($this);
+
+        return $this;
+    }
+
+    /**
+     * Run a callback against a browser scoped to inside a container element, so
+     * its selectors only resolve within that element. The outer chain continues
+     * unscoped.
+     *
+     * @param  callable(self): void  $callback
+     */
+    public function within(string $target, callable $callback): self
+    {
+        $container = $this->resolveWaiting($target);
+        $callback(new self($this->driver, $this->configuration, $this->resolver->within($container), $container));
 
         return $this;
     }
@@ -481,7 +498,9 @@ final readonly class Browser
 
     private function visibleText(): string
     {
-        $text = $this->driver->evaluateScript('document.body ? document.body.innerText : ""');
+        $text = $this->scope instanceof ElementReference
+            ? $this->driver->callFunctionOn($this->scope, 'function(){ return this.innerText; }')
+            : $this->driver->evaluateScript('document.body ? document.body.innerText : ""');
 
         return is_string($text) ? $text : '';
     }

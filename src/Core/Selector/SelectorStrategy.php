@@ -36,14 +36,14 @@ final class SelectorStrategy
         $candidates[] = Locator::accessibleName($target);
         $candidates[] = Locator::css('placeholder', '[placeholder='.$css.']');
         $candidates[] = Locator::xpath('button text', $this->buttonExpression($xpath));
-        $candidates[] = Locator::xpath('link text', '//a[normalize-space()='.$xpath.']');
+        $candidates[] = Locator::xpath('link text', './/a[normalize-space()='.$xpath.']');
         $candidates[] = Locator::css('name', '[name='.$css.']');
 
         if (preg_match('/^[A-Za-z][\w-]*$/', $target) === 1) {
             $candidates[] = Locator::css('id', '#'.$target);
         }
 
-        $candidates[] = Locator::xpath('visible text', '//*[normalize-space(text())='.$xpath.']');
+        $candidates[] = Locator::xpath('visible text', './/*[normalize-space(text())='.$xpath.']');
 
         return $candidates;
     }
@@ -70,18 +70,23 @@ final class SelectorStrategy
         return null;
     }
 
+    /**
+     * Relative (`.//`) so the expression scopes under a `within()` container and
+     * still matches document-wide when unscoped. The inner `//label` is a lookup
+     * for the label's `for` attribute, not the matched node.
+     */
     private function labelExpression(string $xpath): string
     {
-        return "//label[normalize-space()={$xpath}]//input"
-            ." | //label[normalize-space()={$xpath}]//textarea"
-            ." | //label[normalize-space()={$xpath}]//select"
-            ." | //*[@id=//label[normalize-space()={$xpath}]/@for]";
+        return ".//label[normalize-space()={$xpath}]//input"
+            ." | .//label[normalize-space()={$xpath}]//textarea"
+            ." | .//label[normalize-space()={$xpath}]//select"
+            ." | .//*[@id=//label[normalize-space()={$xpath}]/@for]";
     }
 
     private function buttonExpression(string $xpath): string
     {
-        return "//button[normalize-space()={$xpath}]"
-            ." | //input[(@type='submit' or @type='button' or @type='reset') and @value={$xpath}]";
+        return ".//button[normalize-space()={$xpath}]"
+            ." | .//input[(@type='submit' or @type='button' or @type='reset') and @value={$xpath}]";
     }
 
     private function cssString(string $value): string
