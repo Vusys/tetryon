@@ -48,6 +48,11 @@ trait InteractsWithBrowser
         return $this->tetryonBrowser = new Browser($this->tetryonDriver, $configuration);
     }
 
+    protected function scenario(): Scenario
+    {
+        return new Scenario($this->browser());
+    }
+
     protected function browserConfiguration(): Configuration
     {
         return Configuration::fromEnvironment();

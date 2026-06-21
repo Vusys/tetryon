@@ -18,6 +18,7 @@ Node, Selenium, ChromeDriver, or Dusk-style setup.
 - [Selectors](selectors.md) — how a human target ("Email", "Save") resolves to
   an element, and the explicit escape hatches.
 - [Interactions](interactions.md) — navigation, clicking, typing, forms.
+- [Natural-language steps](natural-language.md) — `->step()` and `->scenario()`.
 - [Waiting](waiting.md) — auto-waiting, explicit waits, timeouts.
 - [Assertions](assertions.md) — the `assert*` methods.
 - [Configuration](configuration.md) — base URL, timeouts, viewport, artifacts.
