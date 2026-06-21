@@ -75,6 +75,20 @@ day one:
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`CLAUDE.md`](CLAUDE.md).
 
+## Documentation
+
+Full docs live in [`docs/`](docs/README.md):
+[installation](docs/installation.md) ·
+[writing tests](docs/writing-tests.md) ·
+[selectors](docs/selectors.md) ·
+[interactions](docs/interactions.md) ·
+[waiting](docs/waiting.md) ·
+[assertions](docs/assertions.md) ·
+[configuration](docs/configuration.md) ·
+[diagnostics](docs/diagnostics.md) ·
+[CI](docs/ci.md) ·
+[troubleshooting](docs/troubleshooting.md).
+
 ## Roadmap
 
 | Milestone | Theme |
