@@ -40,5 +40,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   trace, browser stderr, and the viewport into a per-test artifact directory
   (`tests/Browser/Artifacts` by default), and prints a report pointing at
   them. Good errors are the product.
+- **`tetryon doctor` CLI.** `vendor/bin/tetryon doctor` runs preflight checks
+  — PHP, required extensions, Firefox, a real headless launch + BiDi handshake,
+  and a writable artifact directory — and prints a report with fix hints,
+  exiting non-zero if anything is wrong.
 
 [Unreleased]: https://github.com/Vusys/tetryon/commits/master

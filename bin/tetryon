@@ -1,0 +1,23 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use Vusys\Tetryon\Console\Application;
+
+$autoload = null;
+foreach ([__DIR__.'/../vendor/autoload.php', __DIR__.'/../../../autoload.php'] as $candidate) {
+    if (is_file($candidate)) {
+        $autoload = $candidate;
+        break;
+    }
+}
+
+if ($autoload === null) {
+    fwrite(STDERR, "Tetryon: could not locate the Composer autoloader. Run `composer install`.\n");
+    exit(1);
+}
+
+require $autoload;
+
+exit(new Application()->run($argv));
