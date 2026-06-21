@@ -1,0 +1,46 @@
+name: Mutation testing
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  infection:
+    runs-on: ubuntu-latest
+    name: Infection
+    # A github-actions Dependabot bump changes no PHP, so mutation testing is
+    # irrelevant — actionlint (in tests.yml) covers it.
+    if: ${{ !startsWith(github.head_ref, 'dependabot/github_actions/') }}
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          # Infection's git-diff annotations need history beyond the tip commit.
+          fetch-depth: 0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring
+          coverage: pcov
+          tools: composer:v2
+
+      - name: Configure Composer authentication
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: composer config --global --auth github-oauth.github.com "$GH_TOKEN"
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-interaction --no-progress
+
+      # Thresholds live in infection.json5 (minMsi / minCoveredMsi). They start
+      # at 0 so this reports the baseline without failing; ratchet them up once
+      # a measured number is in hand. Infection runs the default (Unit) suite —
+      # the browser-driven code is integration-tested, not mutated here.
+      - name: Run Infection
+        run: vendor/bin/infection --threads=max --no-progress --logger-github
