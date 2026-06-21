@@ -6,7 +6,7 @@ code in this repository.
 ## What this package is
 
 `vusys/tetryon` — a PHP-native browser testing package for PHPUnit. Firefox-first
-and PHPUnit-first. Targets **PHP 8.3+** and **PHPUnit 12 / 13**. Library code
+and PHPUnit-first. Targets **PHP 8.4+** and **PHPUnit 12 / 13**. Library code
 only. Pre-1.0, so backwards-compat breaks are acceptable when called out.
 
 The mantra: **PHPUnit. Firefox. WebDriver BiDi. Composer install. Useful errors.

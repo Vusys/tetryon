@@ -70,7 +70,7 @@ day one:
 - **Laravel Pint** for code style.
 - **Rector** (dry-run gate in CI).
 - **Infection** mutation testing.
-- **CI matrix** across PHP 8.3 / 8.4 / 8.5 and PHPUnit 12 / 13.
+- **CI matrix** across PHP 8.4 / 8.5 and PHPUnit 12 / 13.
 - **OpenSSF Scorecard**, Dependabot, and pinned-SHA GitHub Actions.
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`CLAUDE.md`](CLAUDE.md).

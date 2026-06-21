@@ -28,7 +28,7 @@ reviews:
   path_instructions:
     - path: 'src/**'
       instructions: |
-        PHP 8.3+ browser-testing library for PHPUnit. CI runs PHPStan
+        PHP 8.4+ browser-testing library for PHPUnit. CI runs PHPStan
         level 9, Pint, and Rector — assume all three pass before review.
         Inline @phpstan-ignore comments and PHPStan baseline entries are
         explicitly disallowed (see CLAUDE.md); flag any that creep in.
@@ -47,7 +47,7 @@ reviews:
         ignore-comments.
     - path: '.github/workflows/**'
       instructions: |
-        Static-analysis + Unit matrix (PHP 8.3/8.4/8.5 × PHPUnit 12/13).
+        Static-analysis + Unit matrix (PHP 8.4/8.5 × PHPUnit 12/13).
         Browser tests run in a separate Firefox-provisioned workflow.
         Actions are pinned to commit SHAs on purpose — keep them pinned.
 

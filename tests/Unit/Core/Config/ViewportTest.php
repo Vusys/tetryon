@@ -30,7 +30,7 @@ final class ViewportTest extends TestCase
 
     public function test_it_computes_aspect_ratio(): void
     {
-        self::assertEqualsWithDelta(16 / 9, (new Viewport(1280, 720))->aspectRatio(), 0.0001);
+        self::assertEqualsWithDelta(16 / 9, new Viewport(1280, 720)->aspectRatio(), 0.0001);
     }
 
     public function test_it_rejects_non_positive_dimensions(): void
