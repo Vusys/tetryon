@@ -32,6 +32,37 @@ use Vusys\Tetryon\Firefox\NetworkRecord;
  */
 final readonly class Browser
 {
+    /**
+     * Injected actionability probe. Scrolls the element into view, rejects
+     * invisible / transparent / pointer-event-deaf elements, waits for the
+     * bounding box to be stable across one animation frame (covering opacity,
+     * transform and size transitions, not just opacity), then hit-tests the
+     * click point so an overlay painted on top makes the action wait rather
+     * than land on the wrong element. Returns `ok` or a short failure reason.
+     */
+    private const string ACTIONABLE_JS = <<<'JS'
+        async function () {
+          this.scrollIntoView({ block: 'center', inline: 'center' });
+          const s = getComputedStyle(this);
+          if (this.disabled) return 'disabled';
+          if (s.display === 'none' || s.visibility === 'hidden') return 'hidden';
+          if (parseFloat(s.opacity) === 0) return 'transparent';
+          if (s.pointerEvents === 'none') return 'no-pointer-events';
+          const a = this.getBoundingClientRect();
+          if (!(a.width || a.height)) return 'zero-size';
+          const b = await new Promise(res => requestAnimationFrame(() => res(this.getBoundingClientRect())));
+          if (a.x !== b.x || a.y !== b.y || a.width !== b.width || a.height !== b.height) return 'unstable';
+          const hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+          if (!hit) return 'off-screen';
+          if (hit === this || this.contains(hit) || hit.contains(this)) return 'ok';
+          if (hit.id) return 'occluded:#' + hit.id;
+          if (typeof hit.className === 'string' && hit.className.trim()) {
+            return 'occluded:.' + hit.className.trim().split(/\s+/).join('.');
+          }
+          return 'occluded:' + hit.tagName.toLowerCase();
+        }
+        JS;
+
     private SelectorResolver $resolver;
 
     public function __construct(
@@ -726,18 +757,32 @@ final readonly class Browser
 
     // ── Internals ───────────────────────────────────────────────────────────
 
+    /**
+     * Waits until the element is "actionable" in the Playwright sense: visible,
+     * layout-stable (not mid-transition), and actually receiving pointer events
+     * at its click point (nothing painted on top). Returns the element once the
+     * injected check reports `ok`; on timeout it throws naming the last reason
+     * (e.g. `occluded:.modal-backdrop`, `unstable`, `transparent`) so a
+     * swallowed click surfaces as a useful error instead of a silent no-op.
+     */
     private function actionable(string $target, bool $preferInteractive = false): ElementReference
     {
         $element = $this->resolveWaiting($target, $preferInteractive);
-        $this->wait(
+
+        $reason = 'unknown';
+        $ok = $this->wait(
             $this->configuration->timeouts->default,
-            fn (): bool => $this->driver->callFunctionOn(
-                $element,
-                'function(){ const r = this.getBoundingClientRect(); const s = getComputedStyle(this);'
-                .' return !this.disabled && !!(r.width || r.height)'
-                .' && s.visibility !== "hidden" && s.display !== "none"; }',
-            ) === true,
+            function () use ($element, &$reason): bool {
+                $result = $this->driver->callFunctionOn($element, self::ACTIONABLE_JS);
+                $reason = is_string($result) ? $result : 'unknown';
+
+                return $reason === 'ok';
+            },
         );
+
+        if (! $ok) {
+            throw new TimeoutException("Timed out waiting for \"{$target}\" to become actionable ({$reason}).");
+        }
 
         return $element;
     }

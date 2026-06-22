@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Actionability — pointer-events</title>
+</head>
+<body>
+    <!-- The target ignores pointer events until ~300ms after "Enable" is
+         pressed. A click must wait for it to start receiving events. -->
+    <button data-testid="enable" onclick="
+        setTimeout(function () { document.getElementById('target').style.pointerEvents = 'auto'; }, 300);
+    ">Enable</button>
+
+    <button
+        data-testid="target"
+        id="target"
+        style="pointer-events: none"
+        onclick="document.getElementById('result').textContent = 'clicked'"
+    >Target</button>
+
+    <div data-testid="result" id="result"></div>
+</body>
+</html>

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Actionability — occluded</title>
+    <style>
+        #cover {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <!-- The target is permanently covered by #cover, so it never receives the
+         click. The action should time out naming the interceptor. -->
+    <button
+        data-testid="target"
+        onclick="document.getElementById('result').textContent = 'clicked'"
+    >Target</button>
+
+    <div id="cover"></div>
+    <div data-testid="result" id="result"></div>
+</body>
+</html>

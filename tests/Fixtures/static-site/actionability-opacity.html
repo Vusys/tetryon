@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Actionability — opacity</title>
+</head>
+<body>
+    <!-- The target itself starts fully transparent, then becomes opaque ~300ms
+         after "Reveal" is pressed. A click must wait out the transparent phase. -->
+    <button data-testid="reveal" onclick="
+        setTimeout(function () { document.getElementById('target').style.opacity = '1'; }, 300);
+    ">Reveal</button>
+
+    <button
+        data-testid="target"
+        id="target"
+        style="opacity: 0"
+        onclick="document.getElementById('result').textContent = 'clicked'"
+    >Target</button>
+
+    <div data-testid="result" id="result"></div>
+</body>
+</html>

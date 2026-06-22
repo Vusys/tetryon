@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Actionability — transform</title>
+    <style>
+        #panel {
+            transform: translateY(-40px);
+            transition: transform 300ms linear;
+        }
+        #panel.open { transform: translateY(0); }
+    </style>
+</head>
+<body>
+    <button data-testid="open" onclick="document.getElementById('panel').classList.add('open')">Open</button>
+
+    <div id="panel">
+        <button
+            data-testid="pick"
+            onclick="
+                var t = getComputedStyle(document.getElementById('panel')).transform;
+                var settled = (t === 'none' || t === 'matrix(1, 0, 0, 1, 0, 0)');
+                document.getElementById('result').textContent = settled ? 'settled' : 'sliding';
+            "
+        >Pick</button>
+    </div>
+
+    <div data-testid="result" id="result"></div>
+</body>
+</html>
