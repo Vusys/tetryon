@@ -160,6 +160,35 @@ final class FirefoxBiDiDriver implements NodeLocator
         $this->performActions(InputActions::typeText($text));
     }
 
+    /**
+     * Press on the source element's centre, drag to the target element's centre
+     * over $steps intermediate moves, and release.
+     */
+    public function dragElement(ElementReference $source, ElementReference $target, int $steps = 10): void
+    {
+        [$sx, $sy] = $this->elementCentre($source);
+        [$tx, $ty] = $this->elementCentre($target);
+        $this->performActions(InputActions::pointerDrag($this->dragPath($sx, $sy, $tx, $ty, $steps)));
+    }
+
+    /**
+     * Drag the source element to absolute viewport coordinates.
+     */
+    public function dragElementTo(ElementReference $source, int $x, int $y, int $steps = 10): void
+    {
+        [$sx, $sy] = $this->elementCentre($source);
+        $this->performActions(InputActions::pointerDrag($this->dragPath($sx, $sy, $x, $y, $steps)));
+    }
+
+    /**
+     * Drag the source element by a pixel offset from its centre.
+     */
+    public function dragElementBy(ElementReference $source, int $dx, int $dy, int $steps = 10): void
+    {
+        [$sx, $sy] = $this->elementCentre($source);
+        $this->performActions(InputActions::pointerDrag($this->dragPath($sx, $sy, $sx + $dx, $sy + $dy, $steps)));
+    }
+
     public function pressKeys(string ...$keys): void
     {
         $values = array_map(Keys::resolve(...), $keys);
@@ -395,6 +424,45 @@ final class FirefoxBiDiDriver implements NodeLocator
             $this->bidi = null;
             $this->context = null;
         }
+    }
+
+    /**
+     * @return array{0: int, 1: int} the element's viewport-centre x, y
+     */
+    private function elementCentre(ElementReference $element): array
+    {
+        $json = $this->callFunctionOn(
+            $element,
+            'function(){ const r = this.getBoundingClientRect();'
+            .' return JSON.stringify({ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }); }',
+        );
+
+        $point = is_string($json) ? json_decode($json, true) : null;
+        $x = is_array($point) && is_int($point['x'] ?? null) ? $point['x'] : 0;
+        $y = is_array($point) && is_int($point['y'] ?? null) ? $point['y'] : 0;
+
+        return [$x, $y];
+    }
+
+    /**
+     * A straight path of $steps interpolated points from a start to an end point,
+     * inclusive of both — the intermediate moves a pointer-drag needs.
+     *
+     * @return list<array{x: int, y: int}>
+     */
+    private function dragPath(int $sx, int $sy, int $ex, int $ey, int $steps): array
+    {
+        $steps = max(1, $steps);
+        $path = [['x' => $sx, 'y' => $sy]];
+
+        for ($i = 1; $i <= $steps; $i++) {
+            $path[] = [
+                'x' => (int) round($sx + ($ex - $sx) * $i / $steps),
+                'y' => (int) round($sy + ($ey - $sy) * $i / $steps),
+            ];
+        }
+
+        return $path;
     }
 
     private function awaitDocumentReady(): void

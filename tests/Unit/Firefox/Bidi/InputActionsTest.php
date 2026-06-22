@@ -82,6 +82,26 @@ final class InputActionsTest extends TestCase
         self::assertSame('pointerMove', $actions[0]['type']);
     }
 
+    public function test_pointer_drag_presses_moves_through_the_path_and_releases(): void
+    {
+        $source = InputActions::pointerDrag([
+            ['x' => 10, 'y' => 20],
+            ['x' => 15, 'y' => 25],
+            ['x' => 30, 'y' => 40],
+        ]);
+
+        self::assertSame('pointer', $source['type']);
+
+        $actions = $source['actions'];
+        $types = array_map(static fn (array $action): mixed => $action['type'], $actions);
+        self::assertSame(['pointerMove', 'pointerDown', 'pointerMove', 'pointerMove', 'pointerUp'], $types);
+
+        self::assertSame(['type' => 'pointerMove', 'x' => 10, 'y' => 20, 'origin' => 'viewport'], $actions[0]);
+        self::assertSame(0, $actions[1]['button']);
+        self::assertSame(['type' => 'pointerMove', 'x' => 30, 'y' => 40, 'origin' => 'viewport'], $actions[3]);
+        self::assertSame('pointerUp', $actions[4]['type']);
+    }
+
     public function test_press_keys_emits_keydown_and_keyup_per_key(): void
     {
         self::assertSame([

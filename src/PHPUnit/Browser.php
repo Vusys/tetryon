@@ -146,6 +146,55 @@ final readonly class Browser
         return $this;
     }
 
+    /**
+     * Drag the source element onto the target, with intermediate pointer moves so
+     * pointer-drag libraries (Sortable.js, vuedraggable, …) register the gesture.
+     * Targets pointer-based DnD, not HTML5 `draggable` drag events.
+     */
+    public function drag(string $source, string $target): self
+    {
+        $this->driver->dragElement($this->actionable($source), $this->resolveWaiting($target));
+
+        return $this;
+    }
+
+    /**
+     * Drag the source element to absolute viewport coordinates.
+     */
+    public function dragTo(string $source, int $x, int $y): self
+    {
+        $this->driver->dragElementTo($this->actionable($source), $x, $y);
+
+        return $this;
+    }
+
+    public function dragUp(string $source, int $pixels): self
+    {
+        return $this->dragBy($source, 0, -$pixels);
+    }
+
+    public function dragDown(string $source, int $pixels): self
+    {
+        return $this->dragBy($source, 0, $pixels);
+    }
+
+    public function dragLeft(string $source, int $pixels): self
+    {
+        return $this->dragBy($source, -$pixels, 0);
+    }
+
+    public function dragRight(string $source, int $pixels): self
+    {
+        return $this->dragBy($source, $pixels, 0);
+    }
+
+    private function dragBy(string $source, int $dx, int $dy): self
+    {
+        $this->driver->dragElementBy($this->actionable($source), $dx, $dy);
+
+        return $this;
+    }
+
     public function choose(string $field, string $value): self
     {
         $this->driver->clickElement($this->actionable($this->radioSelector($field, $value)));

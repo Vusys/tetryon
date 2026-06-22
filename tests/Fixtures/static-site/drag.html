@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Drag and drop</title>
+    <style>
+        #handle { width: 100px; height: 100px; background: #cde; }
+        #zone   { width: 160px; height: 160px; background: #efe; margin-top: 60px; }
+    </style>
+</head>
+<body>
+    <div data-testid="handle" id="handle">Drag me</div>
+    <div data-testid="zone" id="zone">Drop zone</div>
+    <div data-testid="result"></div>
+
+    <!-- Minimal pointer-drag recogniser (the same primitives Sortable.js relies
+         on): press, several moves to cross a threshold, release over the zone.
+         Synthetic BiDi pointer input dispatches mouse events. -->
+    <script>
+        var handle = document.getElementById('handle');
+        var zone = document.getElementById('zone');
+        var result = document.querySelector('[data-testid=result]');
+        var dragging = false;
+        var moves = 0;
+
+        handle.addEventListener('mousedown', function () { dragging = true; moves = 0; });
+        document.addEventListener('mousemove', function () { if (dragging) { moves++; } });
+        document.addEventListener('mouseup', function (event) {
+            if (!dragging) { return; }
+            dragging = false;
+            var over = document.elementFromPoint(event.clientX, event.clientY);
+            if (zone.contains(over) && moves >= 3) {
+                result.textContent = 'dropped after ' + moves + ' moves';
+            }
+        });
+    </script>
+</body>
+</html>
