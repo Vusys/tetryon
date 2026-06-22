@@ -75,6 +75,28 @@ For the rare case a custom base class needs the driver primitives directly,
 `InteractsWithBrowser` exposes a `protected driver(): FirefoxBiDiDriver`
 accessor (it boots the browser if it hasn't started) — no reflection needed.
 
+### Waiting on and asserting page state
+
+`evaluate()` is a one-shot read; these add the **wait** and **assert**
+counterparts with the same auto-wait/retry contract as the DOM assertions —
+for state the page knows but doesn't render as text (store readiness, a derived
+total, a chart library's dataset):
+
+```php
+$this->browser()
+    ->waitForExpression('window.store.state.status === "loaded"')  // poll until truthy
+    ->assertExpression('window.chart.data.datasets[0].data.length === 12')
+    ->assertExpressionEquals('window.store.getters.total', 1999);  // diffs expected vs actual
+```
+
+A probe only reaches what's reachable from the page's global scope: anything
+DOM-derived and any library on `window` work as-is, but deeply-bundled framework
+internals (a Vue component's private state, a chart instance not on `window`)
+need the app to opt in by exposing them — e.g. `window.__appState__ = …`.
+Tetryon provides the probe; deciding what internal state to expose is the app's
+call. This covers "is the **data** right"; pixel-level visual correctness is out
+of scope for a DOM/JS tool.
+
 ## Cookies
 
 Seed the cookie state a test depends on — feature flags, locale, consent
