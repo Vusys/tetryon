@@ -8,6 +8,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **JavaScript state probes** (#82): `waitForExpression()`, `assertExpression()`,
+  and `assertExpressionEquals()` — the auto-wait/retry wait-and-assert layer on
+  top of `evaluate()`, for page state the DOM doesn't render as text (store
+  readiness, derived totals, a chart library's data).
 - **Cookie API on `Browser`** — `setCookie()`, `cookie()`, `deleteCookie()`,
   `clearCookies()`. Backed by WebDriver BiDi storage (not `document.cookie`), so
   HttpOnly cookies work and a cookie set before the first `visit()` is carried

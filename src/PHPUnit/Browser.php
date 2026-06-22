@@ -328,6 +328,20 @@ final readonly class Browser
         );
     }
 
+    /**
+     * Poll a JavaScript expression until it evaluates truthy — for page state
+     * the DOM doesn't render as text (store readiness, a derived flag, a chart
+     * library's data). Built on {@see evaluate()}; promises are awaited.
+     */
+    public function waitForExpression(string $expression, ?int $timeoutMs = null): self
+    {
+        return $this->awaitOrThrow(
+            $timeoutMs ?? $this->configuration->timeouts->default,
+            fn (): bool => (bool) $this->evaluate($expression),
+            "Timed out waiting for the expression to become truthy: {$expression}",
+        );
+    }
+
     // ── Queries ─────────────────────────────────────────────────────────────
 
     public function currentUrl(): string
@@ -445,6 +459,40 @@ final readonly class Browser
         Assert::assertTrue(
             $this->driver->evaluateScript($script) === true,
             "Expected to see \"{$text}\" near \"{$near}\".",
+        );
+
+        return $this;
+    }
+
+    // ── JavaScript state probes (retry until they pass) ─────────────────────
+
+    /**
+     * Assert that a JavaScript expression evaluates truthy, retrying until it
+     * does or the timeout elapses — the auto-wait counterpart to {@see evaluate()}
+     * for state the DOM doesn't render as text.
+     */
+    public function assertExpression(string $expression, string $message = ''): self
+    {
+        $this->retry(fn (): bool => (bool) $this->evaluate($expression));
+        Assert::assertTrue(
+            (bool) $this->evaluate($expression),
+            $message !== '' ? $message : "Expected this expression to be truthy: {$expression}",
+        );
+
+        return $this;
+    }
+
+    /**
+     * Assert that a JavaScript expression equals an expected (serialisable)
+     * value, retrying until it matches — so a failure shows expected-vs-actual.
+     */
+    public function assertExpressionEquals(string $expression, mixed $expected, string $message = ''): self
+    {
+        $this->retry(fn (): bool => $this->evaluate($expression) == $expected);
+        Assert::assertEquals(
+            $expected,
+            $this->evaluate($expression),
+            $message !== '' ? $message : "Expression did not equal the expected value: {$expression}",
         );
 
         return $this;
