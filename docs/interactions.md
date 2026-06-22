@@ -46,12 +46,18 @@ character is sent literally.
 ## Forms
 
 ```php
-->select('Country', 'uk')      // <select>: matches the option value
-->check('Remember me')         // checkbox: ensures it is checked
+->select('Country', 'United Kingdom') // <select>: matches the option label or value
+->selectByValue('Country', 'uk')      // match the option value only
+->check('Remember me')                // checkbox: ensures it is checked
 ->uncheck('Remember me')
-->choose('plan', 'pro')        // radio group by name + value
+->choose('plan', 'pro')               // radio group by name + value
 ->upload('Avatar', __DIR__.'/fixtures/avatar.png');
 ```
+
+`select()` matches an option by its **visible label or its value** — handy when
+values are opaque ids. Use `selectByValue()` to match the value only. Either
+throws `OptionNotFoundException` if no option matches, rather than silently
+selecting nothing.
 
 These verbs drive **native** form controls. If one resolves an element it can't
 drive — `fill()` on a `<div contenteditable>`, `select()` on a custom dropdown

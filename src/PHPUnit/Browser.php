@@ -11,6 +11,7 @@ use Vusys\Tetryon\Core\NaturalLanguage\UnknownStepException;
 use Vusys\Tetryon\Core\Selector\ElementInfo;
 use Vusys\Tetryon\Core\Selector\ElementNotFoundException;
 use Vusys\Tetryon\Core\Selector\ElementReference;
+use Vusys\Tetryon\Core\Selector\OptionNotFoundException;
 use Vusys\Tetryon\Core\Selector\SelectorResolver;
 use Vusys\Tetryon\Core\Selector\SelectorStrategy;
 use Vusys\Tetryon\Core\Selector\UndrivableElementException;
@@ -186,15 +187,20 @@ final readonly class Browser
         return $this;
     }
 
+    /**
+     * Choose a `<select>` option by its visible label or its value (label is the
+     * common case when values are opaque ids). Use {@see selectByValue()} to
+     * match the value only. Throws {@see OptionNotFoundException} if no option
+     * matches.
+     */
     public function select(string $field, string $value): self
     {
-        $this->driver->callFunctionOn(
-            $this->drivable('select', $field, 'select'),
-            'function(v){ this.value = v; this.dispatchEvent(new Event("change", { bubbles: true })); }',
-            $value,
-        );
+        return $this->selectOption($field, $value, byValueOnly: false);
+    }
 
-        return $this;
+    public function selectByValue(string $field, string $value): self
+    {
+        return $this->selectOption($field, $value, byValueOnly: true);
     }
 
     public function check(string $field): self
@@ -415,6 +421,26 @@ final readonly class Browser
         );
 
         return $element;
+    }
+
+    private function selectOption(string $field, string $value, bool $byValueOnly): self
+    {
+        $matched = $this->driver->callFunctionOn(
+            $this->drivable('select', $field, 'select'),
+            'function(v, byValue){'
+            .' for (const o of this.options) {'
+            .'  if (o.value === v || (byValue !== "1" && o.text.trim() === v)) {'
+            .'   this.value = o.value; this.dispatchEvent(new Event("change", { bubbles: true })); return true; } }'
+            .' return false; }',
+            $value,
+            $byValueOnly ? '1' : '0',
+        );
+
+        if ($matched !== true) {
+            throw OptionNotFoundException::for($field, $value, $byValueOnly);
+        }
+
+        return $this;
     }
 
     /**
