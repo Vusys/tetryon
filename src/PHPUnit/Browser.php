@@ -162,8 +162,8 @@ final readonly class Browser
 
     public function fill(string $field, string $value): self
     {
-        $element = $this->drivable('fill', $field, 'value');
-        $this->driver->callFunctionOn($element, 'function(){ this.value = ""; }');
+        [$element, $info] = $this->textControl('fill', $field);
+        $this->driver->callFunctionOn($element, $this->clearTextScript($info));
         $this->driver->typeInto($element, $value);
 
         return $this;
@@ -171,17 +171,16 @@ final readonly class Browser
 
     public function type(string $field, string $value): self
     {
-        $this->driver->typeInto($this->drivable('type', $field, 'value'), $value);
+        [$element] = $this->textControl('type', $field);
+        $this->driver->typeInto($element, $value);
 
         return $this;
     }
 
     public function clear(string $field): self
     {
-        $this->driver->callFunctionOn(
-            $this->drivable('clear', $field, 'value'),
-            'function(){ this.value = ""; this.dispatchEvent(new Event("input", { bubbles: true })); }',
-        );
+        [$element, $info] = $this->textControl('clear', $field);
+        $this->driver->callFunctionOn($element, $this->clearTextScript($info));
 
         return $this;
     }
@@ -218,7 +217,10 @@ final readonly class Browser
 
     public function value(string $field): string
     {
-        $value = $this->driver->callFunctionOn($this->resolveWaiting($field), 'function(){ return this.value; }');
+        $value = $this->driver->callFunctionOn(
+            $this->resolveWaiting($field),
+            'function(){ return this.isContentEditable ? this.textContent : this.value; }',
+        );
 
         return is_string($value) ? $value : '';
     }
@@ -665,11 +667,40 @@ final readonly class Browser
     }
 
     /**
+     * Resolve an actionable element for a text verb (`fill`/`type`/`clear`) and
+     * verify it has settable text — an `<input>`/`<textarea>` value, or a
+     * `contenteditable` element (#80). Throws otherwise (#77).
+     *
+     * @return array{0: ElementReference, 1: ElementInfo}
+     */
+    private function textControl(string $verb, string $field): array
+    {
+        $element = $this->actionable($field);
+        $info = $this->elementInfo($element);
+
+        $hasValue = $info->tag === 'textarea'
+            || ($info->tag === 'input' && ! in_array($info->type, ['checkbox', 'radio', 'file', 'submit', 'button', 'reset', 'image'], true));
+
+        if (! $hasValue && ! $info->editable) {
+            throw UndrivableElementException::for($verb, $field, $info->describe(), 'value');
+        }
+
+        return [$element, $info];
+    }
+
+    private function clearTextScript(ElementInfo $info): string
+    {
+        return $info->editable
+            ? 'function(){ this.textContent = ""; this.dispatchEvent(new Event("input", { bubbles: true })); }'
+            : 'function(){ this.value = ""; this.dispatchEvent(new Event("input", { bubbles: true })); }';
+    }
+
+    /**
      * Resolve an actionable element for a form verb and verify it is a control
      * the verb can actually drive, throwing {@see UndrivableElementException}
      * otherwise rather than silently no-opping (#77).
      *
-     * @param  'value'|'select'|'checkable'  $kind
+     * @param  'select'|'checkable'  $kind
      */
     private function drivable(string $verb, string $field, string $kind): ElementReference
     {
@@ -677,8 +708,6 @@ final readonly class Browser
 
         $info = $this->elementInfo($element);
         $accepted = match ($kind) {
-            'value' => $info->tag === 'textarea'
-                || ($info->tag === 'input' && ! in_array($info->type, ['checkbox', 'radio', 'file', 'submit', 'button', 'reset', 'image'], true)),
             'select' => $info->tag === 'select',
             'checkable' => $info->tag === 'input' && in_array($info->type, ['checkbox', 'radio'], true),
         };
