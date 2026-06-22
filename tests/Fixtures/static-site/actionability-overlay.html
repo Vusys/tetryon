@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Actionability — overlay</title>
+    <style>
+        #backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <!-- A backdrop covers the whole viewport (and the target). It is removed
+         ~300ms after "Open" is pressed, mimicking a modal-backdrop fading out.
+         A click on the target must wait until the backdrop clears instead of
+         landing on it and silently no-opping. -->
+    <button data-testid="open" onclick="
+        var b = document.createElement('div');
+        b.id = 'backdrop';
+        document.body.appendChild(b);
+        setTimeout(function () { b.remove(); }, 300);
+    ">Open</button>
+
+    <button
+        data-testid="save"
+        onclick="document.getElementById('result').textContent = 'saved'"
+    >Save</button>
+
+    <div data-testid="result" id="result"></div>
+</body>
+</html>

@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Actionability — below the fold</title>
+</head>
+<body>
+    <!-- The target sits far below the fold. The hit-test must scroll it into
+         view before probing elementFromPoint, otherwise its centre is off-screen
+         and reads as "off-screen" forever. -->
+    <div style="height: 3000px"></div>
+
+    <button
+        data-testid="target"
+        onclick="document.getElementById('result').textContent = 'clicked'"
+    >Target</button>
+
+    <div data-testid="result" id="result"></div>
+</body>
+</html>
