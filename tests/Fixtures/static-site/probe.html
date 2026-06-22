@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>State probe</title>
+</head>
+<body>
+    <!-- State the page knows but never renders as text — the case evaluate()
+         and the expression probes exist for. -->
+    <script>
+        window.appState = { ready: false, total: 42, label: 'hidden-state' };
+        setTimeout(function () { window.appState.ready = true; }, 300);
+    </script>
+</body>
+</html>

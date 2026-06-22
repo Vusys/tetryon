@@ -218,6 +218,44 @@ final readonly class Browser
         return is_string($value) ? $value : '';
     }
 
+    // ── Cookies (state, not actions — no auto-wait) ─────────────────────────
+
+    /**
+     * Set a cookie. The domain defaults to the base-URL host and the path to
+     * `/`; pass `domain`, `path`, `secure`, `httpOnly`, `sameSite`, or `expiry`
+     * to override. Backed by BiDi storage, so HttpOnly cookies work and the
+     * cookie is in place before the first navigation carries it.
+     *
+     * @param  array{domain?: string, path?: string, secure?: bool, httpOnly?: bool, sameSite?: string, expiry?: int}  $options
+     */
+    public function setCookie(string $name, string $value, array $options = []): self
+    {
+        $domain = $options['domain'] ?? $this->cookieDomain();
+        unset($options['domain']);
+        $this->driver->setCookie($name, $value, $domain, $this->cookieOrigin(), $options);
+
+        return $this;
+    }
+
+    public function cookie(string $name): ?string
+    {
+        return $this->driver->getCookie($name, $this->cookieOrigin());
+    }
+
+    public function deleteCookie(string $name): self
+    {
+        $this->driver->deleteCookie($name, $this->cookieOrigin());
+
+        return $this;
+    }
+
+    public function clearCookies(): self
+    {
+        $this->driver->clearCookies($this->cookieOrigin());
+
+        return $this;
+    }
+
     // ── Natural language ────────────────────────────────────────────────────
 
     /**
@@ -292,6 +330,20 @@ final readonly class Browser
         );
     }
 
+    /**
+     * Poll a JavaScript expression until it evaluates truthy — for page state
+     * the DOM doesn't render as text (store readiness, a derived flag, a chart
+     * library's data). Built on {@see evaluate()}; promises are awaited.
+     */
+    public function waitForExpression(string $expression, ?int $timeoutMs = null): self
+    {
+        return $this->awaitOrThrow(
+            $timeoutMs ?? $this->configuration->timeouts->default,
+            fn (): bool => (bool) $this->evaluate($expression),
+            "Timed out waiting for the expression to become truthy: {$expression}",
+        );
+    }
+
     // ── Queries ─────────────────────────────────────────────────────────────
 
     public function currentUrl(): string
@@ -309,6 +361,21 @@ final readonly class Browser
     public function title(): string
     {
         return $this->driver->title();
+    }
+
+    /**
+     * Evaluate a JavaScript expression in the page and return its value. Promises
+     * are awaited, so an async IIFE resolves to its value:
+     *
+     *     $browser->evaluate('document.title');
+     *     $browser->evaluate('(async () => (await fetch("/__test__/login", {method:"POST"})).status)()');
+     *
+     * The generic escape hatch for the cases the fluent verbs don't model. State,
+     * not an action — it does not auto-wait.
+     */
+    public function evaluate(string $script): mixed
+    {
+        return $this->driver->evaluateScript($script);
     }
 
     /**
@@ -394,6 +461,40 @@ final readonly class Browser
         Assert::assertTrue(
             $this->driver->evaluateScript($script) === true,
             "Expected to see \"{$text}\" near \"{$near}\".",
+        );
+
+        return $this;
+    }
+
+    // ── JavaScript state probes (retry until they pass) ─────────────────────
+
+    /**
+     * Assert that a JavaScript expression evaluates truthy, retrying until it
+     * does or the timeout elapses — the auto-wait counterpart to {@see evaluate()}
+     * for state the DOM doesn't render as text.
+     */
+    public function assertExpression(string $expression, string $message = ''): self
+    {
+        $this->retry(fn (): bool => (bool) $this->evaluate($expression));
+        Assert::assertTrue(
+            (bool) $this->evaluate($expression),
+            $message !== '' ? $message : "Expected this expression to be truthy: {$expression}",
+        );
+
+        return $this;
+    }
+
+    /**
+     * Assert that a JavaScript expression equals an expected (serialisable)
+     * value, retrying until it matches — so a failure shows expected-vs-actual.
+     */
+    public function assertExpressionEquals(string $expression, mixed $expected, string $message = ''): self
+    {
+        $this->retry(fn (): bool => $this->evaluate($expression) == $expected);
+        Assert::assertEquals(
+            $expected,
+            $this->evaluate($expression),
+            $message !== '' ? $message : "Expression did not equal the expected value: {$expression}",
         );
 
         return $this;
@@ -556,5 +657,22 @@ final readonly class Browser
     private function cssQuote(string $value): string
     {
         return '"'.addcslashes($value, '"\\').'"';
+    }
+
+    private function cookieDomain(): string
+    {
+        $host = parse_url($this->configuration->baseUrl, PHP_URL_HOST);
+
+        return is_string($host) && $host !== '' ? $host : 'localhost';
+    }
+
+    private function cookieOrigin(): string
+    {
+        $parts = parse_url($this->configuration->baseUrl);
+        $scheme = is_array($parts) && is_string($parts['scheme'] ?? null) ? $parts['scheme'] : 'http';
+        $host = is_array($parts) && is_string($parts['host'] ?? null) ? $parts['host'] : 'localhost';
+        $port = is_array($parts) && is_int($parts['port'] ?? null) ? ':'.$parts['port'] : '';
+
+        return "{$scheme}://{$host}{$port}";
     }
 }

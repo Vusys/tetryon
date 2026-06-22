@@ -10,6 +10,7 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Vusys\Tetryon\Core\Config\Configuration;
 use Vusys\Tetryon\Core\Support\StreamLogger;
+use Vusys\Tetryon\Firefox\Exception\FirefoxException;
 use Vusys\Tetryon\Firefox\FirefoxBiDiDriver;
 use Vusys\Tetryon\Firefox\LaunchOptions;
 
@@ -51,6 +52,19 @@ trait InteractsWithBrowser
     protected function scenario(): Scenario
     {
         return new Scenario($this->browser());
+    }
+
+    /**
+     * The underlying Firefox driver, for the rare advanced case the fluent
+     * {@see Browser} API doesn't model. Boots the browser if it hasn't started.
+     * Prefer {@see Browser::evaluate()} for in-page JavaScript — reach for this
+     * only when a subclass needs the driver primitives directly.
+     */
+    protected function driver(): FirefoxBiDiDriver
+    {
+        $this->browser();
+
+        return $this->tetryonDriver ?? throw new FirefoxException('Browser driver failed to start.');
     }
 
     protected function browserConfiguration(): Configuration

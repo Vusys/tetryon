@@ -21,6 +21,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `<select>`, and `check()` / `uncheck()` a checkbox/radio — otherwise they
   throw `UndrivableElementException` naming the resolved element, rather than
   silently doing nothing and surfacing later at an unrelated assertion.
+- **JavaScript state probes** (#82): `waitForExpression()`, `assertExpression()`,
+  and `assertExpressionEquals()` — the auto-wait/retry wait-and-assert layer on
+  top of `evaluate()`, for page state the DOM doesn't render as text (store
+  readiness, derived totals, a chart library's data).
+- **Cookie API on `Browser`** — `setCookie()`, `cookie()`, `deleteCookie()`,
+  `clearCookies()`. Backed by WebDriver BiDi storage (not `document.cookie`), so
+  HttpOnly cookies work and a cookie set before the first `visit()` is carried
+  by that request. Domain defaults to the base-URL host, path to `/`; options
+  cover `secure`, `httpOnly`, `sameSite`, `expiry`, and explicit `domain`/`path`.
+- **`Browser::evaluate(string $script): mixed`** — run a JavaScript expression in
+  the page and get its value back. Promises are awaited, so an async IIFE
+  resolves to its result. The supported escape hatch for in-page setup the
+  fluent verbs don't model.
+- **`protected driver(): FirefoxBiDiDriver`** on `InteractsWithBrowser` — reach
+  the underlying driver from a subclass without reflection (boots the browser if
+  needed). Prefer `evaluate()`; the driver type itself stays internal.
 
 ## [0.1.0] - 2026-06-22
 
