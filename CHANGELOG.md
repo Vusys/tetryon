@@ -6,8 +6,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **`click()` / `press()` prefer an interactive target.** When more than one
+  element matches, action verbs now pick the interactive candidate (button,
+  link, input, …) instead of letting a non-interactive node — e.g. a heading
+  sharing a button's text — shadow it and silently no-op (#72). When nothing
+  interactive matches, the first match still wins.
+
 ### Added
 
+- **Form verbs fail loudly on controls they can't drive** (#77). `fill()` /
+  `type()` / `clear()` require an `<input>`/`<textarea>`, `select()` a
+  `<select>`, and `check()` / `uncheck()` a checkbox/radio — otherwise they
+  throw `UndrivableElementException` naming the resolved element, rather than
+  silently doing nothing and surfacing later at an unrelated assertion.
 - **JavaScript state probes** (#82): `waitForExpression()`, `assertExpression()`,
   and `assertExpressionEquals()` — the auto-wait/retry wait-and-assert layer on
   top of `evaluate()`, for page state the DOM doesn't render as text (store

@@ -8,10 +8,12 @@ use PHPUnit\Framework\Assert;
 use Vusys\Tetryon\Core\Config\Configuration;
 use Vusys\Tetryon\Core\NaturalLanguage\StepParser;
 use Vusys\Tetryon\Core\NaturalLanguage\UnknownStepException;
+use Vusys\Tetryon\Core\Selector\ElementInfo;
 use Vusys\Tetryon\Core\Selector\ElementNotFoundException;
 use Vusys\Tetryon\Core\Selector\ElementReference;
 use Vusys\Tetryon\Core\Selector\SelectorResolver;
 use Vusys\Tetryon\Core\Selector\SelectorStrategy;
+use Vusys\Tetryon\Core\Selector\UndrivableElementException;
 use Vusys\Tetryon\Core\Support\TimeoutException;
 use Vusys\Tetryon\Core\Support\Waiter;
 use Vusys\Tetryon\Firefox\Bidi\BiDiTrace;
@@ -77,7 +79,7 @@ final readonly class Browser
 
     public function click(string $target): self
     {
-        $this->driver->clickElement($this->actionable($target));
+        $this->driver->clickElement($this->actionable($target, preferInteractive: true));
 
         return $this;
     }
@@ -117,14 +119,14 @@ final readonly class Browser
 
     public function doubleClick(string $target): self
     {
-        $this->driver->doubleClickElement($this->actionable($target));
+        $this->driver->doubleClickElement($this->actionable($target, preferInteractive: true));
 
         return $this;
     }
 
     public function rightClick(string $target): self
     {
-        $this->driver->rightClickElement($this->actionable($target));
+        $this->driver->rightClickElement($this->actionable($target, preferInteractive: true));
 
         return $this;
     }
@@ -160,7 +162,7 @@ final readonly class Browser
 
     public function fill(string $field, string $value): self
     {
-        $element = $this->actionable($field);
+        $element = $this->drivable('fill', $field, 'value');
         $this->driver->callFunctionOn($element, 'function(){ this.value = ""; }');
         $this->driver->typeInto($element, $value);
 
@@ -169,7 +171,7 @@ final readonly class Browser
 
     public function type(string $field, string $value): self
     {
-        $this->driver->typeInto($this->actionable($field), $value);
+        $this->driver->typeInto($this->drivable('type', $field, 'value'), $value);
 
         return $this;
     }
@@ -177,7 +179,7 @@ final readonly class Browser
     public function clear(string $field): self
     {
         $this->driver->callFunctionOn(
-            $this->actionable($field),
+            $this->drivable('clear', $field, 'value'),
             'function(){ this.value = ""; this.dispatchEvent(new Event("input", { bubbles: true })); }',
         );
 
@@ -187,7 +189,7 @@ final readonly class Browser
     public function select(string $field, string $value): self
     {
         $this->driver->callFunctionOn(
-            $this->actionable($field),
+            $this->drivable('select', $field, 'select'),
             'function(v){ this.value = v; this.dispatchEvent(new Event("change", { bubbles: true })); }',
             $value,
         );
@@ -197,14 +199,14 @@ final readonly class Browser
 
     public function check(string $field): self
     {
-        $this->driver->callFunctionOn($this->actionable($field), 'function(){ if (!this.checked) this.click(); }');
+        $this->driver->callFunctionOn($this->drivable('check', $field, 'checkable'), 'function(){ if (!this.checked) this.click(); }');
 
         return $this;
     }
 
     public function uncheck(string $field): self
     {
-        $this->driver->callFunctionOn($this->actionable($field), 'function(){ if (this.checked) this.click(); }');
+        $this->driver->callFunctionOn($this->drivable('uncheck', $field, 'checkable'), 'function(){ if (this.checked) this.click(); }');
 
         return $this;
     }
@@ -500,9 +502,9 @@ final readonly class Browser
 
     // ── Internals ───────────────────────────────────────────────────────────
 
-    private function actionable(string $target): ElementReference
+    private function actionable(string $target, bool $preferInteractive = false): ElementReference
     {
-        $element = $this->resolveWaiting($target);
+        $element = $this->resolveWaiting($target, $preferInteractive);
         $this->wait(
             $this->configuration->timeouts->default,
             fn (): bool => $this->driver->callFunctionOn(
@@ -516,27 +518,73 @@ final readonly class Browser
         return $element;
     }
 
-    private function resolveWaiting(string $target): ElementReference
+    /**
+     * Resolve an actionable element for a form verb and verify it is a control
+     * the verb can actually drive, throwing {@see UndrivableElementException}
+     * otherwise rather than silently no-opping (#77).
+     *
+     * @param  'value'|'select'|'checkable'  $kind
+     */
+    private function drivable(string $verb, string $field, string $kind): ElementReference
+    {
+        $element = $this->actionable($field);
+
+        $info = $this->elementInfo($element);
+        $accepted = match ($kind) {
+            'value' => $info->tag === 'textarea'
+                || ($info->tag === 'input' && ! in_array($info->type, ['checkbox', 'radio', 'file', 'submit', 'button', 'reset', 'image'], true)),
+            'select' => $info->tag === 'select',
+            'checkable' => $info->tag === 'input' && in_array($info->type, ['checkbox', 'radio'], true),
+        };
+
+        if (! $accepted) {
+            throw UndrivableElementException::for($verb, $field, $info->describe(), $kind);
+        }
+
+        return $element;
+    }
+
+    private function elementInfo(ElementReference $element): ElementInfo
+    {
+        $json = $this->driver->callFunctionOn(
+            $element,
+            'function(){ return JSON.stringify({'
+            .' tag: this.tagName.toLowerCase(),'
+            .' type: (this.type || "").toLowerCase(),'
+            .' editable: !!this.isContentEditable }); }',
+        );
+
+        return ElementInfo::fromJson(is_string($json) ? $json : '');
+    }
+
+    private function resolveWaiting(string $target, bool $preferInteractive = false): ElementReference
     {
         $element = null;
-        $this->wait($this->configuration->timeouts->default, function () use ($target, &$element): bool {
-            $element = $this->resolveNow($target);
+        $this->wait($this->configuration->timeouts->default, function () use ($target, $preferInteractive, &$element): bool {
+            $element = $this->resolveNow($target, $preferInteractive);
 
             return $element instanceof ElementReference;
         });
 
         // On timeout, resolve once more so the rich ElementNotFoundException (with
         // its attempt list) surfaces instead of a bare null.
-        return $element ?? $this->resolver->resolve($target);
+        return $element ?? $this->resolveElement($target, $preferInteractive);
     }
 
-    private function resolveNow(string $target): ?ElementReference
+    private function resolveNow(string $target, bool $preferInteractive = false): ?ElementReference
     {
         try {
-            return $this->resolver->resolve($target);
+            return $this->resolveElement($target, $preferInteractive);
         } catch (ElementNotFoundException) {
             return null;
         }
+    }
+
+    private function resolveElement(string $target, bool $preferInteractive): ElementReference
+    {
+        return $preferInteractive
+            ? $this->resolver->resolveInteractive($target)
+            : $this->resolver->resolve($target);
     }
 
     private function isVisibleNow(string $target): bool

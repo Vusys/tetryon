@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Loud action verbs</title>
+</head>
+<body>
+    <!-- A heading sharing the submit button's text (#72): pressing "Log in" must
+         click the button, not the heading. -->
+    <h1>Log in</h1>
+    <form onsubmit="event.preventDefault(); document.querySelector('[data-testid=out]').textContent = 'submitted'">
+        <button type="submit">Log in</button>
+    </form>
+    <div data-testid="out"></div>
+
+    <!-- Non-native controls a form verb cannot drive (#77). -->
+    <div data-testid="editor" contenteditable="true">edit me</div>
+    <div data-testid="fakeselect" role="listbox">Custom dropdown</div>
+</body>
+</html>
