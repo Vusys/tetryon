@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Element state</title>
+</head>
+<body>
+    <label><input type="checkbox" id="subscribe" checked> Subscribe</label>
+    <label><input type="checkbox" id="terms"> Accept terms</label>
+
+    <label><input type="radio" name="plan" value="free"> Free</label>
+    <label><input type="radio" name="plan" value="pro" checked> Pro</label>
+
+    <label for="country">Country</label>
+    <select id="country">
+        <option value="">--</option>
+        <option value="uk">United Kingdom</option>
+        <option value="us" selected>United States</option>
+    </select>
+
+    <button id="save" disabled>Save</button>
+    <button id="cancel">Cancel</button>
+
+    <a id="home" href="/dashboard" data-state="active" class="nav is-active">Home</a>
+</body>
+</html>

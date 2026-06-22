@@ -41,6 +41,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **`protected driver(): FirefoxBiDiDriver`** on `InteractsWithBrowser` — reach
   the underlying driver from a subclass without reflection (boots the browser if
   needed). Prefer `evaluate()`; the driver type itself stays internal.
+- **Form-control state assertions** (#75): `assertChecked` / `assertNotChecked`,
+  `assertRadioSelected` / `assertRadioNotSelected`, `assertSelected` /
+  `assertNotSelected`, plus `isChecked()` and `selected()` queries. These read
+  `this.checked` / the selected option rather than `value` (a checkbox's value
+  attribute isn't its checked state) and retry until they pass, like
+  `assertValue`.
+- **Enabled/disabled and attribute assertions** (#76): `assertEnabled` /
+  `assertDisabled`, `assertAttribute` / `assertAttributeContains`, plus an
+  `attribute()` query for reading `href` / `data-*` / `aria-*` and the like.
 
 ## [0.1.0] - 2026-06-22
 

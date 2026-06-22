@@ -148,8 +148,7 @@ final readonly class Browser
 
     public function choose(string $field, string $value): self
     {
-        $css = sprintf('[type="radio"][name=%s][value=%s]', $this->cssQuote($field), $this->cssQuote($value));
-        $this->driver->clickElement($this->actionable($css));
+        $this->driver->clickElement($this->actionable($this->radioSelector($field, $value)));
 
         return $this;
     }
@@ -222,6 +221,47 @@ final readonly class Browser
         $value = $this->driver->callFunctionOn($this->resolveWaiting($field), 'function(){ return this.value; }');
 
         return is_string($value) ? $value : '';
+    }
+
+    /**
+     * Whether a checkbox or radio is currently checked.
+     */
+    public function isChecked(string $target): bool
+    {
+        return $this->driver->callFunctionOn(
+            $this->resolveWaiting($target),
+            'function(){ return !!this.checked; }',
+        ) === true;
+    }
+
+    /**
+     * The selected option's value of a `<select>`, or null if the element is not
+     * a select.
+     */
+    public function selected(string $field): ?string
+    {
+        $value = $this->driver->callFunctionOn(
+            $this->resolveWaiting($field),
+            'function(){ if (this.tagName.toLowerCase() !== "select") return null;'
+            .' return this.multiple ? ((this.selectedOptions[0] || {}).value ?? null) : this.value; }',
+        );
+
+        return is_string($value) ? $value : null;
+    }
+
+    /**
+     * The value of an attribute (`href`, `data-*`, `aria-*`, …), or null when the
+     * attribute is absent.
+     */
+    public function attribute(string $target, string $name): ?string
+    {
+        $value = $this->driver->callFunctionOn(
+            $this->resolveWaiting($target),
+            'function(name){ return this.getAttribute(name); }',
+            $name,
+        );
+
+        return is_string($value) ? $value : null;
     }
 
     // ── Cookies (state, not actions — no auto-wait) ─────────────────────────
@@ -472,6 +512,86 @@ final readonly class Browser
         return $this;
     }
 
+    // ── Form-control state assertions (retry until they pass) ───────────────
+
+    public function assertChecked(string $target): self
+    {
+        $this->retry(fn (): bool => $this->isChecked($target));
+        Assert::assertTrue($this->isChecked($target), "Expected \"{$target}\" to be checked.");
+
+        return $this;
+    }
+
+    public function assertNotChecked(string $target): self
+    {
+        $this->retry(fn (): bool => ! $this->isChecked($target));
+        Assert::assertFalse($this->isChecked($target), "Expected \"{$target}\" not to be checked.");
+
+        return $this;
+    }
+
+    public function assertRadioSelected(string $field, string $value): self
+    {
+        return $this->assertChecked($this->radioSelector($field, $value));
+    }
+
+    public function assertRadioNotSelected(string $field, string $value): self
+    {
+        return $this->assertNotChecked($this->radioSelector($field, $value));
+    }
+
+    public function assertSelected(string $field, string $value): self
+    {
+        $this->retry(fn (): bool => $this->selected($field) === $value);
+        Assert::assertSame($value, $this->selected($field), "Expected \"{$field}\" to have \"{$value}\" selected.");
+
+        return $this;
+    }
+
+    public function assertNotSelected(string $field, string $value): self
+    {
+        $this->retry(fn (): bool => $this->selected($field) !== $value);
+        Assert::assertNotSame($value, $this->selected($field), "Expected \"{$field}\" not to have \"{$value}\" selected.");
+
+        return $this;
+    }
+
+    public function assertEnabled(string $target): self
+    {
+        $this->retry(fn (): bool => ! $this->isDisabled($target));
+        Assert::assertFalse($this->isDisabled($target), "Expected \"{$target}\" to be enabled.");
+
+        return $this;
+    }
+
+    public function assertDisabled(string $target): self
+    {
+        $this->retry(fn (): bool => $this->isDisabled($target));
+        Assert::assertTrue($this->isDisabled($target), "Expected \"{$target}\" to be disabled.");
+
+        return $this;
+    }
+
+    public function assertAttribute(string $target, string $name, string $expected): self
+    {
+        $this->retry(fn (): bool => $this->attribute($target, $name) === $expected);
+        Assert::assertSame($expected, $this->attribute($target, $name), "Attribute \"{$name}\" of \"{$target}\" had an unexpected value.");
+
+        return $this;
+    }
+
+    public function assertAttributeContains(string $target, string $name, string $needle): self
+    {
+        $this->retry(fn (): bool => str_contains($this->attribute($target, $name) ?? '', $needle));
+        Assert::assertStringContainsString(
+            $needle,
+            $this->attribute($target, $name) ?? '',
+            "Attribute \"{$name}\" of \"{$target}\" did not contain \"{$needle}\".",
+        );
+
+        return $this;
+    }
+
     // ── JavaScript state probes (retry until they pass) ─────────────────────
 
     /**
@@ -678,6 +798,19 @@ final readonly class Browser
             : $this->driver->evaluateScript('document.body ? document.body.innerText : ""');
 
         return is_string($text) ? $text : '';
+    }
+
+    private function isDisabled(string $target): bool
+    {
+        return $this->driver->callFunctionOn(
+            $this->resolveWaiting($target),
+            'function(){ return !!this.disabled; }',
+        ) === true;
+    }
+
+    private function radioSelector(string $field, string $value): string
+    {
+        return sprintf('[type="radio"][name=%s][value=%s]', $this->cssQuote($field), $this->cssQuote($value));
     }
 
     private function cssQuote(string $value): string
