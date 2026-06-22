@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Actionability — nested scroll container</title>
+    <style>
+        .scroller {
+            overflow-x: auto;
+            width: 300px;
+            border: 1px solid #ccc;
+            white-space: nowrap;
+        }
+        .wide { width: 600px; }
+        .spacer { display: inline-block; }
+        .lead { width: 180px; }
+        .trail { width: 320px; }
+        /* Icon-only control: its only child is the icon, so the click point
+           lands on the descendant, mirroring a Font Awesome button. */
+        #del { width: 36px; height: 31px; }
+        #del .icon { pointer-events: auto; }
+    </style>
+</head>
+<body>
+    <!-- An icon-only button sits mid-way inside a horizontally scrollable
+         container, reached via a delegated handler on an ancestor. Centring the
+         container under the button must not shift it out from under the click. -->
+    <div class="scroller">
+        <div class="wide">
+            <span class="spacer lead"></span>
+            <button id="del" data-action="delete-row"><span class="icon">x</span></button>
+            <span class="spacer trail"></span>
+        </div>
+    </div>
+
+    <div data-testid="result" id="result"></div>
+
+    <script>
+        document.querySelector('.scroller').addEventListener('click', function (event) {
+            if (event.target.closest('[data-action="delete-row"]')) {
+                document.getElementById('result').textContent = 'deleted';
+            }
+        });
+    </script>
+</body>
+</html>

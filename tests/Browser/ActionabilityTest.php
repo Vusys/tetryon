@@ -72,6 +72,14 @@ final class ActionabilityTest extends StaticSiteTestCase
             ->assertSee('clicked');
     }
 
+    public function test_click_targets_an_icon_only_control_in_a_scroll_container(): void
+    {
+        $this->browser()
+            ->visit('/actionability-scroll-container.html')
+            ->click('[data-action="delete-row"]')
+            ->assertSee('deleted');
+    }
+
     public function test_click_on_a_permanently_occluded_target_reports_the_interceptor(): void
     {
         $this->expectException(TimeoutException::class);
