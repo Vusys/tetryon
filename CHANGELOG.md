@@ -6,6 +6,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Form-control state assertions** (#75): `assertChecked` / `assertNotChecked`,
+  `assertRadioSelected` / `assertRadioNotSelected`, `assertSelected` /
+  `assertNotSelected`, plus `isChecked()` and `selected()` queries. These read
+  `this.checked` / the selected option rather than `value` (a checkbox's value
+  attribute isn't its checked state) and retry until they pass, like
+  `assertValue`.
+- **Enabled/disabled and attribute assertions** (#76): `assertEnabled` /
+  `assertDisabled`, `assertAttribute` / `assertAttributeContains`, plus an
+  `attribute()` query for reading `href` / `data-*` / `aria-*` and the like.
+
 ## [0.1.0] - 2026-06-22
 
 First tagged release. Beta and pre-1.0 — the public API may still change before

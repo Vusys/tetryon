@@ -36,6 +36,40 @@ PHPUnit failure, and a flaky-by-timing assertion just waits.
 ->assertValue('Email', 'bryan@example.com');
 ```
 
+## Form-control state
+
+`assertValue` covers an input's text; these cover the **state** of toggles and
+selects — a checkbox's `value` attribute is `"on"`, not its checked state, so
+these read `this.checked` / the selected option instead. Like every assertion,
+they retry until they pass, so async-rendered forms need no manual wait.
+
+```php
+->assertChecked('Remember me')          // checkbox / radio is checked
+->assertNotChecked('Subscribe')
+->assertRadioSelected('plan', 'pro')    // radio group by name + value
+->assertRadioNotSelected('plan', 'free')
+->assertSelected('Country', 'uk')       // <select> has this option chosen
+->assertNotSelected('Country', 'us');
+
+// query counterparts
+$browser->isChecked('Remember me');     // bool
+$browser->selected('Country');          // ?string — the selected option's value
+```
+
+## Enabled / disabled and attributes
+
+```php
+->assertEnabled('Save')                 // !this.disabled
+->assertDisabled('Save')
+->assertAttribute('@avatar', 'src', '/img/ada.png')
+->assertAttributeContains('@nav-home', 'class', 'is-active');
+
+$browser->attribute('@nav-home', 'data-state'); // ?string — null if absent
+```
+
+`attribute()` reads the literal attribute (`href`, `src`, `title`, `data-*`,
+`aria-*`, …), so `href="/x"` reads back as `/x`, not the resolved absolute URL.
+
 ## Grouping with `tap()`
 
 `tap()` hands your callback the browser and returns it, so you can group related
