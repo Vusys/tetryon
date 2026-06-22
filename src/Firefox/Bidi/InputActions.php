@@ -48,6 +48,30 @@ final class InputActions
     }
 
     /**
+     * A pointer press-drag-release along an absolute (viewport) path: move to the
+     * first point, press, move through the remaining points, release. Pointer-drag
+     * libraries (Sortable.js, vuedraggable, …) need the intermediate moves to
+     * cross their drag threshold and compute direction, so the path carries steps
+     * rather than a single jump.
+     *
+     * @param  list<array{x: int, y: int}>  $path  start point, then one or more move targets
+     * @return Source
+     */
+    public static function pointerDrag(array $path, int $button = 0): array
+    {
+        $start = $path[0] ?? ['x' => 0, 'y' => 0];
+        $actions = [self::moveTo($start['x'], $start['y']), self::down($button)];
+
+        foreach (array_slice($path, 1) as $point) {
+            $actions[] = self::moveTo($point['x'], $point['y']);
+        }
+
+        $actions[] = self::up($button);
+
+        return self::pointer($actions);
+    }
+
+    /**
      * Type text one character at a time (keyDown+keyUp), so real input events
      * fire on the focused element.
      *
@@ -81,6 +105,14 @@ final class InputActions
             'y' => 0,
             'origin' => ['type' => 'element', 'element' => ['sharedId' => $sharedId]],
         ];
+    }
+
+    /**
+     * @return array{type: string, x: int, y: int, origin: string}
+     */
+    private static function moveTo(int $x, int $y): array
+    {
+        return ['type' => 'pointerMove', 'x' => $x, 'y' => $y, 'origin' => 'viewport'];
     }
 
     /**

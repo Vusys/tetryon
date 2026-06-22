@@ -29,6 +29,19 @@ when more than one element matches — so pressing `'Log in'` clicks the submit
 button, not a heading that happens to share its text. When nothing interactive
 matches, the first match still wins, so a `<div>` with a click handler is fine.
 
+### Drag and drop
+
+```php
+->drag('@card-1', '@column-done')   // element onto element
+->dragTo('@card-1', 320, 480)       // element to absolute viewport coordinates
+->dragDown('@row-3', 120)           // by a pixel offset; also dragUp/dragLeft/dragRight
+```
+
+The drag issues intermediate pointer moves (not a single jump), so pointer-drag
+libraries like Sortable.js / vuedraggable register the gesture and compute
+direction. This drives **pointer-based** DnD; HTML5-native `draggable`
+drag/drop events are out of scope.
+
 ## Typing
 
 ```php

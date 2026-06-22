@@ -16,6 +16,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Drag-and-drop** (#83): `drag($source, $target)`, `dragTo($source, $x, $y)`,
+  and `dragUp`/`dragDown`/`dragLeft`/`dragRight($source, $pixels)`. Built on a new
+  pointer-drag primitive that issues intermediate moves, so pointer-drag
+  libraries (Sortable.js, vuedraggable) register the gesture. Pointer-based DnD;
+  HTML5-native `draggable` events are out of scope.
 - **Text verbs drive `contenteditable` editors** (#80). `fill()` / `type()` /
   `clear()` now work on rich-text / `contenteditable` elements as well as
   `<input>`/`<textarea>`, and `value()` reads their text back. Anything else
