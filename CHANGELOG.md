@@ -16,6 +16,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`select()` matches an option by its visible label or its value** (#73), so
+  tests can pick "United Kingdom" without scraping an opaque option value first.
+  `selectByValue()` keeps value-only selection; both throw
+  `OptionNotFoundException` when no option matches.
 - **Form verbs fail loudly on controls they can't drive** (#77). `fill()` /
   `type()` / `clear()` require an `<input>`/`<textarea>`, `select()` a
   `<select>`, and `check()` / `uncheck()` a checkbox/radio — otherwise they
