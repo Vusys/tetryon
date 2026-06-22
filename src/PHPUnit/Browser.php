@@ -33,18 +33,20 @@ use Vusys\Tetryon\Firefox\NetworkRecord;
 final readonly class Browser
 {
     /**
-     * Injected actionability probe. Scrolls the element just into view
-     * (`nearest`, so an already-visible target in a nested overflow container
-     * is left where it is rather than re-centred out from under the click),
-     * rejects invisible / transparent / pointer-event-deaf elements, waits for
-     * the bounding box to be stable across one animation frame (covering
-     * transform and size transitions, not just opacity), then hit-tests the
-     * click point so an overlay painted on top makes the action wait rather
-     * than land on the wrong element. Returns `ok` or a short failure reason.
+     * Injected actionability probe. Scrolls the element into view centred
+     * vertically (`block: center`, to clear fixed/sticky top and bottom bars)
+     * but only as far as needed horizontally (`inline: nearest`, so an
+     * already-visible target in a nested overflow-x container is left where it
+     * is rather than re-centred out from under the click), rejects invisible /
+     * transparent / pointer-event-deaf elements, waits for the bounding box to
+     * be stable across one animation frame (covering transform and size
+     * transitions, not just opacity), then hit-tests the click point so an
+     * overlay painted on top makes the action wait rather than land on the
+     * wrong element. Returns `ok` or a short failure reason.
      */
     private const string ACTIONABLE_JS = <<<'JS'
         async function () {
-          this.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+          this.scrollIntoView({ block: 'center', inline: 'nearest' });
           const s = getComputedStyle(this);
           if (this.disabled) return 'disabled';
           if (s.display === 'none' || s.visibility === 'hidden') return 'hidden';

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Actionability — target under a fixed bar</title>
+    <style>
+        #bar {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 64px;
+            background: #222;
+        }
+    </style>
+</head>
+<body>
+    <!-- The target sits mid-page with content below it, so scrolling it "just"
+         into view (nearest) parks it at the bottom viewport edge — under the
+         fixed bar. The probe must place it clear of the bar. -->
+    <div style="margin-top: 120vh">
+        <button
+            data-testid="target"
+            onclick="document.getElementById('result').textContent = 'clicked'"
+        >Target</button>
+    </div>
+    <div style="height: 80vh">content below the target</div>
+
+    <nav id="bar">bar</nav>
+    <div data-testid="result" id="result"></div>
+</body>
+</html>

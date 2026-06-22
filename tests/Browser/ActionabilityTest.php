@@ -80,6 +80,14 @@ final class ActionabilityTest extends StaticSiteTestCase
             ->assertSee('deleted');
     }
 
+    public function test_click_clears_a_fixed_bar_when_scrolling_into_view(): void
+    {
+        $this->browser()
+            ->visit('/actionability-fixed-bar.html')
+            ->click('Target')
+            ->assertSee('clicked');
+    }
+
     public function test_click_on_a_permanently_occluded_target_reports_the_interceptor(): void
     {
         $this->expectException(TimeoutException::class);
