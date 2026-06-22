@@ -8,10 +8,13 @@ use PHPUnit\Framework\Assert;
 use Vusys\Tetryon\Core\Config\Configuration;
 use Vusys\Tetryon\Core\NaturalLanguage\StepParser;
 use Vusys\Tetryon\Core\NaturalLanguage\UnknownStepException;
+use Vusys\Tetryon\Core\Selector\ElementInfo;
 use Vusys\Tetryon\Core\Selector\ElementNotFoundException;
 use Vusys\Tetryon\Core\Selector\ElementReference;
+use Vusys\Tetryon\Core\Selector\OptionNotFoundException;
 use Vusys\Tetryon\Core\Selector\SelectorResolver;
 use Vusys\Tetryon\Core\Selector\SelectorStrategy;
+use Vusys\Tetryon\Core\Selector\UndrivableElementException;
 use Vusys\Tetryon\Core\Support\TimeoutException;
 use Vusys\Tetryon\Core\Support\Waiter;
 use Vusys\Tetryon\Firefox\Bidi\BiDiTrace;
@@ -77,7 +80,7 @@ final readonly class Browser
 
     public function click(string $target): self
     {
-        $this->driver->clickElement($this->actionable($target));
+        $this->driver->clickElement($this->actionable($target, preferInteractive: true));
 
         return $this;
     }
@@ -117,14 +120,14 @@ final readonly class Browser
 
     public function doubleClick(string $target): self
     {
-        $this->driver->doubleClickElement($this->actionable($target));
+        $this->driver->doubleClickElement($this->actionable($target, preferInteractive: true));
 
         return $this;
     }
 
     public function rightClick(string $target): self
     {
-        $this->driver->rightClickElement($this->actionable($target));
+        $this->driver->rightClickElement($this->actionable($target, preferInteractive: true));
 
         return $this;
     }
@@ -159,7 +162,7 @@ final readonly class Browser
 
     public function fill(string $field, string $value): self
     {
-        $element = $this->actionable($field);
+        $element = $this->drivable('fill', $field, 'value');
         $this->driver->callFunctionOn($element, 'function(){ this.value = ""; }');
         $this->driver->typeInto($element, $value);
 
@@ -168,7 +171,7 @@ final readonly class Browser
 
     public function type(string $field, string $value): self
     {
-        $this->driver->typeInto($this->actionable($field), $value);
+        $this->driver->typeInto($this->drivable('type', $field, 'value'), $value);
 
         return $this;
     }
@@ -176,34 +179,39 @@ final readonly class Browser
     public function clear(string $field): self
     {
         $this->driver->callFunctionOn(
-            $this->actionable($field),
+            $this->drivable('clear', $field, 'value'),
             'function(){ this.value = ""; this.dispatchEvent(new Event("input", { bubbles: true })); }',
         );
 
         return $this;
     }
 
+    /**
+     * Choose a `<select>` option by its visible label or its value (label is the
+     * common case when values are opaque ids). Use {@see selectByValue()} to
+     * match the value only. Throws {@see OptionNotFoundException} if no option
+     * matches.
+     */
     public function select(string $field, string $value): self
     {
-        $this->driver->callFunctionOn(
-            $this->actionable($field),
-            'function(v){ this.value = v; this.dispatchEvent(new Event("change", { bubbles: true })); }',
-            $value,
-        );
+        return $this->selectOption($field, $value, byValueOnly: false);
+    }
 
-        return $this;
+    public function selectByValue(string $field, string $value): self
+    {
+        return $this->selectOption($field, $value, byValueOnly: true);
     }
 
     public function check(string $field): self
     {
-        $this->driver->callFunctionOn($this->actionable($field), 'function(){ if (!this.checked) this.click(); }');
+        $this->driver->callFunctionOn($this->drivable('check', $field, 'checkable'), 'function(){ if (!this.checked) this.click(); }');
 
         return $this;
     }
 
     public function uncheck(string $field): self
     {
-        $this->driver->callFunctionOn($this->actionable($field), 'function(){ if (this.checked) this.click(); }');
+        $this->driver->callFunctionOn($this->drivable('uncheck', $field, 'checkable'), 'function(){ if (this.checked) this.click(); }');
 
         return $this;
     }
@@ -254,6 +262,44 @@ final readonly class Browser
         );
 
         return is_string($value) ? $value : null;
+    }
+
+    // ── Cookies (state, not actions — no auto-wait) ─────────────────────────
+
+    /**
+     * Set a cookie. The domain defaults to the base-URL host and the path to
+     * `/`; pass `domain`, `path`, `secure`, `httpOnly`, `sameSite`, or `expiry`
+     * to override. Backed by BiDi storage, so HttpOnly cookies work and the
+     * cookie is in place before the first navigation carries it.
+     *
+     * @param  array{domain?: string, path?: string, secure?: bool, httpOnly?: bool, sameSite?: string, expiry?: int}  $options
+     */
+    public function setCookie(string $name, string $value, array $options = []): self
+    {
+        $domain = $options['domain'] ?? $this->cookieDomain();
+        unset($options['domain']);
+        $this->driver->setCookie($name, $value, $domain, $this->cookieOrigin(), $options);
+
+        return $this;
+    }
+
+    public function cookie(string $name): ?string
+    {
+        return $this->driver->getCookie($name, $this->cookieOrigin());
+    }
+
+    public function deleteCookie(string $name): self
+    {
+        $this->driver->deleteCookie($name, $this->cookieOrigin());
+
+        return $this;
+    }
+
+    public function clearCookies(): self
+    {
+        $this->driver->clearCookies($this->cookieOrigin());
+
+        return $this;
     }
 
     // ── Natural language ────────────────────────────────────────────────────
@@ -330,6 +376,20 @@ final readonly class Browser
         );
     }
 
+    /**
+     * Poll a JavaScript expression until it evaluates truthy — for page state
+     * the DOM doesn't render as text (store readiness, a derived flag, a chart
+     * library's data). Built on {@see evaluate()}; promises are awaited.
+     */
+    public function waitForExpression(string $expression, ?int $timeoutMs = null): self
+    {
+        return $this->awaitOrThrow(
+            $timeoutMs ?? $this->configuration->timeouts->default,
+            fn (): bool => (bool) $this->evaluate($expression),
+            "Timed out waiting for the expression to become truthy: {$expression}",
+        );
+    }
+
     // ── Queries ─────────────────────────────────────────────────────────────
 
     public function currentUrl(): string
@@ -347,6 +407,21 @@ final readonly class Browser
     public function title(): string
     {
         return $this->driver->title();
+    }
+
+    /**
+     * Evaluate a JavaScript expression in the page and return its value. Promises
+     * are awaited, so an async IIFE resolves to its value:
+     *
+     *     $browser->evaluate('document.title');
+     *     $browser->evaluate('(async () => (await fetch("/__test__/login", {method:"POST"})).status)()');
+     *
+     * The generic escape hatch for the cases the fluent verbs don't model. State,
+     * not an action — it does not auto-wait.
+     */
+    public function evaluate(string $script): mixed
+    {
+        return $this->driver->evaluateScript($script);
     }
 
     /**
@@ -517,11 +592,45 @@ final readonly class Browser
         return $this;
     }
 
+    // ── JavaScript state probes (retry until they pass) ─────────────────────
+
+    /**
+     * Assert that a JavaScript expression evaluates truthy, retrying until it
+     * does or the timeout elapses — the auto-wait counterpart to {@see evaluate()}
+     * for state the DOM doesn't render as text.
+     */
+    public function assertExpression(string $expression, string $message = ''): self
+    {
+        $this->retry(fn (): bool => (bool) $this->evaluate($expression));
+        Assert::assertTrue(
+            (bool) $this->evaluate($expression),
+            $message !== '' ? $message : "Expected this expression to be truthy: {$expression}",
+        );
+
+        return $this;
+    }
+
+    /**
+     * Assert that a JavaScript expression equals an expected (serialisable)
+     * value, retrying until it matches — so a failure shows expected-vs-actual.
+     */
+    public function assertExpressionEquals(string $expression, mixed $expected, string $message = ''): self
+    {
+        $this->retry(fn (): bool => $this->evaluate($expression) == $expected);
+        Assert::assertEquals(
+            $expected,
+            $this->evaluate($expression),
+            $message !== '' ? $message : "Expression did not equal the expected value: {$expression}",
+        );
+
+        return $this;
+    }
+
     // ── Internals ───────────────────────────────────────────────────────────
 
-    private function actionable(string $target): ElementReference
+    private function actionable(string $target, bool $preferInteractive = false): ElementReference
     {
-        $element = $this->resolveWaiting($target);
+        $element = $this->resolveWaiting($target, $preferInteractive);
         $this->wait(
             $this->configuration->timeouts->default,
             fn (): bool => $this->driver->callFunctionOn(
@@ -535,27 +644,93 @@ final readonly class Browser
         return $element;
     }
 
-    private function resolveWaiting(string $target): ElementReference
+    private function selectOption(string $field, string $value, bool $byValueOnly): self
+    {
+        $matched = $this->driver->callFunctionOn(
+            $this->drivable('select', $field, 'select'),
+            'function(v, byValue){'
+            .' for (const o of this.options) {'
+            .'  if (o.value === v || (byValue !== "1" && o.text.trim() === v)) {'
+            .'   this.value = o.value; this.dispatchEvent(new Event("change", { bubbles: true })); return true; } }'
+            .' return false; }',
+            $value,
+            $byValueOnly ? '1' : '0',
+        );
+
+        if ($matched !== true) {
+            throw OptionNotFoundException::for($field, $value, $byValueOnly);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Resolve an actionable element for a form verb and verify it is a control
+     * the verb can actually drive, throwing {@see UndrivableElementException}
+     * otherwise rather than silently no-opping (#77).
+     *
+     * @param  'value'|'select'|'checkable'  $kind
+     */
+    private function drivable(string $verb, string $field, string $kind): ElementReference
+    {
+        $element = $this->actionable($field);
+
+        $info = $this->elementInfo($element);
+        $accepted = match ($kind) {
+            'value' => $info->tag === 'textarea'
+                || ($info->tag === 'input' && ! in_array($info->type, ['checkbox', 'radio', 'file', 'submit', 'button', 'reset', 'image'], true)),
+            'select' => $info->tag === 'select',
+            'checkable' => $info->tag === 'input' && in_array($info->type, ['checkbox', 'radio'], true),
+        };
+
+        if (! $accepted) {
+            throw UndrivableElementException::for($verb, $field, $info->describe(), $kind);
+        }
+
+        return $element;
+    }
+
+    private function elementInfo(ElementReference $element): ElementInfo
+    {
+        $json = $this->driver->callFunctionOn(
+            $element,
+            'function(){ return JSON.stringify({'
+            .' tag: this.tagName.toLowerCase(),'
+            .' type: (this.type || "").toLowerCase(),'
+            .' editable: !!this.isContentEditable }); }',
+        );
+
+        return ElementInfo::fromJson(is_string($json) ? $json : '');
+    }
+
+    private function resolveWaiting(string $target, bool $preferInteractive = false): ElementReference
     {
         $element = null;
-        $this->wait($this->configuration->timeouts->default, function () use ($target, &$element): bool {
-            $element = $this->resolveNow($target);
+        $this->wait($this->configuration->timeouts->default, function () use ($target, $preferInteractive, &$element): bool {
+            $element = $this->resolveNow($target, $preferInteractive);
 
             return $element instanceof ElementReference;
         });
 
         // On timeout, resolve once more so the rich ElementNotFoundException (with
         // its attempt list) surfaces instead of a bare null.
-        return $element ?? $this->resolver->resolve($target);
+        return $element ?? $this->resolveElement($target, $preferInteractive);
     }
 
-    private function resolveNow(string $target): ?ElementReference
+    private function resolveNow(string $target, bool $preferInteractive = false): ?ElementReference
     {
         try {
-            return $this->resolver->resolve($target);
+            return $this->resolveElement($target, $preferInteractive);
         } catch (ElementNotFoundException) {
             return null;
         }
+    }
+
+    private function resolveElement(string $target, bool $preferInteractive): ElementReference
+    {
+        return $preferInteractive
+            ? $this->resolver->resolveInteractive($target)
+            : $this->resolver->resolve($target);
     }
 
     private function isVisibleNow(string $target): bool
@@ -641,5 +816,22 @@ final readonly class Browser
     private function cssQuote(string $value): string
     {
         return '"'.addcslashes($value, '"\\').'"';
+    }
+
+    private function cookieDomain(): string
+    {
+        $host = parse_url($this->configuration->baseUrl, PHP_URL_HOST);
+
+        return is_string($host) && $host !== '' ? $host : 'localhost';
+    }
+
+    private function cookieOrigin(): string
+    {
+        $parts = parse_url($this->configuration->baseUrl);
+        $scheme = is_array($parts) && is_string($parts['scheme'] ?? null) ? $parts['scheme'] : 'http';
+        $host = is_array($parts) && is_string($parts['host'] ?? null) ? $parts['host'] : 'localhost';
+        $port = is_array($parts) && is_int($parts['port'] ?? null) ? ':'.$parts['port'] : '';
+
+        return "{$scheme}://{$host}{$port}";
     }
 }

@@ -6,8 +6,41 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **`click()` / `press()` prefer an interactive target.** When more than one
+  element matches, action verbs now pick the interactive candidate (button,
+  link, input, …) instead of letting a non-interactive node — e.g. a heading
+  sharing a button's text — shadow it and silently no-op (#72). When nothing
+  interactive matches, the first match still wins.
+
 ### Added
 
+- **`select()` matches an option by its visible label or its value** (#73), so
+  tests can pick "United Kingdom" without scraping an opaque option value first.
+  `selectByValue()` keeps value-only selection; both throw
+  `OptionNotFoundException` when no option matches.
+- **Form verbs fail loudly on controls they can't drive** (#77). `fill()` /
+  `type()` / `clear()` require an `<input>`/`<textarea>`, `select()` a
+  `<select>`, and `check()` / `uncheck()` a checkbox/radio — otherwise they
+  throw `UndrivableElementException` naming the resolved element, rather than
+  silently doing nothing and surfacing later at an unrelated assertion.
+- **JavaScript state probes** (#82): `waitForExpression()`, `assertExpression()`,
+  and `assertExpressionEquals()` — the auto-wait/retry wait-and-assert layer on
+  top of `evaluate()`, for page state the DOM doesn't render as text (store
+  readiness, derived totals, a chart library's data).
+- **Cookie API on `Browser`** — `setCookie()`, `cookie()`, `deleteCookie()`,
+  `clearCookies()`. Backed by WebDriver BiDi storage (not `document.cookie`), so
+  HttpOnly cookies work and a cookie set before the first `visit()` is carried
+  by that request. Domain defaults to the base-URL host, path to `/`; options
+  cover `secure`, `httpOnly`, `sameSite`, `expiry`, and explicit `domain`/`path`.
+- **`Browser::evaluate(string $script): mixed`** — run a JavaScript expression in
+  the page and get its value back. Promises are awaited, so an async IIFE
+  resolves to its result. The supported escape hatch for in-page setup the
+  fluent verbs don't model.
+- **`protected driver(): FirefoxBiDiDriver`** on `InteractsWithBrowser` — reach
+  the underlying driver from a subclass without reflection (boots the browser if
+  needed). Prefer `evaluate()`; the driver type itself stays internal.
 - **Form-control state assertions** (#75): `assertChecked` / `assertNotChecked`,
   `assertRadioSelected` / `assertRadioNotSelected`, `assertSelected` /
   `assertNotSelected`, plus `isChecked()` and `selected()` queries. These read
