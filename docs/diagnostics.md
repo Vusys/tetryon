@@ -27,6 +27,8 @@ The bundle contains:
 - `screenshot.png` — the page at the moment of failure.
 - `page.html` — the rendered DOM.
 - `console.log` — browser console messages.
+- `network.log` — the requests observed, with method, URL, and response status
+  (the request that 404'd, 500'd, or never fired is often the real cause).
 - `trace.log` — the recent BiDi command trace (what the browser was doing).
 - `browser-stderr.log` — Firefox's own stderr.
 - `info.txt` — current URL and viewport.

@@ -19,6 +19,7 @@ use Vusys\Tetryon\Core\Support\TimeoutException;
 use Vusys\Tetryon\Core\Support\Waiter;
 use Vusys\Tetryon\Firefox\Bidi\BiDiTrace;
 use Vusys\Tetryon\Firefox\FirefoxBiDiDriver;
+use Vusys\Tetryon\Firefox\NetworkRecord;
 
 /**
  * The fluent, user-facing browser API. Wraps the Firefox driver and turns its
@@ -677,6 +678,52 @@ final readonly class Browser
         return $this;
     }
 
+    // ── Network observation ─────────────────────────────────────────────────
+
+    /**
+     * Wait until a request whose URL matches has been sent — synchronise on the
+     * network instead of polling the DOM. The pattern is a substring, or a glob
+     * with `*` wildcards (e.g. `*​/api/search*`).
+     */
+    public function waitForRequest(string $pattern): self
+    {
+        return $this->awaitOrThrow(
+            $this->configuration->timeouts->navigation,
+            fn (): bool => $this->matchingRequests($pattern) !== [],
+            "Timed out waiting for a request matching \"{$pattern}\".",
+        );
+    }
+
+    /**
+     * Wait until a matching request has *completed* (a response arrived).
+     */
+    public function waitForResponse(string $pattern): self
+    {
+        return $this->awaitOrThrow(
+            $this->configuration->timeouts->navigation,
+            fn (): bool => $this->matchingResponses($pattern) !== [],
+            "Timed out waiting for a response matching \"{$pattern}\".",
+        );
+    }
+
+    public function assertRequested(string $pattern): self
+    {
+        $this->retry(fn (): bool => $this->matchingRequests($pattern) !== []);
+        Assert::assertNotEmpty($this->matchingRequests($pattern), "Expected a request matching \"{$pattern}\".");
+
+        return $this;
+    }
+
+    public function assertNotRequested(string $pattern): self
+    {
+        Assert::assertEmpty(
+            $this->matchingRequests($pattern),
+            "Did not expect a request matching \"{$pattern}\".",
+        );
+
+        return $this;
+    }
+
     // ── Internals ───────────────────────────────────────────────────────────
 
     private function actionable(string $target, bool $preferInteractive = false): ElementReference
@@ -894,6 +941,37 @@ final readonly class Browser
     private function cssQuote(string $value): string
     {
         return '"'.addcslashes($value, '"\\').'"';
+    }
+
+    /**
+     * @return list<NetworkRecord>
+     */
+    private function matchingRequests(string $pattern): array
+    {
+        return array_values(array_filter(
+            $this->driver->networkLog(),
+            fn (NetworkRecord $record): bool => $this->urlMatches($pattern, $record->url),
+        ));
+    }
+
+    /**
+     * @return list<NetworkRecord>
+     */
+    private function matchingResponses(string $pattern): array
+    {
+        return array_values(array_filter(
+            $this->matchingRequests($pattern),
+            static fn (NetworkRecord $record): bool => $record->status !== null,
+        ));
+    }
+
+    private function urlMatches(string $pattern, string $url): bool
+    {
+        if (str_contains($pattern, '*')) {
+            return preg_match('#'.str_replace('\*', '.*', preg_quote($pattern, '#')).'#', $url) === 1;
+        }
+
+        return str_contains($url, $pattern);
     }
 
     private function cookieDomain(): string

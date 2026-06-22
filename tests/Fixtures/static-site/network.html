@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Network</title>
+</head>
+<body>
+    <button data-testid="load">Load</button>
+    <div data-testid="out"></div>
+
+    <script>
+        document.querySelector('[data-testid=load]').addEventListener('click', function () {
+            fetch('/api-data.json')
+                .then(function (response) { return response.json(); })
+                .then(function (data) {
+                    document.querySelector('[data-testid=out]').textContent = data.message;
+                });
+        });
+    </script>
+</body>
+</html>

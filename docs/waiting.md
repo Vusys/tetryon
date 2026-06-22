@@ -31,7 +31,21 @@ holds:
 ->waitUntilMissing('Loading…')
 ->waitForUrl('/dashboard')      // resolved against base_url
 ->waitForPath('/dashboard')     // path only
+->waitForExpression('window.store.state.ready === true') // arbitrary JS state
 ```
+
+## Waiting on the network
+
+Synchronise on an XHR/fetch instead of polling the DOM — the most reliable thing
+to wait for in a single-page app. The pattern is a substring or a `*`-glob:
+
+```php
+->click('Search')
+->waitForRequest('*/api/search*')   // request was sent
+->waitForResponse('/api/search');   // …and its response arrived
+```
+
+See also `assertRequested` / `assertNotRequested` in [Assertions](assertions.md).
 
 ## Timeouts
 
