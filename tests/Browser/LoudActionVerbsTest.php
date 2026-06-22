@@ -21,12 +21,12 @@ final class LoudActionVerbsTest extends StaticSiteTestCase
             ->assertSee('submitted');
     }
 
-    public function test_fill_throws_on_a_contenteditable_element(): void
+    public function test_fill_throws_on_a_plain_element_with_no_text_to_set(): void
     {
         $this->expectException(UndrivableElementException::class);
-        $this->expectExceptionMessage('contenteditable');
+        $this->expectExceptionMessage('has no text to set');
 
-        $this->browser()->visit('/loud.html')->fill('@editor', 'hello');
+        $this->browser()->visit('/loud.html')->fill('@fakeselect', 'hello');
     }
 
     public function test_select_throws_on_a_non_select(): void

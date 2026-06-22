@@ -38,6 +38,11 @@ matches, the first match still wins, so a `<div>` with a click handler is fine.
 ->pressKey('Enter');                   // named keys: Enter, Tab, Escape, ArrowDown, ...
 ```
 
+`fill` / `type` / `clear` work on `<input>`/`<textarea>` **and**
+`contenteditable` editors (rich-text fields), and `value()` reads either back.
+On anything else they throw `UndrivableElementException` rather than silently
+no-opping.
+
 `pressKey` sends to the focused element. Named keys (`Enter`, `Tab`, `Escape`,
 `Backspace`, `Delete`, `ArrowUp`/`Down`/`Left`/`Right`, `Home`, `End`,
 `PageUp`/`PageDown`, …) are translated to the right key codes; a single

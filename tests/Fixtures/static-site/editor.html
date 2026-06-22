@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Rich-text editor</title>
+</head>
+<body>
+    <label id="bio-label">Bio</label>
+    <div data-testid="bio" contenteditable="true" aria-labelledby="bio-label"></div>
+
+    <div data-testid="note" contenteditable="true">Existing note</div>
+
+    <!-- Mirror the editor's text so a plain assertSee can observe edits too. -->
+    <div data-testid="mirror"></div>
+    <script>
+        document.querySelector('[data-testid=bio]').addEventListener('input', function () {
+            document.querySelector('[data-testid=mirror]').textContent = this.textContent;
+        });
+    </script>
+</body>
+</html>
