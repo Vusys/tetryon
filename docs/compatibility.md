@@ -48,3 +48,8 @@ policy above:
 Everything else — `Core\Selector\*`, `Firefox\*`, the BiDi transport — is
 **internal** and may change without notice. If you find yourself reaching into
 it, please open an issue so the need can be met by the public surface instead.
+
+`Browser::evaluate()` is the supported escape hatch for in-page JavaScript the
+fluent verbs don't model. The `protected driver()` accessor on
+`InteractsWithBrowser` is supported too, but it hands you a `FirefoxBiDiDriver`
+— an internal type whose primitives may change. Prefer `evaluate()`.

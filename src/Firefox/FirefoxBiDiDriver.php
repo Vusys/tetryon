@@ -198,6 +198,90 @@ final class FirefoxBiDiDriver implements NodeLocator
         $this->collectConsole();
     }
 
+    /**
+     * Set a cookie via BiDi storage, partitioned by the source origin so it can
+     * be seeded before the first navigation and carried by that request. Handles
+     * HttpOnly and the Secure/SameSite/expiry attributes natively.
+     *
+     * @param  array{path?: string, secure?: bool, httpOnly?: bool, sameSite?: string, expiry?: int}  $options
+     */
+    public function setCookie(string $name, string $value, string $domain, string $sourceOrigin, array $options = []): void
+    {
+        $cookie = [
+            'name' => $name,
+            'value' => ['type' => 'string', 'value' => $value],
+            'domain' => $domain,
+            'path' => $options['path'] ?? '/',
+        ];
+        if (isset($options['secure'])) {
+            $cookie['secure'] = $options['secure'];
+        }
+        if (isset($options['httpOnly'])) {
+            $cookie['httpOnly'] = $options['httpOnly'];
+        }
+        if (isset($options['sameSite'])) {
+            $cookie['sameSite'] = strtolower($options['sameSite']);
+        }
+        if (isset($options['expiry'])) {
+            $cookie['expiry'] = $options['expiry'];
+        }
+
+        $this->connection()->send('storage.setCookie', [
+            'cookie' => $cookie,
+            'partition' => $this->cookiePartition($sourceOrigin),
+        ]);
+    }
+
+    public function getCookie(string $name, string $sourceOrigin): ?string
+    {
+        $result = $this->connection()->send('storage.getCookies', [
+            'filter' => ['name' => $name],
+            'partition' => $this->cookiePartition($sourceOrigin),
+        ]);
+
+        $cookies = $result['cookies'] ?? null;
+        if (! is_array($cookies)) {
+            return null;
+        }
+
+        foreach ($cookies as $cookie) {
+            if (! is_array($cookie)) {
+                continue;
+            }
+            $value = $cookie['value'] ?? null;
+            if (is_array($value) && is_string($value['value'] ?? null)) {
+                return ($value['type'] ?? null) === 'base64'
+                    ? (base64_decode($value['value'], true) ?: '')
+                    : $value['value'];
+            }
+        }
+
+        return null;
+    }
+
+    public function deleteCookie(string $name, string $sourceOrigin): void
+    {
+        $this->connection()->send('storage.deleteCookies', [
+            'filter' => ['name' => $name],
+            'partition' => $this->cookiePartition($sourceOrigin),
+        ]);
+    }
+
+    public function clearCookies(string $sourceOrigin): void
+    {
+        $this->connection()->send('storage.deleteCookies', [
+            'partition' => $this->cookiePartition($sourceOrigin),
+        ]);
+    }
+
+    /**
+     * @return array{type: string, sourceOrigin: string}
+     */
+    private function cookiePartition(string $sourceOrigin): array
+    {
+        return ['type' => 'storageKey', 'sourceOrigin' => $sourceOrigin];
+    }
+
     public function evaluateScript(string $expression): mixed
     {
         $result = $this->connection()->send('script.evaluate', [
