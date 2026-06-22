@@ -54,6 +54,27 @@ character is sent literally.
 $email = $this->browser()->value('Email');
 ```
 
+## Escape hatch: evaluate()
+
+When the fluent verbs don't reach something, run JavaScript in the page
+directly. Promises are awaited, so an async IIFE resolves to its value:
+
+```php
+$title  = $this->browser()->evaluate('document.title');                       // mixed
+$status = $this->browser()->evaluate(
+    '(async () => (await fetch("/__test__/login", {method:"POST"})).status)()'
+);
+$this->browser()->evaluate('window.localStorage.setItem("flag", "1")');
+```
+
+`evaluate()` is state, not an action — it does not auto-wait. Reach for it for
+in-page setup the verbs don't model, and the fluent verbs for everything they
+cover.
+
+For the rare case a custom base class needs the driver primitives directly,
+`InteractsWithBrowser` exposes a `protected driver(): FirefoxBiDiDriver`
+accessor (it boots the browser if it hasn't started) — no reflection needed.
+
 ## A complete flow
 
 ```php

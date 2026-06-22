@@ -310,6 +310,21 @@ final readonly class Browser
     }
 
     /**
+     * Evaluate a JavaScript expression in the page and return its value. Promises
+     * are awaited, so an async IIFE resolves to its value:
+     *
+     *     $browser->evaluate('document.title');
+     *     $browser->evaluate('(async () => (await fetch("/__test__/login", {method:"POST"})).status)()');
+     *
+     * The generic escape hatch for the cases the fluent verbs don't model. State,
+     * not an action — it does not auto-wait.
+     */
+    public function evaluate(string $script): mixed
+    {
+        return $this->driver->evaluateScript($script);
+    }
+
+    /**
      * The recent BiDi command trace — useful for debugging or asserting on what
      * the browser actually did.
      */

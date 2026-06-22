@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **`Browser::evaluate(string $script): mixed`** — run a JavaScript expression in
+  the page and get its value back. Promises are awaited, so an async IIFE
+  resolves to its result. The supported escape hatch for in-page setup the
+  fluent verbs don't model.
+- **`protected driver(): FirefoxBiDiDriver`** on `InteractsWithBrowser` — reach
+  the underlying driver from a subclass without reflection (boots the browser if
+  needed). Prefer `evaluate()`; the driver type itself stays internal.
+
 ## [0.1.0] - 2026-06-22
 
 First tagged release. Beta and pre-1.0 — the public API may still change before
