@@ -6,6 +6,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **`click()` / `press()` prefer an interactive target.** When more than one
+  element matches, action verbs now pick the interactive candidate (button,
+  link, input, …) instead of letting a non-interactive node — e.g. a heading
+  sharing a button's text — shadow it and silently no-op (#72). When nothing
+  interactive matches, the first match still wins.
+
+### Added
+
+- **Form verbs fail loudly on controls they can't drive** (#77). `fill()` /
+  `type()` / `clear()` require an `<input>`/`<textarea>`, `select()` a
+  `<select>`, and `check()` / `uncheck()` a checkbox/radio — otherwise they
+  throw `UndrivableElementException` naming the resolved element, rather than
+  silently doing nothing and surfacing later at an unrelated assertion.
+
 ## [0.1.0] - 2026-06-22
 
 First tagged release. Beta and pre-1.0 — the public API may still change before

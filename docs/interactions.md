@@ -24,6 +24,11 @@ $this->browser()
 ->hover('Account menu');
 ```
 
+`click()` / `press()` prefer an **interactive** target (button, link, input, …)
+when more than one element matches — so pressing `'Log in'` clicks the submit
+button, not a heading that happens to share its text. When nothing interactive
+matches, the first match still wins, so a `<div>` with a click handler is fine.
+
 ## Typing
 
 ```php
@@ -47,6 +52,13 @@ character is sent literally.
 ->choose('plan', 'pro')        // radio group by name + value
 ->upload('Avatar', __DIR__.'/fixtures/avatar.png');
 ```
+
+These verbs drive **native** form controls. If one resolves an element it can't
+drive — `fill()` on a `<div contenteditable>`, `select()` on a custom dropdown
+that isn't a `<select>`, `check()` on something that isn't a checkbox — it
+throws `UndrivableElementException` naming the element, instead of silently
+doing nothing and failing later at an unrelated assertion. Drive a custom widget
+by composing `click()` with `evaluate()` (or `within()` + `click()`).
 
 ## Reading values
 
