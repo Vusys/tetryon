@@ -33,9 +33,11 @@ use Vusys\Tetryon\Firefox\NetworkRecord;
 final readonly class Browser
 {
     /**
-     * Injected actionability probe. Scrolls the element into view centred
-     * vertically (`block: center`, to clear fixed/sticky top and bottom bars)
-     * but only as far as needed horizontally (`inline: nearest`, so an
+     * Injected actionability probe. Scrolls the element into view instantly
+     * (`behavior: instant` overrides any `scroll-behavior: smooth` — Bootstrap
+     * Reboot sets it on :root — so the scroll can't animate under the click)
+     * centred vertically (`block: center`, to clear fixed/sticky top and bottom
+     * bars) but only as far as needed horizontally (`inline: nearest`, so an
      * already-visible target in a nested overflow-x container is left where it
      * is rather than re-centred out from under the click), rejects invisible /
      * transparent / pointer-event-deaf elements, waits for the bounding box to
@@ -46,7 +48,7 @@ final readonly class Browser
      */
     private const string ACTIONABLE_JS = <<<'JS'
         async function () {
-          this.scrollIntoView({ block: 'center', inline: 'nearest' });
+          this.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'nearest' });
           const s = getComputedStyle(this);
           if (this.disabled) return 'disabled';
           if (s.display === 'none' || s.visibility === 'hidden') return 'hidden';

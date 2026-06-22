@@ -88,6 +88,14 @@ final class ActionabilityTest extends StaticSiteTestCase
             ->assertSee('clicked');
     }
 
+    public function test_click_lands_under_smooth_scrolling(): void
+    {
+        $this->browser()
+            ->visit('/actionability-smooth-scroll.html')
+            ->click('Target')
+            ->assertSee('clicked');
+    }
+
     public function test_click_on_a_permanently_occluded_target_reports_the_interceptor(): void
     {
         $this->expectException(TimeoutException::class);

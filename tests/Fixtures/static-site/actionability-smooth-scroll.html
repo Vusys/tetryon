@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Actionability — smooth scroll page</title>
+    <style>
+        /* Bootstrap 5 Reboot ships exactly this. scrollIntoView without an
+           explicit behavior honours it and animates, racing the click. */
+        :root { scroll-behavior: smooth; }
+    </style>
+</head>
+<body>
+    <!-- Target is far down with content below it, so it needs a large scroll to
+         reach (and to centre). Under smooth scrolling the click must still land
+         on it rather than on whatever is mid-glide under the point. -->
+    <div style="height: 300vh"></div>
+    <button
+        data-testid="target"
+        onclick="document.getElementById('result').textContent = 'clicked'"
+    >Target</button>
+    <div style="height: 100vh">content below the target</div>
+
+    <div data-testid="result" id="result"></div>
+</body>
+</html>
