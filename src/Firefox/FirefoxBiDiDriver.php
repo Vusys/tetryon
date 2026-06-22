@@ -39,6 +39,9 @@ final class FirefoxBiDiDriver implements NodeLocator
     /** @var list<ConsoleMessage> */
     private array $console = [];
 
+    /** @var array<string, NetworkRecord> keyed by BiDi request id */
+    private array $network = [];
+
     public function __construct(
         private readonly LaunchOptions $options = new LaunchOptions,
         private readonly LoggerInterface $logger = new NullLogger,
@@ -59,7 +62,7 @@ final class FirefoxBiDiDriver implements NodeLocator
         $this->bidi = new BiDiConnection($this->socket, $this->logger, $this->trace);
 
         $this->bidi->send('session.new', ['capabilities' => ['alwaysMatch' => new stdClass]]);
-        $this->bidi->subscribe('log.entryAdded');
+        $this->bidi->subscribe('log.entryAdded', 'network.beforeRequestSent', 'network.responseCompleted');
         $this->context = $this->resolveFirstContext();
     }
 
@@ -401,6 +404,18 @@ final class FirefoxBiDiDriver implements NodeLocator
         return $this->console;
     }
 
+    /**
+     * The network exchanges observed so far (drains any pending events first).
+     *
+     * @return list<NetworkRecord>
+     */
+    public function networkLog(): array
+    {
+        $this->collectConsole();
+
+        return array_values($this->network);
+    }
+
     public function trace(): BiDiTrace
     {
         return $this->trace;
@@ -423,6 +438,7 @@ final class FirefoxBiDiDriver implements NodeLocator
             $this->socket = null;
             $this->bidi = null;
             $this->context = null;
+            $this->network = [];
         }
     }
 
@@ -484,11 +500,42 @@ final class FirefoxBiDiDriver implements NodeLocator
         $connection->pumpEvents(0.05);
 
         foreach ($connection->takeEvents() as $event) {
-            if (($event['method'] ?? null) !== 'log.entryAdded') {
-                continue;
-            }
-            $this->console[] = ConsoleMessage::fromLogEntry($event['params'] ?? null);
+            match ($event['method'] ?? null) {
+                'log.entryAdded' => $this->console[] = ConsoleMessage::fromLogEntry($event['params'] ?? null),
+                'network.beforeRequestSent', 'network.responseCompleted' => $this->recordNetwork($event),
+                default => null,
+            };
         }
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $event
+     */
+    private function recordNetwork(array $event): void
+    {
+        $params = $event['params'] ?? null;
+        if (! is_array($params)) {
+            return;
+        }
+
+        $request = $params['request'] ?? null;
+        if (! is_array($request)) {
+            return;
+        }
+
+        $id = is_string($request['request'] ?? null) ? $request['request'] : null;
+        $url = is_string($request['url'] ?? null) ? $request['url'] : null;
+        if ($id === null || $url === null) {
+            return;
+        }
+
+        $response = $params['response'] ?? null;
+        $status = is_array($response) && is_int($response['status'] ?? null) ? $response['status'] : null;
+
+        $existing = $this->network[$id] ?? null;
+        $this->network[$id] = $existing instanceof NetworkRecord
+            ? $existing->withStatus($status)
+            : new NetworkRecord(is_string($request['method'] ?? null) ? $request['method'] : '', $url, $status);
     }
 
     private function resolveFirstContext(): string

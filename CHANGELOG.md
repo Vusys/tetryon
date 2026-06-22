@@ -16,6 +16,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Network observation** (#70): `waitForRequest()` / `waitForResponse()` to
+  synchronise on an XHR/fetch instead of polling the DOM, and `assertRequested()`
+  / `assertNotRequested()` (substring or `*`-glob match). A `network.log` of
+  observed requests (method, URL, status) is now captured in the failure
+  artifacts too, backed by BiDi `network.*` events.
 - **Drag-and-drop** (#83): `drag($source, $target)`, `dragTo($source, $x, $y)`,
   and `dragUp`/`dragDown`/`dragLeft`/`dragRight($source, $pixels)`. Built on a new
   pointer-drag primitive that issues intermediate moves, so pointer-drag

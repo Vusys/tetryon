@@ -8,6 +8,7 @@ use Throwable;
 use Vusys\Tetryon\Core\Config\Configuration;
 use Vusys\Tetryon\Firefox\ConsoleMessage;
 use Vusys\Tetryon\Firefox\FirefoxBiDiDriver;
+use Vusys\Tetryon\Firefox\NetworkRecord;
 
 /**
  * Captures the diagnostic bundle when a browser test fails — screenshot, page
@@ -47,6 +48,18 @@ final readonly class FailureArtifacts
         );
         file_put_contents("{$directory}/console.log", implode("\n", $console));
         $paths['Console'] = "{$directory}/console.log";
+
+        $network = array_map(
+            static fn (NetworkRecord $record): string => sprintf(
+                '%s %s %s',
+                $record->status === null ? '(pending)' : (string) $record->status,
+                $record->method,
+                $record->url,
+            ),
+            $this->guard(static fn (): array => $driver->networkLog()) ?? [],
+        );
+        file_put_contents("{$directory}/network.log", implode("\n", $network));
+        $paths['Network'] = "{$directory}/network.log";
 
         file_put_contents("{$directory}/trace.log", (string) $driver->trace());
         $paths['Trace'] = "{$directory}/trace.log";

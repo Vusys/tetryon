@@ -70,6 +70,20 @@ $browser->attribute('@nav-home', 'data-state'); // ?string — null if absent
 `attribute()` reads the literal attribute (`href`, `src`, `title`, `data-*`,
 `aria-*`, …), so `href="/x"` reads back as `/x`, not the resolved absolute URL.
 
+## Network
+
+Assert which requests did or didn't fire (substring or `*`-glob match). Useful
+for telling "the request returned empty" apart from "the request never fired":
+
+```php
+->assertRequested('/api/search')
+->assertNotRequested('/api/telemetry');
+```
+
+To *wait* on a request/response rather than assert after the fact, see
+`waitForRequest` / `waitForResponse` in [Waiting](waiting.md). A network log is
+also captured in the [failure artifacts](diagnostics.md).
+
 ## Grouping with `tap()`
 
 `tap()` hands your callback the browser and returns it, so you can group related
