@@ -68,12 +68,44 @@ $this->browser()->evaluate('window.localStorage.setItem("flag", "1")');
 ```
 
 `evaluate()` is state, not an action — it does not auto-wait. Reach for it for
-in-page setup the verbs don't model, and the fluent verbs for everything they
-cover.
+in-page setup the verbs don't model — though for cookies prefer the
+[cookie API](#cookies) below, and for everything the verbs cover, the verbs.
 
 For the rare case a custom base class needs the driver primitives directly,
 `InteractsWithBrowser` exposes a `protected driver(): FirefoxBiDiDriver`
 accessor (it boots the browser if it hasn't started) — no reflection needed.
+
+## Cookies
+
+Seed the cookie state a test depends on — feature flags, locale, consent
+banners, A/B buckets, or a session token — before exercising the UI. Backed by
+WebDriver BiDi storage rather than `document.cookie`, so **HttpOnly cookies work**
+and a cookie set before the first `visit()` is carried by that request.
+
+```php
+$this->browser()
+    ->setCookie('feature_flags', $value)                       // domain/path inferred from base_url
+    ->setCookie('session', $token, ['httpOnly' => true, 'sameSite' => 'Lax'])
+    ->visit('/');                                              // first request already carries them
+
+$this->browser()->cookie('feature_flags');   // ?string — null if unset
+$this->browser()->deleteCookie('feature_flags');
+$this->browser()->clearCookies();
+```
+
+The domain defaults to the base-URL host and the path to `/`. Override with the
+options array: `domain`, `path`, `secure`, `httpOnly`, `sameSite`, `expiry`.
+Set/delete/clear are fluent; `cookie()` returns the value. No auto-wait — it's
+state, not an actionable element.
+
+> **Encrypted cookies.** Some frameworks (Laravel among them) encrypt cookies,
+> so a plaintext `setCookie('name', '1')` may be rejected on decrypt unless the
+> cookie name is excluded from encryption. That's the application's concern, not
+> Tetryon's.
+
+This is orthogonal to `loginAs()`, which establishes auth via a server-side
+session route. Use cookies for the state `loginAs()` doesn't cover — flags,
+routing, locale, banners.
 
 ## A complete flow
 

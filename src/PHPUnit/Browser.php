@@ -216,6 +216,44 @@ final readonly class Browser
         return is_string($value) ? $value : '';
     }
 
+    // ── Cookies (state, not actions — no auto-wait) ─────────────────────────
+
+    /**
+     * Set a cookie. The domain defaults to the base-URL host and the path to
+     * `/`; pass `domain`, `path`, `secure`, `httpOnly`, `sameSite`, or `expiry`
+     * to override. Backed by BiDi storage, so HttpOnly cookies work and the
+     * cookie is in place before the first navigation carries it.
+     *
+     * @param  array{domain?: string, path?: string, secure?: bool, httpOnly?: bool, sameSite?: string, expiry?: int}  $options
+     */
+    public function setCookie(string $name, string $value, array $options = []): self
+    {
+        $domain = $options['domain'] ?? $this->cookieDomain();
+        unset($options['domain']);
+        $this->driver->setCookie($name, $value, $domain, $this->cookieOrigin(), $options);
+
+        return $this;
+    }
+
+    public function cookie(string $name): ?string
+    {
+        return $this->driver->getCookie($name, $this->cookieOrigin());
+    }
+
+    public function deleteCookie(string $name): self
+    {
+        $this->driver->deleteCookie($name, $this->cookieOrigin());
+
+        return $this;
+    }
+
+    public function clearCookies(): self
+    {
+        $this->driver->clearCookies($this->cookieOrigin());
+
+        return $this;
+    }
+
     // ── Natural language ────────────────────────────────────────────────────
 
     /**
@@ -523,5 +561,22 @@ final readonly class Browser
     private function cssQuote(string $value): string
     {
         return '"'.addcslashes($value, '"\\').'"';
+    }
+
+    private function cookieDomain(): string
+    {
+        $host = parse_url($this->configuration->baseUrl, PHP_URL_HOST);
+
+        return is_string($host) && $host !== '' ? $host : 'localhost';
+    }
+
+    private function cookieOrigin(): string
+    {
+        $parts = parse_url($this->configuration->baseUrl);
+        $scheme = is_array($parts) && is_string($parts['scheme'] ?? null) ? $parts['scheme'] : 'http';
+        $host = is_array($parts) && is_string($parts['host'] ?? null) ? $parts['host'] : 'localhost';
+        $port = is_array($parts) && is_int($parts['port'] ?? null) ? ':'.$parts['port'] : '';
+
+        return "{$scheme}://{$host}{$port}";
     }
 }

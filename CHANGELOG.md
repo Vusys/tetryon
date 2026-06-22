@@ -8,6 +8,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Cookie API on `Browser`** — `setCookie()`, `cookie()`, `deleteCookie()`,
+  `clearCookies()`. Backed by WebDriver BiDi storage (not `document.cookie`), so
+  HttpOnly cookies work and a cookie set before the first `visit()` is carried
+  by that request. Domain defaults to the base-URL host, path to `/`; options
+  cover `secure`, `httpOnly`, `sameSite`, `expiry`, and explicit `domain`/`path`.
 - **`Browser::evaluate(string $script): mixed`** — run a JavaScript expression in
   the page and get its value back. Promises are awaited, so an async IIFE
   resolves to its result. The supported escape hatch for in-page setup the
