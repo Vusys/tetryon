@@ -35,7 +35,7 @@
         "psr/log": "^3.0"
     },
     "require-dev": {
-        "infection/infection": "^0.29 || ^0.33",
+        "infection/infection": "^0.29 || ^0.33 || ^0.34",
         "larastan/larastan": "^3.0",
         "laravel/pint": "^1.18",
         "orchestra/testbench": "^9.0 || ^10.0",
