@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Actionability — scroll-dismiss overlay</title>
+    <style>
+        #menu {
+            position: absolute;
+            top: 500px;
+            left: 8px;
+            border: 1px solid #333;
+            background: #fff;
+        }
+        /* A tall page, so re-centring the already-visible menu item forces a
+           real downward scroll rather than a no-op. */
+        #filler { height: 3000px; }
+    </style>
+</head>
+<body>
+    <!-- An anchor-positioned popover that dismisses itself on the first scroll,
+         mimicking a real dropdown/menu. The menu opens at y=500 in a 720-tall
+         viewport, so its "Pick" item is fully visible and needs no scrolling to
+         be clicked. But it is not centred: an unconditional
+         scrollIntoView({block:'center'}) scrolls the page down to centre it,
+         that scroll closes the menu, the item collapses to 0x0 and the click
+         times out as zero-size (issue #96). The check must scroll only when the
+         target is off-screen. -->
+    <button data-testid="open" onclick="
+        var m = document.createElement('div');
+        m.id = 'menu';
+        var item = document.createElement('button');
+        item.setAttribute('data-testid', 'pick');
+        item.textContent = 'Pick';
+        item.onclick = function () {
+            document.getElementById('result').textContent = 'picked';
+        };
+        m.appendChild(item);
+        document.body.appendChild(m);
+        window.addEventListener('scroll', function () { m.remove(); }, { once: true });
+    ">Open</button>
+
+    <div id="filler"></div>
+
+    <div data-testid="result" id="result"></div>
+</body>
+</html>

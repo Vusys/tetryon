@@ -96,6 +96,15 @@ final class ActionabilityTest extends StaticSiteTestCase
             ->assertSee('clicked');
     }
 
+    public function test_click_inside_a_scroll_dismissing_overlay_does_not_dismiss_it(): void
+    {
+        $this->browser()
+            ->visit('/actionability-scroll-dismiss-overlay.html')
+            ->press('Open')
+            ->click('Pick')
+            ->assertSee('picked');
+    }
+
     public function test_click_on_a_permanently_occluded_target_reports_the_interceptor(): void
     {
         $this->expectException(TimeoutException::class);
