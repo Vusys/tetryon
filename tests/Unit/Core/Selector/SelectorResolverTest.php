@@ -8,6 +8,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Vusys\Tetryon\Core\Selector\ElementNotFoundException;
 use Vusys\Tetryon\Core\Selector\ElementReference;
+use Vusys\Tetryon\Core\Selector\HitTestProbe;
 use Vusys\Tetryon\Core\Selector\Locator;
 use Vusys\Tetryon\Core\Selector\NodeLocator;
 use Vusys\Tetryon\Core\Selector\ResolutionAttempt;
@@ -87,6 +88,41 @@ final class SelectorResolverTest extends TestCase
         new SelectorResolver($this->matchingOn('never', []))->resolveInteractive('Nope');
     }
 
+    public function test_it_prefers_a_hit_testable_match_over_an_earlier_occluded_one(): void
+    {
+        // Two elements share the target; the first in DOM order is not
+        // hit-testable (occluded), so the second must win (#101).
+        $locator = $this->matchingWithHitTesting(
+            'visible text',
+            [new ElementReference('occluded', 'div'), new ElementReference('visible', 'div')],
+            hitTestable: ['visible'],
+        );
+
+        self::assertSame('visible', new SelectorResolver($locator)->resolve('Pick me')->sharedId);
+    }
+
+    public function test_interactive_prefers_a_hit_testable_interactive_match(): void
+    {
+        $locator = $this->matchingWithHitTesting(
+            'button text',
+            [new ElementReference('occluded', 'button'), new ElementReference('visible', 'button')],
+            hitTestable: ['visible'],
+        );
+
+        self::assertSame('visible', new SelectorResolver($locator)->resolveInteractive('Pick me')->sharedId);
+    }
+
+    public function test_it_keeps_the_first_match_when_none_are_hit_testable(): void
+    {
+        $locator = $this->matchingWithHitTesting(
+            'visible text',
+            [new ElementReference('first', 'div'), new ElementReference('second', 'div')],
+            hitTestable: [],
+        );
+
+        self::assertSame('first', new SelectorResolver($locator)->resolve('Pick me')->sharedId);
+    }
+
     public function test_within_passes_the_root_to_the_locator(): void
     {
         $recorder = new class implements NodeLocator
@@ -125,6 +161,40 @@ final class SelectorResolverTest extends TestCase
             public function locateAll(Locator $locator, ?ElementReference $within = null): array
             {
                 return $this->byStrategy[$locator->description] ?? [];
+            }
+        };
+    }
+
+    /**
+     * A NodeLocator that also reports hit-testability: returns the given nodes
+     * for the named strategy, and treats only the listed shared ids as visible /
+     * hit-testable.
+     *
+     * @param  list<ElementReference>  $nodes
+     * @param  list<string>  $hitTestable
+     */
+    private function matchingWithHitTesting(string $description, array $nodes, array $hitTestable): NodeLocator&HitTestProbe
+    {
+        return new readonly class($description, $nodes, $hitTestable) implements HitTestProbe, NodeLocator
+        {
+            /**
+             * @param  list<ElementReference>  $nodes
+             * @param  list<string>  $hitTestable
+             */
+            public function __construct(
+                private string $description,
+                private array $nodes,
+                private array $hitTestable,
+            ) {}
+
+            public function locateAll(Locator $locator, ?ElementReference $within = null): array
+            {
+                return $locator->description === $this->description ? $this->nodes : [];
+            }
+
+            public function isHitTestable(ElementReference $element): bool
+            {
+                return in_array($element->sharedId, $this->hitTestable, true);
             }
         };
     }

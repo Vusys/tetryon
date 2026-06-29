@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Resolution — occluded duplicate</title>
+    <style>
+        #cover {
+            position: absolute;
+            inset: 0;
+            background: #fff;
+        }
+    </style>
+</head>
+<body>
+    <!-- Two controls share the text "Pick me". The first in DOM order is fully
+         covered by an opaque overlay, mimicking a widget that renders a hidden /
+         duplicate copy of an option's label (issue #101). Resolution must prefer
+         the second, visible, hit-testable control; picking the first (DOM order)
+         makes the click time out as occluded even though a clickable match
+         exists. -->
+    <div style="position: relative; height: 30px; width: 120px;">
+        <button data-testid="decoy" onclick="document.getElementById('result').textContent = 'wrong'">Pick me</button>
+        <div id="cover"></div>
+    </div>
+
+    <button
+        data-testid="real"
+        onclick="document.getElementById('result').textContent = 'picked'"
+    >Pick me</button>
+
+    <div data-testid="result" id="result"></div>
+</body>
+</html>

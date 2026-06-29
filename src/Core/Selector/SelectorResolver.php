@@ -7,8 +7,9 @@ namespace Vusys\Tetryon\Core\Selector;
 /**
  * Resolves a human target to a single element by trying each {@see Locator}
  * from {@see SelectorStrategy} in order and returning the first match —
- * preferring a form control over its `<label>` — or throwing
- * {@see ElementNotFoundException} with the full attempt list.
+ * preferring a form control over its `<label>`, and (when the locator can
+ * report it) a visible, hit-testable match over an occluded or hidden duplicate
+ * (#101) — or throwing {@see ElementNotFoundException} with the full attempt list.
  */
 final readonly class SelectorResolver
 {
@@ -45,7 +46,7 @@ final readonly class SelectorResolver
             $matches = $this->nodeLocator->locateAll($candidate, $this->root);
             $attempts[] = new ResolutionAttempt($candidate->description, count($matches));
 
-            $picked = $this->preferControl($matches);
+            $picked = $this->preferHitTestable($this->controlsFirst($matches));
             if ($picked instanceof ElementReference) {
                 return $picked;
             }
@@ -69,29 +70,56 @@ final readonly class SelectorResolver
             $matches = $this->nodeLocator->locateAll($candidate, $this->root);
             $attempts[] = new ResolutionAttempt($candidate->description, count($matches));
 
-            foreach ($matches as $match) {
-                if (in_array($match->localName, self::INTERACTIVE_TAGS, true)) {
-                    return $match;
-                }
+            $interactive = array_values(array_filter(
+                $matches,
+                fn (ElementReference $match): bool => in_array($match->localName, self::INTERACTIVE_TAGS, true),
+            ));
+            if ($interactive !== []) {
+                return $this->preferHitTestable($interactive) ?? $interactive[0];
             }
 
-            $fallback ??= $this->preferControl($matches);
+            $fallback ??= $this->preferHitTestable($this->controlsFirst($matches));
         }
 
         return $fallback ?? throw new ElementNotFoundException($target, $attempts);
     }
 
     /**
+     * Order matches so a non-`<label>` control comes before its `<label>` (#72),
+     * preserving DOM order within each group.
+     *
      * @param  list<ElementReference>  $matches
+     * @return list<ElementReference>
      */
-    private function preferControl(array $matches): ?ElementReference
+    private function controlsFirst(array $matches): array
     {
-        foreach ($matches as $match) {
-            if ($match->localName !== 'label') {
-                return $match;
+        $controls = array_filter($matches, fn (ElementReference $m): bool => $m->localName !== 'label');
+        $labels = array_filter($matches, fn (ElementReference $m): bool => $m->localName === 'label');
+
+        return [...$controls, ...$labels];
+    }
+
+    /**
+     * From candidates already in preference order, return the first that is
+     * visible and hit-testable, falling back to the first candidate. Only probes
+     * when more than one element matched and the locator can answer — so a single
+     * match (including a legitimately off-screen target) is returned untouched
+     * with no extra round-trip.
+     *
+     * @param  list<ElementReference>  $ordered
+     */
+    private function preferHitTestable(array $ordered): ?ElementReference
+    {
+        if (count($ordered) <= 1 || ! $this->nodeLocator instanceof HitTestProbe) {
+            return $ordered[0] ?? null;
+        }
+
+        foreach ($ordered as $candidate) {
+            if ($this->nodeLocator->isHitTestable($candidate)) {
+                return $candidate;
             }
         }
 
-        return $matches[0] ?? null;
+        return $ordered[0];
     }
 }

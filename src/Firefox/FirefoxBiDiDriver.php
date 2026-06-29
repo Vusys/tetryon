@@ -9,6 +9,7 @@ use Psr\Log\NullLogger;
 use stdClass;
 use Throwable;
 use Vusys\Tetryon\Core\Selector\ElementReference;
+use Vusys\Tetryon\Core\Selector\HitTestProbe;
 use Vusys\Tetryon\Core\Selector\Locator;
 use Vusys\Tetryon\Core\Selector\NodeLocator;
 use Vusys\Tetryon\Firefox\Bidi\BiDiConnection;
@@ -26,8 +27,32 @@ use Vusys\Tetryon\Firefox\Exception\FirefoxException;
  * layers build on: navigate, evaluate JS, screenshot, and collect console
  * output. Diagnostics (command trace, browser stderr) are first-class.
  */
-final class FirefoxBiDiDriver implements NodeLocator
+final class FirefoxBiDiDriver implements HitTestProbe, NodeLocator
 {
+    /**
+     * Predicate for {@see isHitTestable()}: visible, non-zero, on-screen, and the
+     * top-most element at its own centre (or related to it). Deliberately does
+     * NOT scroll — resolution only ranks candidates; scrolling is the
+     * actionability check's job. Used solely to break ties between several
+     * matches, and only when there is more than one, so a single legitimately
+     * off-screen target is never reached by this check and is returned as-is.
+     */
+    private const string HIT_TESTABLE_JS = <<<'JS'
+        function () {
+          const s = getComputedStyle(this);
+          if (s.display === 'none' || s.visibility === 'hidden') return false;
+          const r = this.getBoundingClientRect();
+          if (!(r.width || r.height)) return false;
+          const x = r.left + r.width / 2, y = r.top + r.height / 2;
+          const vw = window.innerWidth || document.documentElement.clientWidth;
+          const vh = window.innerHeight || document.documentElement.clientHeight;
+          if (x < 0 || y < 0 || x > vw || y > vh) return false;
+          const hit = document.elementFromPoint(x, y);
+          if (!hit) return false;
+          return hit === this || this.contains(hit) || hit.contains(this);
+        }
+        JS;
+
     private ?FirefoxProcess $process = null;
 
     private ?WebSocketClient $socket = null;
@@ -129,6 +154,11 @@ final class FirefoxBiDiDriver implements NodeLocator
         }
 
         return $references;
+    }
+
+    public function isHitTestable(ElementReference $element): bool
+    {
+        return $this->callFunctionOn($element, self::HIT_TESTABLE_JS) === true;
     }
 
     public function locate(string $css): ElementReference
