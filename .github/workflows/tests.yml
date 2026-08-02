@@ -136,3 +136,22 @@ jobs:
 
       - name: Run actionlint
         uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7 # v2.2.0
+
+  gate:
+    needs: [test, static-analysis, actionlint]
+    runs-on: ubuntu-latest
+    if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}
+    name: CI gate
+
+    steps:
+      - name: Require every upstream job to have passed or been skipped
+        run: |
+          results='${{ join(needs.*.result, ' ') }}'
+          echo "upstream results: ${results}"
+          for r in ${results}; do
+            if [ "${r}" = "failure" ] || [ "${r}" = "cancelled" ]; then
+              echo "::error::a required job did not pass (result=${r})"
+              exit 1
+            fi
+          done
+          echo "all required jobs passed (or were legitimately skipped)"
