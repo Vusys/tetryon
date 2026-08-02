@@ -2,7 +2,8 @@
 
 Tetryon is **beta** and **pre-1.0** (current release: 0.1.0): the public API may
 still change before 1.0, and changes are called out in the
-[changelog](../CHANGELOG.md). The supported surface is deliberately narrow.
+[changelog](https://github.com/Vusys/tetryon/blob/master/CHANGELOG.md). The
+supported surface is deliberately narrow.
 
 ## Supported
 
