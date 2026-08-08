@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Custom checkbox</title>
+    <style>
+        .hidden-opacity { opacity: 0; }
+        .hidden-pointer-events { pointer-events: none; }
+    </style>
+</head>
+<body>
+    <!--
+        The ubiquitous "hide the real checkbox, style the adjacent label" pattern:
+        the input is a sibling of the label with no for= and no wrapping (#138),
+        and it is visually hidden (#139). check()/uncheck() drive it with a
+        synthetic click, which a hidden real input still receives.
+    -->
+    <input type="checkbox" class="toggle hidden-opacity">
+    <label>Subscribe</label>
+
+    <input type="checkbox" class="pe-toggle hidden-pointer-events">
+    <label>Notifications</label>
+
+    <div data-testid="log"></div>
+    <script>
+        for (const cb of document.querySelectorAll('input[type=checkbox]')) {
+            cb.addEventListener('change', function () {
+                document.querySelector('[data-testid=log]').textContent =
+                    cb.className.split(' ')[0] + '=' + cb.checked;
+            });
+        }
+    </script>
+</body>
+</html>

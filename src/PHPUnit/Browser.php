@@ -1029,13 +1029,27 @@ final readonly class Browser
 
     /**
      * Resolve a checkbox/radio for check()/uncheck() — including one behind a
-     * text label associated by wrapping, `for=`, or adjacency (#138) — then wait
-     * for it to be actionable, and verify it really is a checkbox or radio (#77).
+     * text label associated by wrapping, `for=`, or adjacency (#138) — and verify
+     * it really is a checkbox or radio (#77).
+     *
+     * Unlike the pointer verbs, check()/uncheck() drive the control with a
+     * synthetic `this.click()`, which a visually-hidden real input backing a
+     * styled label still receives — the ubiquitous custom checkbox/radio/toggle
+     * pattern (`opacity: 0`, `pointer-events: none`). So this deliberately skips
+     * the pointer-actionability probe and waits only for the element to exist and
+     * be enabled (#139).
      */
     private function checkable(string $verb, string $field): ElementReference
     {
         $element = $this->resolveCheckableWaiting($field);
-        $this->awaitActionable($element, $field);
+
+        $enabled = $this->wait(
+            $this->configuration->timeouts->default,
+            fn (): bool => $this->driver->callFunctionOn($element, 'function(){ return !this.disabled; }') === true,
+        );
+        if (! $enabled) {
+            throw new TimeoutException("Timed out waiting for \"{$field}\" to become actionable (disabled).");
+        }
 
         $info = $this->elementInfo($element);
         if ($info->tag !== 'input' || ! in_array($info->type, ['checkbox', 'radio'], true)) {
