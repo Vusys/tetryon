@@ -47,6 +47,14 @@ genuinely did not appear in time. Increase the relevant
 [timeout](waiting.md#timeouts), or assert on a more specific signal that the
 page is ready.
 
+## An unhandled dialog appeared
+
+The page opened a `window.confirm` / `alert` / `prompt` that the test had not
+arranged an answer for. A dialog blocks the page, so it is dismissed to keep the
+session usable and the action fails naming it. Arrange the answer **before** the
+action that opens it — see
+[native dialogs](interactions.md#native-dialogs).
+
 ## Base URL is not reachable
 
 Tetryon does not start your app. Make sure it is running and that

@@ -6,8 +6,11 @@ namespace Vusys\Tetryon\Firefox;
 
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
-use stdClass;
 use Throwable;
+use Vusys\Tetryon\Core\Dialog\Dialog;
+use Vusys\Tetryon\Core\Dialog\DialogExpectation;
+use Vusys\Tetryon\Core\Dialog\DialogType;
+use Vusys\Tetryon\Core\Dialog\UnhandledDialogException;
 use Vusys\Tetryon\Core\Selector\ElementReference;
 use Vusys\Tetryon\Core\Selector\HitTestProbe;
 use Vusys\Tetryon\Core\Selector\Locator;
@@ -67,6 +70,13 @@ final class FirefoxBiDiDriver implements HitTestProbe, NodeLocator
     /** @var array<string, NetworkRecord> keyed by BiDi request id */
     private array $network = [];
 
+    private ?DialogExpectation $expectation = null;
+
+    private ?Dialog $lastDialog = null;
+
+    /** @var list<string> complaints about dialogs nobody arranged an answer for */
+    private array $dialogComplaints = [];
+
     public function __construct(
         private readonly LaunchOptions $options = new LaunchOptions,
         private readonly LoggerInterface $logger = new NullLogger,
@@ -86,8 +96,22 @@ final class FirefoxBiDiDriver implements HitTestProbe, NodeLocator
         );
         $this->bidi = new BiDiConnection($this->socket, $this->logger, $this->trace);
 
-        $this->bidi->send('session.new', ['capabilities' => ['alwaysMatch' => new stdClass]]);
-        $this->bidi->subscribe('log.entryAdded', 'network.beforeRequestSent', 'network.responseCompleted');
+        $this->bidi->send('session.new', ['capabilities' => ['alwaysMatch' => [
+            // Firefox's default is to dismiss a dialog behind the test's back,
+            // which silently sends every journey down the "cancel" branch. Take
+            // ownership instead: the dialogs the test arranged an answer for get
+            // it, and the ones it didn't are dismissed *and reported*. Leaving
+            // beforeunload to the browser keeps navigation from wedging on a
+            // guard no test asked about.
+            'unhandledPromptBehavior' => ['default' => 'ignore', 'beforeUnload' => 'accept'],
+        ]]]);
+        $this->bidi->subscribe(
+            'log.entryAdded',
+            'network.beforeRequestSent',
+            'network.responseCompleted',
+            'browsingContext.userPromptOpened',
+        );
+        $this->bidi->listen($this->onEvent(...));
         $this->context = $this->resolveFirstContext();
     }
 
@@ -99,6 +123,7 @@ final class FirefoxBiDiDriver implements HitTestProbe, NodeLocator
             'wait' => 'complete',
         ]);
         $this->collectConsole();
+        $this->reportDialogs();
     }
 
     public function reload(): void
@@ -108,6 +133,7 @@ final class FirefoxBiDiDriver implements HitTestProbe, NodeLocator
             'wait' => 'complete',
         ]);
         $this->collectConsole();
+        $this->reportDialogs();
     }
 
     public function traverseHistory(int $delta): void
@@ -118,6 +144,7 @@ final class FirefoxBiDiDriver implements HitTestProbe, NodeLocator
         ]);
         $this->awaitDocumentReady();
         $this->collectConsole();
+        $this->reportDialogs();
     }
 
     /**
@@ -159,6 +186,101 @@ final class FirefoxBiDiDriver implements HitTestProbe, NodeLocator
     public function isHitTestable(ElementReference $element): bool
     {
         return $this->callFunctionOn($element, self::HIT_TESTABLE_JS) === true;
+    }
+
+    // ── Native dialogs ──────────────────────────────────────────────────────
+
+    /**
+     * Arrange how the next dialog is answered. Must be set *before* the action
+     * that opens it: a dialog blocks the page, so the command that triggered it
+     * does not return until the dialog is gone.
+     */
+    public function expectDialog(DialogExpectation $expectation): void
+    {
+        $this->expectation = $expectation;
+    }
+
+    /**
+     * The last dialog that appeared, whether it was expected or not — so a test
+     * can assert on the wording after the fact.
+     */
+    public function lastDialog(): ?Dialog
+    {
+        return $this->lastDialog;
+    }
+
+    /**
+     * Raise (once) anything that went wrong with a dialog since the last check.
+     * Called at the end of every command that can trigger one, so the failure
+     * lands on the action that caused it rather than on an unrelated timeout
+     * later in the test.
+     */
+    private function reportDialogs(): void
+    {
+        $complaint = array_shift($this->dialogComplaints);
+        if ($complaint === null) {
+            return;
+        }
+
+        $this->dialogComplaints = [];
+
+        throw new UnhandledDialogException($complaint);
+    }
+
+    /**
+     * Answer a dialog the moment it opens, from inside the wait of whichever
+     * command opened it. Never throws — the complaint is recorded and raised by
+     * {@see reportDialogs()} once that command has completed.
+     *
+     * @param  array<string, mixed>  $event
+     */
+    private function onEvent(array $event): void
+    {
+        if (($event['method'] ?? null) !== 'browsingContext.userPromptOpened') {
+            return;
+        }
+
+        $params = $event['params'] ?? null;
+        $dialog = new Dialog(
+            DialogType::fromDriver(is_array($params) ? $params['type'] ?? null : null),
+            is_array($params) && is_string($params['message'] ?? null) ? $params['message'] : '',
+            is_array($params) && is_string($params['defaultValue'] ?? null) ? $params['defaultValue'] : '',
+        );
+        $this->lastDialog = $dialog;
+
+        $expectation = $this->expectation;
+        $this->expectation = null;
+
+        if (! $expectation instanceof DialogExpectation) {
+            $this->handleUserPrompt(accept: false);
+            $this->dialogComplaints[] = UnhandledDialogException::unexpected($dialog)->getMessage();
+
+            return;
+        }
+
+        $this->handleUserPrompt($expectation->accept, $expectation->text);
+
+        $mismatch = $expectation->mismatch($dialog);
+        if ($mismatch !== null) {
+            $this->dialogComplaints[] = UnhandledDialogException::mismatched($mismatch)->getMessage();
+        }
+    }
+
+    private function handleUserPrompt(bool $accept, ?string $text = null): void
+    {
+        $params = ['context' => $this->context(), 'accept' => $accept];
+        if ($text !== null) {
+            $params['userText'] = $text;
+        }
+
+        try {
+            $this->connection()->send('browsingContext.handleUserPrompt', $params);
+        } catch (Throwable $e) {
+            // The dialog may already have closed (a `beforeunload` the browser
+            // accepts for us, or a page that tore itself down). Nothing to
+            // answer is not a failure; losing the session would be.
+            $this->logger->debug('BiDi could not handle a user prompt: {message}', ['message' => $e->getMessage()]);
+        }
     }
 
     public function locate(string $css): ElementReference
@@ -236,6 +358,7 @@ final class FirefoxBiDiDriver implements HitTestProbe, NodeLocator
             'files' => array_values($paths),
         ]);
         $this->collectConsole();
+        $this->reportDialogs();
     }
 
     public function click(string $css): void
@@ -258,6 +381,7 @@ final class FirefoxBiDiDriver implements HitTestProbe, NodeLocator
             'actions' => [$source],
         ]);
         $this->collectConsole();
+        $this->reportDialogs();
     }
 
     /**
@@ -356,6 +480,8 @@ final class FirefoxBiDiDriver implements HitTestProbe, NodeLocator
             throw new BiDiException('Script evaluation threw: '.$this->exceptionText($result));
         }
 
+        $this->reportDialogs();
+
         return RemoteValue::toPhp($result['result'] ?? null);
     }
 
@@ -384,6 +510,7 @@ final class FirefoxBiDiDriver implements HitTestProbe, NodeLocator
         }
 
         $this->collectConsole();
+        $this->reportDialogs();
 
         return RemoteValue::toPhp($result['result'] ?? null);
     }
@@ -469,6 +596,9 @@ final class FirefoxBiDiDriver implements HitTestProbe, NodeLocator
             $this->bidi = null;
             $this->context = null;
             $this->network = [];
+            $this->expectation = null;
+            $this->lastDialog = null;
+            $this->dialogComplaints = [];
         }
     }
 

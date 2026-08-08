@@ -48,6 +48,49 @@ final class BiDiConnectionTest extends TestCase
         }
     }
 
+    public function test_a_listener_can_answer_an_event_before_the_outer_command_returns(): void
+    {
+        // The shape a native dialog forces (#118): the event arrives while the
+        // command that opened it is still waiting, the listener must issue a
+        // command of its own to unblock it, and the outer response then arrives
+        // *after* the inner one.
+        $transport = new FakeTransport;
+        $transport->queue(['method' => 'browsingContext.userPromptOpened', 'params' => ['type' => 'confirm']]);
+        $transport->queue(['id' => 2, 'type' => 'success', 'result' => ['handled' => true]]);
+        $transport->queue(['id' => 1, 'type' => 'success', 'result' => ['clicked' => true]]);
+
+        $connection = new BiDiConnection($transport);
+        $inner = [];
+        $connection->listen(function (array $event) use ($connection, &$inner): void {
+            if (($event['method'] ?? null) === 'browsingContext.userPromptOpened') {
+                $inner[] = $connection->send('browsingContext.handleUserPrompt');
+            }
+        });
+
+        $result = $connection->send('input.performActions');
+
+        self::assertSame(['clicked' => true], $result);
+        self::assertSame([['handled' => true]], $inner);
+    }
+
+    public function test_a_response_arriving_before_an_inner_command_completes_is_not_lost(): void
+    {
+        // Same nesting, but Firefox answers the outer command first. The held
+        // response must be delivered when the outer wait resumes rather than
+        // dropped, which would hang the session.
+        $transport = new FakeTransport;
+        $transport->queue(['method' => 'browsingContext.userPromptOpened', 'params' => []]);
+        $transport->queue(['id' => 1, 'type' => 'success', 'result' => ['clicked' => true]]);
+        $transport->queue(['id' => 2, 'type' => 'success', 'result' => ['handled' => true]]);
+
+        $connection = new BiDiConnection($transport);
+        $connection->listen(function (array $event) use ($connection): void {
+            $connection->send('browsingContext.handleUserPrompt');
+        });
+
+        self::assertSame(['clicked' => true], $connection->send('input.performActions'));
+    }
+
     public function test_it_buffers_events_seen_while_awaiting_a_response(): void
     {
         $transport = new FakeTransport;

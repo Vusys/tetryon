@@ -84,6 +84,49 @@ throws `UndrivableElementException` naming the element, instead of silently
 doing nothing and failing later at an unrelated assertion. Drive a custom widget
 by composing `click()` with `evaluate()` (or `within()` + `click()`).
 
+## Native dialogs
+
+`window.confirm`, `window.alert` and `window.prompt` block the page, so the
+answer has to be arranged **before** the action that opens the dialog — the
+click that triggered it doesn't complete until the dialog is gone, so there is
+no "after" to answer it in.
+
+```php
+$this->browser()
+    ->visit('/presets')
+    ->acceptDialog('Delete the preset')   // OK; optionally assert the wording
+    ->press('Delete preset')
+    ->assertSee('Preset deleted');
+
+->dismissDialog()        // Cancel — the "keep it" branch of a destructive confirm
+->typeInDialog('Weekly') // answers a window.prompt with text, then OK
+```
+
+After the action, the wording is still readable:
+
+```php
+->assertDialogMessage('Delete the preset')   // substring match, retries
+$message = $this->browser()->dialogMessage(); // ?string
+```
+
+An answer is **one-shot** — it applies to the next dialog only. A second,
+unexpected dialog is still a failure rather than something silently swallowed.
+
+### Unexpected dialogs
+
+A dialog nobody arranged an answer for is **dismissed and reported**: the action
+fails immediately with `UnhandledDialogException`, naming the type and message.
+
+```
+An unhandled dialog appeared (confirm: "Delete the preset 'Nightly'?"). It was
+dismissed so the session could continue. Arrange an answer before the action
+that opens it: acceptDialog(), dismissDialog(), or typeInDialog("...").
+```
+
+The dismissal is what keeps the session usable — the rest of the test, and the
+failure artifacts, still work. `beforeunload` guards are left to the browser and
+accepted automatically, so navigating away from a dirty form is never blocked.
+
 ## Reading values
 
 ```php

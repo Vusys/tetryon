@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Native dialogs</title>
+</head>
+<body>
+    <!-- Every journey shape that passes through a native dialog: a destructive
+         confirm, an alert, a prompt, and a confirm nobody was expecting. -->
+    <button data-testid="delete" onclick="
+        if (window.confirm('Delete the preset \'Nightly\'?')) {
+            document.getElementById('result').textContent = 'deleted';
+        } else {
+            document.getElementById('result').textContent = 'kept';
+        }
+    ">Delete preset</button>
+
+    <button data-testid="notify" onclick="
+        window.alert('Saved 3 presets.');
+        document.getElementById('result').textContent = 'acknowledged';
+    ">Notify</button>
+
+    <button data-testid="rename" onclick="
+        var name = window.prompt('New preset name', 'Nightly');
+        document.getElementById('result').textContent = name === null ? 'cancelled' : 'renamed to ' + name;
+    ">Rename preset</button>
+
+    <div data-testid="result" id="result"></div>
+</body>
+</html>

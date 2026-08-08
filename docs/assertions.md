@@ -70,6 +70,15 @@ $browser->attribute('@nav-home', 'data-state'); // ?string — null if absent
 `attribute()` reads the literal attribute (`href`, `src`, `title`, `data-*`,
 `aria-*`, …), so `href="/x"` reads back as `/x`, not the resolved absolute URL.
 
+## Dialogs
+
+```php
+->assertDialogMessage('Delete the preset')   // the last dialog that appeared; substring match
+```
+
+Answering a dialog is an [interaction](interactions.md#native-dialogs) and is
+arranged before the action; this asserts the wording afterwards.
+
 ## Network
 
 Assert which requests did or didn't fire (substring or `*`-glob match). Useful

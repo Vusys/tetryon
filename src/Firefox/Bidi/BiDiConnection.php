@@ -22,6 +22,12 @@ final class BiDiConnection
     /** @var list<array<string, mixed>> */
     private array $events = [];
 
+    /** @var array<int, array<array-key, mixed>> responses that arrived while an inner command was in flight */
+    private array $responses = [];
+
+    /** @var list<callable(array<string, mixed>): void> */
+    private array $listeners = [];
+
     public function __construct(
         private readonly MessageTransport $socket,
         private readonly LoggerInterface $logger = new NullLogger,
@@ -31,6 +37,24 @@ final class BiDiConnection
     public function trace(): BiDiTrace
     {
         return $this->trace;
+    }
+
+    /**
+     * Watch events as they arrive, rather than after the command that saw them
+     * returns. Needed for events that must be answered *before* the in-flight
+     * command can complete — a native dialog blocks the page, so the command
+     * that opened it never responds until the dialog is handled.
+     *
+     * A listener may therefore call {@see send()} re-entrantly. That is safe: a
+     * response for an outer command that arrives while the inner one is waiting
+     * is held and delivered when the outer wait resumes. Listeners must not
+     * throw — an event is not the right place to fail a test.
+     *
+     * @param  callable(array<string, mixed>): void  $listener
+     */
+    public function listen(callable $listener): void
+    {
+        $this->listeners[] = $listener;
     }
 
     /**
@@ -49,6 +73,13 @@ final class BiDiConnection
         $this->socket->sendText($this->encode($id, $method, $params));
 
         while (true) {
+            $held = $this->responses[$id] ?? null;
+            if ($held !== null) {
+                unset($this->responses[$id]);
+
+                return $this->resultOrThrow($method, $id, $held);
+            }
+
             $message = $this->readDecoded();
             $messageId = $message['id'] ?? null;
 
@@ -57,7 +88,9 @@ final class BiDiConnection
             }
 
             if (is_int($messageId)) {
-                $this->logger->warning('BiDi unexpected response for #{id}', ['id' => $messageId]);
+                // An outer command's response, arriving while a listener runs a
+                // nested command inside its wait. Hold it for the outer loop.
+                $this->responses[$messageId] = $message;
 
                 continue;
             }
@@ -177,6 +210,10 @@ final class BiDiConnection
         ));
 
         $this->events[] = $message;
+
+        foreach ($this->listeners as $listener) {
+            $listener($message);
+        }
     }
 
     private function summarise(mixed $data): string
