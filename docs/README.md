@@ -27,6 +27,8 @@ Node, Selenium, ChromeDriver, or Dusk-style setup.
 - [Continuous integration](ci.md) — running the Browser suite in CI.
 - [Compatibility](compatibility.md) — supported PHP/PHPUnit/Firefox/OS, the
   public API, and versioning.
+- [TodoMVC compatibility](todomvc.md) — the shared behavioural suite run against
+  ten real frameworks, with a matrix and gap triage.
 - [Troubleshooting](troubleshooting.md) — common problems.
 
 ## The shape of a test
