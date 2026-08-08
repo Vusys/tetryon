@@ -8,15 +8,17 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Vusys\Tetryon\Core\Selector\ElementNotFoundException;
 use Vusys\Tetryon\Core\Selector\ElementReference;
-use Vusys\Tetryon\Core\Selector\HitTestProbe;
 use Vusys\Tetryon\Core\Selector\Locator;
 use Vusys\Tetryon\Core\Selector\NodeLocator;
 use Vusys\Tetryon\Core\Selector\ResolutionAttempt;
 use Vusys\Tetryon\Core\Selector\SelectorResolver;
+use Vusys\Tetryon\Core\Selector\Visibility;
+use Vusys\Tetryon\Core\Selector\VisibilityProbe;
 
 #[CoversClass(SelectorResolver::class)]
 #[CoversClass(ElementNotFoundException::class)]
 #[CoversClass(ResolutionAttempt::class)]
+#[CoversClass(Visibility::class)]
 final class SelectorResolverTest extends TestCase
 {
     public function test_it_returns_the_first_matching_strategy(): void
@@ -88,36 +90,50 @@ final class SelectorResolverTest extends TestCase
         new SelectorResolver($this->matchingOn('never', []))->resolveInteractive('Nope');
     }
 
-    public function test_it_prefers_a_hit_testable_match_over_an_earlier_occluded_one(): void
+    public function test_it_prefers_a_clickable_match_over_an_earlier_occluded_one(): void
     {
-        // Two elements share the target; the first in DOM order is not
-        // hit-testable (occluded), so the second must win (#101).
-        $locator = $this->matchingWithHitTesting(
+        // Two elements share the target; the first in DOM order is occluded, so
+        // the second must win (#101).
+        $locator = $this->matchingWithVisibility(
             'visible text',
             [new ElementReference('occluded', 'div'), new ElementReference('visible', 'div')],
-            hitTestable: ['visible'],
+            visibility: ['occluded' => Visibility::Rendered, 'visible' => Visibility::Clickable],
         );
 
         self::assertSame('visible', new SelectorResolver($locator)->resolve('Pick me')->sharedId);
     }
 
-    public function test_interactive_prefers_a_hit_testable_interactive_match(): void
+    public function test_interactive_prefers_a_clickable_interactive_match(): void
     {
-        $locator = $this->matchingWithHitTesting(
+        $locator = $this->matchingWithVisibility(
             'button text',
             [new ElementReference('occluded', 'button'), new ElementReference('visible', 'button')],
-            hitTestable: ['visible'],
+            visibility: ['occluded' => Visibility::Rendered, 'visible' => Visibility::Clickable],
         );
 
         self::assertSame('visible', new SelectorResolver($locator)->resolveInteractive('Pick me')->sharedId);
     }
 
-    public function test_it_keeps_the_first_match_when_none_are_hit_testable(): void
+    public function test_it_prefers_a_rendered_match_when_nothing_is_clickable(): void
     {
-        $locator = $this->matchingWithHitTesting(
+        // Neither is clickable at rest: the first is a zero-size measurement
+        // node, the second a real match below the fold. Only the second becomes
+        // clickable once the action scrolls to it, so it must win (#101).
+        $locator = $this->matchingWithVisibility(
+            'visible text',
+            [new ElementReference('sizer', 'div'), new ElementReference('off-screen', 'div')],
+            visibility: ['sizer' => Visibility::Hidden, 'off-screen' => Visibility::Rendered],
+        );
+
+        self::assertSame('off-screen', new SelectorResolver($locator)->resolve('Pick me')->sharedId);
+    }
+
+    public function test_it_keeps_the_first_match_when_none_are_rendered(): void
+    {
+        $locator = $this->matchingWithVisibility(
             'visible text',
             [new ElementReference('first', 'div'), new ElementReference('second', 'div')],
-            hitTestable: [],
+            visibility: [],
         );
 
         self::assertSame('first', new SelectorResolver($locator)->resolve('Pick me')->sharedId);
@@ -166,25 +182,25 @@ final class SelectorResolverTest extends TestCase
     }
 
     /**
-     * A NodeLocator that also reports hit-testability: returns the given nodes
-     * for the named strategy, and treats only the listed shared ids as visible /
-     * hit-testable.
+     * A NodeLocator that also ranks visibility: returns the given nodes for the
+     * named strategy, and reports each shared id at the visibility named in the
+     * map (anything unlisted is hidden).
      *
      * @param  list<ElementReference>  $nodes
-     * @param  list<string>  $hitTestable
+     * @param  array<string, Visibility>  $visibility
      */
-    private function matchingWithHitTesting(string $description, array $nodes, array $hitTestable): NodeLocator&HitTestProbe
+    private function matchingWithVisibility(string $description, array $nodes, array $visibility): NodeLocator&VisibilityProbe
     {
-        return new readonly class($description, $nodes, $hitTestable) implements HitTestProbe, NodeLocator
+        return new readonly class($description, $nodes, $visibility) implements NodeLocator, VisibilityProbe
         {
             /**
              * @param  list<ElementReference>  $nodes
-             * @param  list<string>  $hitTestable
+             * @param  array<string, Visibility>  $visibility
              */
             public function __construct(
                 private string $description,
                 private array $nodes,
-                private array $hitTestable,
+                private array $visibility,
             ) {}
 
             public function locateAll(Locator $locator, ?ElementReference $within = null): array
@@ -192,9 +208,9 @@ final class SelectorResolverTest extends TestCase
                 return $locator->description === $this->description ? $this->nodes : [];
             }
 
-            public function isHitTestable(ElementReference $element): bool
+            public function visibility(ElementReference $element): Visibility
             {
-                return in_array($element->sharedId, $this->hitTestable, true);
+                return $this->visibility[$element->sharedId] ?? Visibility::Hidden;
             }
         };
     }

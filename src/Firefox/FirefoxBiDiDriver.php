@@ -9,9 +9,10 @@ use Psr\Log\NullLogger;
 use stdClass;
 use Throwable;
 use Vusys\Tetryon\Core\Selector\ElementReference;
-use Vusys\Tetryon\Core\Selector\HitTestProbe;
 use Vusys\Tetryon\Core\Selector\Locator;
 use Vusys\Tetryon\Core\Selector\NodeLocator;
+use Vusys\Tetryon\Core\Selector\Visibility;
+use Vusys\Tetryon\Core\Selector\VisibilityProbe;
 use Vusys\Tetryon\Firefox\Bidi\BiDiConnection;
 use Vusys\Tetryon\Firefox\Bidi\BiDiTrace;
 use Vusys\Tetryon\Firefox\Bidi\InputActions;
@@ -27,29 +28,32 @@ use Vusys\Tetryon\Firefox\Exception\FirefoxException;
  * layers build on: navigate, evaluate JS, screenshot, and collect console
  * output. Diagnostics (command trace, browser stderr) are first-class.
  */
-final class FirefoxBiDiDriver implements HitTestProbe, NodeLocator
+final class FirefoxBiDiDriver implements NodeLocator, VisibilityProbe
 {
     /**
-     * Predicate for {@see isHitTestable()}: visible, non-zero, on-screen, and the
-     * top-most element at its own centre (or related to it). Deliberately does
-     * NOT scroll — resolution only ranks candidates; scrolling is the
-     * actionability check's job. Used solely to break ties between several
-     * matches, and only when there is more than one, so a single legitimately
-     * off-screen target is never reached by this check and is returned as-is.
+     * Probe for {@see self::visibility()}: `clickable` when the element is rendered,
+     * on-screen and top-most at its own centre; `rendered` when it has a real box
+     * but is off-screen or covered; `hidden` when it is not rendered at all.
+     * Deliberately does NOT scroll — resolution only ranks candidates; scrolling
+     * is the actionability check's job, which is exactly why `rendered` is not
+     * folded into `hidden`: an off-screen match is one scroll away from being
+     * clicked, an unrendered one never will be. Used solely to break ties between
+     * several matches, and only when there is more than one, so a single
+     * legitimately off-screen target is never reached by this check.
      */
-    private const string HIT_TESTABLE_JS = <<<'JS'
+    private const string VISIBILITY_JS = <<<'JS'
         function () {
           const s = getComputedStyle(this);
-          if (s.display === 'none' || s.visibility === 'hidden') return false;
+          if (s.display === 'none' || s.visibility === 'hidden') return 'hidden';
           const r = this.getBoundingClientRect();
-          if (!(r.width || r.height)) return false;
+          if (!(r.width || r.height)) return 'hidden';
           const x = r.left + r.width / 2, y = r.top + r.height / 2;
           const vw = window.innerWidth || document.documentElement.clientWidth;
           const vh = window.innerHeight || document.documentElement.clientHeight;
-          if (x < 0 || y < 0 || x > vw || y > vh) return false;
+          if (x < 0 || y < 0 || x > vw || y > vh) return 'rendered';
           const hit = document.elementFromPoint(x, y);
-          if (!hit) return false;
-          return hit === this || this.contains(hit) || hit.contains(this);
+          if (!hit) return 'rendered';
+          return (hit === this || this.contains(hit) || hit.contains(this)) ? 'clickable' : 'rendered';
         }
         JS;
 
@@ -156,9 +160,9 @@ final class FirefoxBiDiDriver implements HitTestProbe, NodeLocator
         return $references;
     }
 
-    public function isHitTestable(ElementReference $element): bool
+    public function visibility(ElementReference $element): Visibility
     {
-        return $this->callFunctionOn($element, self::HIT_TESTABLE_JS) === true;
+        return Visibility::fromProbe($this->callFunctionOn($element, self::VISIBILITY_JS));
     }
 
     public function locate(string $css): ElementReference

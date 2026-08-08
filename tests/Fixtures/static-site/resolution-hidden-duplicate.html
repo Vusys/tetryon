@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Resolution — hidden duplicate, real match below the fold</title>
+    <style>
+        /* An off-screen measurement node of the kind rich select / tree-select
+           widgets keep alongside the visible options (issue #101 names
+           @riophae/vue-treeselect's hidden input sizer). Rendered, so it matches
+           a text locator; zero-size, so it can never be clicked. */
+        .sizer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 0;
+            height: 0;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+    <!-- Two nodes share the text "Pick me": a zero-size sizer first in DOM
+         order, and the real option far below the fold. Neither is hit-testable
+         at rest — the sizer because it has no box, the option because it is not
+         in the viewport yet — so a hit-test-or-nothing preference falls straight
+         back to DOM order and locks onto the sizer, and the click then times out
+         as zero-size even though a perfectly clickable match exists a scroll
+         away. Resolution must prefer the rendered match over the unrendered one
+         even when neither is clickable right now. -->
+    <div class="sizer" role="option">Pick me</div>
+
+    <div style="height: 150vh">options above</div>
+
+    <div
+        role="option"
+        data-testid="real"
+        onclick="document.getElementById('result').textContent = 'picked'"
+    >Pick me</div>
+
+    <div data-testid="result" id="result"></div>
+</body>
+</html>
