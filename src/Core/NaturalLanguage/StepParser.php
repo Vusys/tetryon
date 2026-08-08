@@ -30,6 +30,7 @@ final class StepParser
         ['/^I uncheck "([^"]*)"$/i', 'uncheck', [1]],
         ['/^I select "([^"]*)" from "([^"]*)"$/i', 'select', [2, 1]],
         ['/^I press the "([^"]*)" key$/i', 'pressKey', [1]],
+        ['/^I scroll to "([^"]*)"$/i', 'scrollTo', [1]],
         ['/^I should not see "([^"]*)"$/i', 'assertDontSee', [1]],
         ['/^I should see "([^"]*)"$/i', 'assertSee', [1]],
         ['/^I should be on "([^"]*)"$/i', 'assertPathIs', [1]],

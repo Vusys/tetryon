@@ -42,6 +42,21 @@ libraries like Sortable.js / vuedraggable register the gesture and compute
 direction. This drives **pointer-based** DnD; HTML5-native `draggable`
 drag/drop events are out of scope.
 
+## Scrolling
+
+```php
+->scrollTo('Load more')   // centre the target, scrolling any scrollable ancestor
+->scrollToBottom()
+->scrollToTop();
+```
+
+Actions scroll on their own — `click()` brings its target into view, including
+out of an `overflow: auto` pane, and moves it clear of a fixed header or footer
+if one covers the click point. These verbs are for when the scroll *is* the
+behaviour under test: an infinite scroller, a scroll-spy nav, a list that
+lazy-loads as you reach it. `scrollTo()` waits for the element to exist but not
+to be clickable, so it can reach a region that has not rendered its controls yet.
+
 ## Typing
 
 ```php

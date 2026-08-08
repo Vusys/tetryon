@@ -53,6 +53,14 @@ final class StepParserTest extends TestCase
         self::assertSame('assertSee', StepParser::parse('I should see "Dashboard"')->action);
     }
 
+    public function test_it_parses_a_scroll_step(): void
+    {
+        $step = StepParser::parse('I scroll to "Load more"');
+
+        self::assertSame('scrollTo', $step->action);
+        self::assertSame(['Load more'], $step->arguments);
+    }
+
     public function test_parsing_is_case_insensitive_and_trims(): void
     {
         self::assertSame('press', StepParser::parse('  i PRESS "Save"  ')->action);

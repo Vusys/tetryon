@@ -8,7 +8,11 @@ test.
 - **Every action** (`click`, `fill`, `select`, …) first waits for its target to
   exist and be **actionable** — visible, not `display:none` / `visibility:hidden`,
   and not `disabled`. So clicking a button that appears 400ms after an AJAX call
-  just works.
+  just works. The action also brings its target into view — out of a scrollable
+  pane if it has scrolled past the pane's edge, and clear of a fixed header or
+  footer if one is painted over the click point — while leaving a target that is
+  already clear exactly where it is, so an anchored popover or menu is not
+  scrolled out from under the click.
 - **Every assertion** (`assertSee`, `assertVisible`, `assertValue`, …) retries
   until it passes or the timeout elapses. A delayed-rendered "Dashboard" heading
   is asserted without any explicit wait.

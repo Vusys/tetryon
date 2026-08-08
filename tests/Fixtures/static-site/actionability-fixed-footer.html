@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Actionability — target under a fixed footer, no scroll needed</title>
+    <style>
+        body { margin: 0; }
+
+        #bar {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 20vh;
+            background: #222;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <!-- The second shape of issue #117, and the one that needs no scroll
+         container at all: a `position: fixed` action bar painted over a target
+         that is inside the viewport by every measure the probe takes. The rect
+         sits around 85vh–88vh in a 100vh viewport, so a viewport-only in-view
+         test says "already visible" and declines to scroll; the hit test then
+         returns the bar on every retry and the click can never land. There is
+         plenty of page below, so centring the target clears the bar. -->
+    <div style="height: 85vh">a list that has grown past the fold</div>
+
+    <button
+        data-testid="target"
+        onclick="document.getElementById('result').textContent = 'clicked'"
+    >Target</button>
+
+    <div style="height: 100vh">more rows below</div>
+
+    <div data-testid="result" id="result"></div>
+
+    <nav id="bar">save / generate</nav>
+</body>
+</html>

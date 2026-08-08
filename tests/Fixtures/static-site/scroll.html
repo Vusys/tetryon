@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Scroll verbs</title>
+    <style>
+        body { margin: 0; }
+        .pane { height: 200px; overflow-y: auto; border: 1px solid #ccc; }
+        .pane .filler { height: 800px; }
+    </style>
+</head>
+<body>
+    <!-- Exercises the public scroll verbs: a lazily-revealed row far down the
+         page, and a row inside a scrollable pane that no page-level scroll can
+         reach. -->
+    <div style="height: 300vh">page content</div>
+
+    <div data-testid="lazy-row">Lazy row</div>
+
+    <div class="pane">
+        <div class="filler">pane content</div>
+        <div data-testid="pane-row">Pane row</div>
+    </div>
+
+    <div style="height: 200vh">more page content</div>
+
+    <div data-testid="seen" id="seen"></div>
+
+    <script>
+        const seen = [];
+        const observer = new IntersectionObserver(function (entries) {
+            for (const entry of entries) {
+                if (! entry.isIntersecting) {
+                    continue;
+                }
+                const name = entry.target.getAttribute('data-testid');
+                if (! seen.includes(name)) {
+                    seen.push(name);
+                    document.getElementById('seen').textContent = seen.join(' ');
+                }
+            }
+        });
+
+        for (const row of document.querySelectorAll('[data-testid$="-row"]')) {
+            observer.observe(row);
+        }
+    </script>
+</body>
+</html>

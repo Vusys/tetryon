@@ -46,6 +46,7 @@ Quoted values are the arguments. Parsing is case-insensitive.
 | `I uncheck "Field"` | `uncheck` |
 | `I select "value" from "Field"` | `select` |
 | `I press the "Enter" key` | `pressKey` |
+| `I scroll to "Target"` | `scrollTo` |
 | `I should see "text"` | `assertSee` |
 | `I should not see "text"` | `assertDontSee` |
 | `I should be on "/path"` | `assertPathIs` |

@@ -105,6 +105,22 @@ final class ActionabilityTest extends StaticSiteTestCase
             ->assertSee('picked');
     }
 
+    public function test_click_scrolls_a_target_clipped_out_of_a_scrollable_container(): void
+    {
+        $this->browser()
+            ->visit('/actionability-scroll-container-clipped.html')
+            ->click('Target')
+            ->assertSee('clicked');
+    }
+
+    public function test_click_scrolls_an_in_viewport_target_out_from_under_a_fixed_footer(): void
+    {
+        $this->browser()
+            ->visit('/actionability-fixed-footer.html')
+            ->click('Target')
+            ->assertSee('clicked');
+    }
+
     public function test_click_on_a_permanently_occluded_target_reports_the_interceptor(): void
     {
         $this->expectException(TimeoutException::class);
