@@ -19,6 +19,9 @@
         <testsuite name="Browser">
             <directory>tests/Browser</directory>
         </testsuite>
+        <testsuite name="TodoMvc">
+            <directory>tests/TodoMvc</directory>
+        </testsuite>
     </testsuites>
     <source>
         <include>
