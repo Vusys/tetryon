@@ -20,4 +20,12 @@ final class ResolutionTest extends StaticSiteTestCase
             ->click('Pick me')
             ->assertSee('picked');
     }
+
+    public function test_click_prefers_a_rendered_match_below_the_fold_over_a_zero_size_duplicate(): void
+    {
+        $this->browser()
+            ->visit('/resolution-hidden-duplicate.html')
+            ->click('Pick me')
+            ->assertSee('picked');
+    }
 }

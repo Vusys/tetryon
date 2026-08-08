@@ -33,6 +33,26 @@ The configured test attributes are the most robust and the recommended way to
 target elements you control. See [Configuration](configuration.md) to change
 the list.
 
+## When several elements match
+
+Within one strategy, resolution breaks the tie rather than blindly taking the
+first node in DOM order:
+
+- a **form control** wins over its `<label>`;
+- for `click()` / `press()`, an **interactive** element (button, link, input, …)
+  wins over a non-interactive one — so pressing `'Log in'` doesn't hit a heading
+  that shares the text;
+- a **clickable** match — rendered, on-screen, and top-most at its own centre —
+  wins over one that is hidden or covered;
+- failing that, a **rendered** match wins over an unrendered one. A real option
+  below the fold and a zero-size measurement node are both un-clickable where
+  they sit, but only the first becomes clickable once the action scrolls to it.
+  Rich select / tree-select widgets that keep a hidden sizer node alongside the
+  visible options rely on this.
+
+DOM order is the last resort, so a single match is never probed and behaves
+exactly as before.
+
 ## Explicit selectors
 
 Prefix or shape the target to bypass the human-text resolution:

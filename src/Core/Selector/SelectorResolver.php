@@ -8,8 +8,9 @@ namespace Vusys\Tetryon\Core\Selector;
  * Resolves a human target to a single element by trying each {@see Locator}
  * from {@see SelectorStrategy} in order and returning the first match —
  * preferring a form control over its `<label>`, and (when the locator can
- * report it) a visible, hit-testable match over an occluded or hidden duplicate
- * (#101) — or throwing {@see ElementNotFoundException} with the full attempt list.
+ * report it) a clickable match, then a merely rendered one, over an occluded or
+ * unrendered duplicate (#101) — or throwing {@see ElementNotFoundException}
+ * with the full attempt list.
  */
 final readonly class SelectorResolver
 {
@@ -46,7 +47,7 @@ final readonly class SelectorResolver
             $matches = $this->nodeLocator->locateAll($candidate, $this->root);
             $attempts[] = new ResolutionAttempt($candidate->description, count($matches));
 
-            $picked = $this->preferHitTestable($this->controlsFirst($matches));
+            $picked = $this->preferVisible($this->controlsFirst($matches));
             if ($picked instanceof ElementReference) {
                 return $picked;
             }
@@ -75,10 +76,10 @@ final readonly class SelectorResolver
                 fn (ElementReference $match): bool => in_array($match->localName, self::INTERACTIVE_TAGS, true),
             ));
             if ($interactive !== []) {
-                return $this->preferHitTestable($interactive) ?? $interactive[0];
+                return $this->preferVisible($interactive) ?? $interactive[0];
             }
 
-            $fallback ??= $this->preferHitTestable($this->controlsFirst($matches));
+            $fallback ??= $this->preferVisible($this->controlsFirst($matches));
         }
 
         return $fallback ?? throw new ElementNotFoundException($target, $attempts);
@@ -100,26 +101,36 @@ final readonly class SelectorResolver
     }
 
     /**
-     * From candidates already in preference order, return the first that is
-     * visible and hit-testable, falling back to the first candidate. Only probes
-     * when more than one element matched and the locator can answer — so a single
-     * match (including a legitimately off-screen target) is returned untouched
-     * with no extra round-trip.
+     * From candidates already in preference order, return the first clickable
+     * one; failing that the first merely rendered one; failing that the first
+     * candidate. The middle tier is what keeps the preference useful when
+     * *nothing* is clickable at rest — a real option below the fold and a
+     * zero-size measurement node are both un-hit-testable, but only one of them
+     * becomes clickable once the action scrolls to it.
+     *
+     * Only probes when more than one element matched and the locator can answer,
+     * so a single match (including a legitimately off-screen target) is returned
+     * untouched with no extra round-trip.
      *
      * @param  list<ElementReference>  $ordered
      */
-    private function preferHitTestable(array $ordered): ?ElementReference
+    private function preferVisible(array $ordered): ?ElementReference
     {
-        if (count($ordered) <= 1 || ! $this->nodeLocator instanceof HitTestProbe) {
+        if (count($ordered) <= 1 || ! $this->nodeLocator instanceof VisibilityProbe) {
             return $ordered[0] ?? null;
         }
 
+        $rendered = null;
         foreach ($ordered as $candidate) {
-            if ($this->nodeLocator->isHitTestable($candidate)) {
+            $visibility = $this->nodeLocator->visibility($candidate);
+            if ($visibility === Visibility::Clickable) {
                 return $candidate;
+            }
+            if ($visibility === Visibility::Rendered) {
+                $rendered ??= $candidate;
             }
         }
 
-        return $ordered[0];
+        return $rendered ?? $ordered[0];
     }
 }
