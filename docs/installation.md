@@ -6,8 +6,7 @@
 - **PHPUnit 12 or 13.**
 - **Firefox** (stable; ESR where practical) on **macOS** or **Linux**.
 
-No Node, Selenium Server, ChromeDriver, or geckodriver is needed — Tetryon
-drives Firefox directly over WebDriver BiDi.
+No Node, Selenium Server, ChromeDriver, or geckodriver is needed — Tetryon drives Firefox directly over WebDriver BiDi.
 
 ## Install with Composer
 
@@ -35,8 +34,7 @@ sudo apt-get update && sudo apt-get install -y firefox
 brew install --cask firefox
 ```
 
-If Firefox is not on your `PATH`, point Tetryon at it with the
-`TETRYON_FIREFOX_BINARY` environment variable (see [Configuration](configuration.md)).
+If Firefox is not on your `PATH`, point Tetryon at it with the `TETRYON_FIREFOX_BINARY` environment variable (see [Configuration](configuration.md)).
 
 ## Check your environment
 
@@ -56,14 +54,11 @@ Artifacts         OK    tests/Browser/Artifacts
 Ready.
 ```
 
-`doctor` actually launches headless Firefox and completes a WebDriver BiDi
-handshake, so a green report means real browser tests will run. Each failure
-prints a fix hint; `doctor` exits non-zero if anything is wrong.
+`doctor` actually launches headless Firefox and completes a WebDriver BiDi handshake, so a green report means real browser tests will run. Each failure prints a fix hint; `doctor` exits non-zero if anything is wrong.
 
 ## Configure a Browser test suite
 
-Add a `Browser` suite to your `phpunit.xml` so browser tests are opt-in and run
-separately from your fast unit tests:
+Add a `Browser` suite to your `phpunit.xml` so browser tests are opt-in and run separately from your fast unit tests:
 
 ```xml
 <testsuites>

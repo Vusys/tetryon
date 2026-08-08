@@ -1,9 +1,6 @@
 # Natural-language steps
 
-Tetryon has a small, deterministic natural-language layer that lives **inside**
-PHPUnit — no `.feature` files, no separate runner, no AI. Each sentence maps to
-exactly one fluent call, so it is just a readable convenience over the
-[canonical API](writing-tests.md).
+Tetryon has a small, deterministic natural-language layer that lives **inside** PHPUnit — no `.feature` files, no separate runner, no AI. Each sentence maps to exactly one fluent call, so it is just a readable convenience over the [canonical API](writing-tests.md).
 
 ## `->step()`
 
@@ -18,8 +15,7 @@ $this->browser()
 
 ## `->scenario()` (given / when / then)
 
-The clause verbs (`given`, `when`, `and`, `but`, `then`) are interchangeable —
-they read as English and do not change behaviour.
+The clause verbs (`given`, `when`, `and`, `but`, `then`) are interchangeable — they read as English and do not change behaviour.
 
 ```php
 $this->scenario()
@@ -52,6 +48,4 @@ Quoted values are the arguments. Parsing is case-insensitive.
 | `I should be on "/path"` | `assertPathIs` |
 | `the title should be "Title"` | `assertTitleIs` |
 
-An unrecognised sentence throws an `UnknownStepException` naming the step — the
-grammar is intentionally small and explicit. For anything outside it, drop back
-to the [fluent API](writing-tests.md); the two mix freely.
+An unrecognised sentence throws an `UnknownStepException` naming the step — the grammar is intentionally small and explicit. For anything outside it, drop back to the [fluent API](writing-tests.md); the two mix freely.
