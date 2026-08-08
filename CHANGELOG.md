@@ -6,8 +6,37 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-08
+
+Auto-wait and selector resolution grow up: actions now reach targets they
+previously could never click, resolution picks the match a human meant, and
+native dialogs stop wedging the session. Still beta and pre-1.0 — see
+[`docs/compatibility.md`](docs/compatibility.md).
+
 ### Changed
 
+- **Actionability scrolls when the hit test fails, not only when the rect is
+  off-screen** (#117, #96). The probe used to decide whether to scroll by
+  comparing the target's rect against the viewport alone, *before* anything was
+  known about occlusion — so an element clipped out of a scrollable pane (a
+  Bootstrap `modal-dialog-scrollable`, an `overflow: auto` panel), or sitting
+  under a `position: fixed` action bar, was "already visible", never moved, and
+  could never become actionable. Every click, fill and select against it timed
+  out. In-view is now measured against the visible box of every scrollable
+  ancestor as well as the viewport, and a failed hit test triggers a recovery
+  centre-scroll before the target is reported occluded. A target that is already
+  clear is still never moved, so an anchored popover or menu is not scrolled out
+  from under its own click.
+- **Resolution prefers a rendered match over an unrendered duplicate** (#101).
+  The tie-break between several elements matching one target was all-or-nothing:
+  a candidate either hit-tested to itself right now or counted for nothing, and
+  when none qualified, DOM order won. Visibility is now *ranked* — clickable,
+  then merely rendered, then DOM order — so a real option below the fold beats a
+  zero-size measurement node (the hidden input sizer rich select / tree-select
+  widgets keep alongside their visible options). Internally this replaces
+  `Core\Selector\HitTestProbe::isHitTestable(): bool` with
+  `VisibilityProbe::visibility(): Visibility`; `Core\Selector\*` is internal, so
+  this only affects anything that implemented the probe itself.
 - **`click()` / `press()` prefer an interactive target.** When more than one
   element matches, action verbs now pick the interactive candidate (button,
   link, input, …) instead of letting a non-interactive node — e.g. a heading
@@ -16,6 +45,25 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Native dialog handling** (#118): `acceptDialog()`, `dismissDialog()`,
+  `typeInDialog()` — each arranged *before* the action that opens the dialog,
+  since a dialog blocks the page and the click that triggered it does not
+  complete until it is answered — plus `assertDialogMessage()` and
+  `dialogMessage()` for the wording afterwards. Previously a journey through
+  `window.confirm` could not be tested at all: Firefox dismissed the dialog
+  behind the test's back, so a destructive confirm always took the cancel
+  branch, and when a dialog did stay up the session simply stopped responding.
+  A dialog nobody arranged an answer for is now dismissed *and reported* — the
+  action fails immediately with `UnhandledDialogException` naming the type and
+  message, so what used to be a silent hang is a one-line diagnosis.
+  `beforeunload` guards are left to the browser, so navigating away from a dirty
+  form is never blocked.
+- **Scroll verbs** (#117): `scrollTo($target)`, `scrollToBottom()`,
+  `scrollToTop()`, and an `I scroll to "..."` natural-language step — for when
+  the scroll itself is the behaviour under test (an infinite scroller, a
+  scroll-spy nav, a lazy-loading list). `scrollTo()` waits for the element to
+  exist but not to be clickable, so it reaches a region that has not rendered
+  its controls yet.
 - **Network observation** (#70): `waitForRequest()` / `waitForResponse()` to
   synchronise on an XHR/fetch instead of polling the DOM, and `assertRequested()`
   / `assertNotRequested()` (substring or `*`-glob match). A `network.log` of
@@ -142,5 +190,6 @@ first-class Laravel integration.
   and a writable artifact directory — and prints a report with fix hints,
   exiting non-zero if anything is wrong.
 
-[Unreleased]: https://github.com/Vusys/tetryon/compare/v0.1.0...master
+[Unreleased]: https://github.com/Vusys/tetryon/compare/v0.2.0...master
+[0.2.0]: https://github.com/Vusys/tetryon/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Vusys/tetryon/releases/tag/v0.1.0

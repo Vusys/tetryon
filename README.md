@@ -10,7 +10,7 @@ It is **Firefox-first** and **PHPUnit-first**. You run your app however you
 like; Tetryon drives the browser.
 
 > [!NOTE]
-> **Status: 0.1.0 — beta, pre-1.0.** The API below ships and is exercised
+> **Status: 0.2.0 — beta, pre-1.0.** The API below ships and is exercised
 > against real Firefox on Linux and macOS in CI — including a real Vue 3
 > single-page app — but it may still change before 1.0. See
 > [compatibility](docs/compatibility.md).
@@ -49,7 +49,12 @@ vendor/bin/phpunit --testsuite Browser
   attributes → label → accessible name → placeholder → button/link text → name
   → id → visible text, with `@`/CSS/XPath escape hatches.
 - **Auto-waiting** — every action waits for its target to be actionable; every
-  assertion retries until timeout. Never a `sleep()`.
+  assertion retries until timeout. Never a `sleep()`. Actions bring their target
+  into view too — out of a scrollable pane, or clear of a fixed header/footer
+  painted over the click point — without disturbing one that is already clear.
+- **Native dialogs** — `acceptDialog()` / `dismissDialog()` / `typeInDialog()`
+  drive a `window.confirm` or `prompt` in either direction, and a dialog nobody
+  expected fails the action with a readable message instead of wedging the run.
 - **Failure diagnostics** — on failure, a screenshot, page HTML, console log,
   BiDi command trace, and browser stderr land in an artifact directory, with a
   readable report pointing at them.
