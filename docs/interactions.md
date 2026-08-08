@@ -1,8 +1,6 @@
 # Interactions
 
-Every action resolves its target (see [Selectors](selectors.md)) and waits for
-the element to be **actionable** — present, visible, and enabled — before
-acting. You never need a manual wait.
+Every action resolves its target (see [Selectors](selectors.md)) and waits for the element to be **actionable** — present, visible, and enabled — before acting. You never need a manual wait.
 
 ## Navigation
 
@@ -24,10 +22,7 @@ $this->browser()
 ->hover('Account menu');
 ```
 
-`click()` / `press()` prefer an **interactive** target (button, link, input, …)
-when more than one element matches — so pressing `'Log in'` clicks the submit
-button, not a heading that happens to share its text. When nothing interactive
-matches, the first match still wins, so a `<div>` with a click handler is fine.
+`click()` / `press()` prefer an **interactive** target (button, link, input, …) when more than one element matches — so pressing `'Log in'` clicks the submit button, not a heading that happens to share its text. When nothing interactive matches, the first match still wins, so a `<div>` with a click handler is fine.
 
 ### Drag and drop
 
@@ -37,10 +32,7 @@ matches, the first match still wins, so a `<div>` with a click handler is fine.
 ->dragDown('@row-3', 120)           // by a pixel offset; also dragUp/dragLeft/dragRight
 ```
 
-The drag issues intermediate pointer moves (not a single jump), so pointer-drag
-libraries like Sortable.js / vuedraggable register the gesture and compute
-direction. This drives **pointer-based** DnD; HTML5-native `draggable`
-drag/drop events are out of scope.
+The drag issues intermediate pointer moves (not a single jump), so pointer-drag libraries like Sortable.js / vuedraggable register the gesture and compute direction. This drives **pointer-based** DnD; HTML5-native `draggable` drag/drop events are out of scope.
 
 ## Scrolling
 
@@ -50,12 +42,7 @@ drag/drop events are out of scope.
 ->scrollToTop();
 ```
 
-Actions scroll on their own — `click()` brings its target into view, including
-out of an `overflow: auto` pane, and moves it clear of a fixed header or footer
-if one covers the click point. These verbs are for when the scroll *is* the
-behaviour under test: an infinite scroller, a scroll-spy nav, a list that
-lazy-loads as you reach it. `scrollTo()` waits for the element to exist but not
-to be clickable, so it can reach a region that has not rendered its controls yet.
+Actions scroll on their own — `click()` brings its target into view, including out of an `overflow: auto` pane, and moves it clear of a fixed header or footer if one covers the click point. These verbs are for when the scroll *is* the behaviour under test: an infinite scroller, a scroll-spy nav, a list that lazy-loads as you reach it. `scrollTo()` waits for the element to exist but not to be clickable, so it can reach a region that has not rendered its controls yet.
 
 ## Typing
 
@@ -66,15 +53,9 @@ to be clickable, so it can reach a region that has not rendered its controls yet
 ->pressKey('Enter');                   // named keys: Enter, Tab, Escape, ArrowDown, ...
 ```
 
-`fill` / `type` / `clear` work on `<input>`/`<textarea>` **and**
-`contenteditable` editors (rich-text fields), and `value()` reads either back.
-On anything else they throw `UndrivableElementException` rather than silently
-no-opping.
+`fill` / `type` / `clear` work on `<input>`/`<textarea>` **and** `contenteditable` editors (rich-text fields), and `value()` reads either back. On anything else they throw `UndrivableElementException` rather than silently no-opping.
 
-`pressKey` sends to the focused element. Named keys (`Enter`, `Tab`, `Escape`,
-`Backspace`, `Delete`, `ArrowUp`/`Down`/`Left`/`Right`, `Home`, `End`,
-`PageUp`/`PageDown`, …) are translated to the right key codes; a single
-character is sent literally.
+`pressKey` sends to the focused element. Named keys (`Enter`, `Tab`, `Escape`, `Backspace`, `Delete`, `ArrowUp`/`Down`/`Left`/`Right`, `Home`, `End`, `PageUp`/`PageDown`, …) are translated to the right key codes; a single character is sent literally.
 
 ## Forms
 
@@ -87,24 +68,13 @@ character is sent literally.
 ->upload('Avatar', __DIR__.'/fixtures/avatar.png');
 ```
 
-`select()` matches an option by its **visible label or its value** — handy when
-values are opaque ids. Use `selectByValue()` to match the value only. Either
-throws `OptionNotFoundException` if no option matches, rather than silently
-selecting nothing.
+`select()` matches an option by its **visible label or its value** — handy when values are opaque ids. Use `selectByValue()` to match the value only. Either throws `OptionNotFoundException` if no option matches, rather than silently selecting nothing.
 
-These verbs drive **native** form controls. If one resolves an element it can't
-drive — `fill()` on a `<div contenteditable>`, `select()` on a custom dropdown
-that isn't a `<select>`, `check()` on something that isn't a checkbox — it
-throws `UndrivableElementException` naming the element, instead of silently
-doing nothing and failing later at an unrelated assertion. Drive a custom widget
-by composing `click()` with `evaluate()` (or `within()` + `click()`).
+These verbs drive **native** form controls. If one resolves an element it can't drive — `fill()` on a `<div contenteditable>`, `select()` on a custom dropdown that isn't a `<select>`, `check()` on something that isn't a checkbox — it throws `UndrivableElementException` naming the element, instead of silently doing nothing and failing later at an unrelated assertion. Drive a custom widget by composing `click()` with `evaluate()` (or `within()` + `click()`).
 
 ## Native dialogs
 
-`window.confirm`, `window.alert` and `window.prompt` block the page, so the
-answer has to be arranged **before** the action that opens the dialog — the
-click that triggered it doesn't complete until the dialog is gone, so there is
-no "after" to answer it in.
+`window.confirm`, `window.alert` and `window.prompt` block the page, so the answer has to be arranged **before** the action that opens the dialog — the click that triggered it doesn't complete until the dialog is gone, so there is no "after" to answer it in.
 
 ```php
 $this->browser()
@@ -124,13 +94,11 @@ After the action, the wording is still readable:
 $message = $this->browser()->dialogMessage(); // ?string
 ```
 
-An answer is **one-shot** — it applies to the next dialog only. A second,
-unexpected dialog is still a failure rather than something silently swallowed.
+An answer is **one-shot** — it applies to the next dialog only. A second, unexpected dialog is still a failure rather than something silently swallowed.
 
 ### Unexpected dialogs
 
-A dialog nobody arranged an answer for is **dismissed and reported**: the action
-fails immediately with `UnhandledDialogException`, naming the type and message.
+A dialog nobody arranged an answer for is **dismissed and reported**: the action fails immediately with `UnhandledDialogException`, naming the type and message.
 
 ```
 An unhandled dialog appeared (confirm: "Delete the preset 'Nightly'?"). It was
@@ -138,9 +106,7 @@ dismissed so the session could continue. Arrange an answer before the action
 that opens it: acceptDialog(), dismissDialog(), or typeInDialog("...").
 ```
 
-The dismissal is what keeps the session usable — the rest of the test, and the
-failure artifacts, still work. `beforeunload` guards are left to the browser and
-accepted automatically, so navigating away from a dirty form is never blocked.
+The dismissal is what keeps the session usable — the rest of the test, and the failure artifacts, still work. `beforeunload` guards are left to the browser and accepted automatically, so navigating away from a dirty form is never blocked.
 
 ## Reading values
 
@@ -150,8 +116,7 @@ $email = $this->browser()->value('Email');
 
 ## Escape hatch: evaluate()
 
-When the fluent verbs don't reach something, run JavaScript in the page
-directly. Promises are awaited, so an async IIFE resolves to its value:
+When the fluent verbs don't reach something, run JavaScript in the page directly. Promises are awaited, so an async IIFE resolves to its value:
 
 ```php
 $title  = $this->browser()->evaluate('document.title');                       // mixed
@@ -161,20 +126,13 @@ $status = $this->browser()->evaluate(
 $this->browser()->evaluate('window.localStorage.setItem("flag", "1")');
 ```
 
-`evaluate()` is state, not an action — it does not auto-wait. Reach for it for
-in-page setup the verbs don't model — though for cookies prefer the
-[cookie API](#cookies) below, and for everything the verbs cover, the verbs.
+`evaluate()` is state, not an action — it does not auto-wait. Reach for it for in-page setup the verbs don't model — though for cookies prefer the [cookie API](#cookies) below, and for everything the verbs cover, the verbs.
 
-For the rare case a custom base class needs the driver primitives directly,
-`InteractsWithBrowser` exposes a `protected driver(): FirefoxBiDiDriver`
-accessor (it boots the browser if it hasn't started) — no reflection needed.
+For the rare case a custom base class needs the driver primitives directly, `InteractsWithBrowser` exposes a `protected driver(): FirefoxBiDiDriver` accessor (it boots the browser if it hasn't started) — no reflection needed.
 
 ### Waiting on and asserting page state
 
-`evaluate()` is a one-shot read; these add the **wait** and **assert**
-counterparts with the same auto-wait/retry contract as the DOM assertions —
-for state the page knows but doesn't render as text (store readiness, a derived
-total, a chart library's dataset):
+`evaluate()` is a one-shot read; these add the **wait** and **assert** counterparts with the same auto-wait/retry contract as the DOM assertions — for state the page knows but doesn't render as text (store readiness, a derived total, a chart library's dataset):
 
 ```php
 $this->browser()
@@ -183,20 +141,11 @@ $this->browser()
     ->assertExpressionEquals('window.store.getters.total', 1999);  // diffs expected vs actual
 ```
 
-A probe only reaches what's reachable from the page's global scope: anything
-DOM-derived and any library on `window` work as-is, but deeply-bundled framework
-internals (a Vue component's private state, a chart instance not on `window`)
-need the app to opt in by exposing them — e.g. `window.__appState__ = …`.
-Tetryon provides the probe; deciding what internal state to expose is the app's
-call. This covers "is the **data** right"; pixel-level visual correctness is out
-of scope for a DOM/JS tool.
+A probe only reaches what's reachable from the page's global scope: anything DOM-derived and any library on `window` work as-is, but deeply-bundled framework internals (a Vue component's private state, a chart instance not on `window`) need the app to opt in by exposing them — e.g. `window.__appState__ = …`. Tetryon provides the probe; deciding what internal state to expose is the app's call. This covers "is the **data** right"; pixel-level visual correctness is out of scope for a DOM/JS tool.
 
 ## Cookies
 
-Seed the cookie state a test depends on — feature flags, locale, consent
-banners, A/B buckets, or a session token — before exercising the UI. Backed by
-WebDriver BiDi storage rather than `document.cookie`, so **HttpOnly cookies work**
-and a cookie set before the first `visit()` is carried by that request.
+Seed the cookie state a test depends on — feature flags, locale, consent banners, A/B buckets, or a session token — before exercising the UI. Backed by WebDriver BiDi storage rather than `document.cookie`, so **HttpOnly cookies work** and a cookie set before the first `visit()` is carried by that request.
 
 ```php
 $this->browser()
@@ -209,19 +158,11 @@ $this->browser()->deleteCookie('feature_flags');
 $this->browser()->clearCookies();
 ```
 
-The domain defaults to the base-URL host and the path to `/`. Override with the
-options array: `domain`, `path`, `secure`, `httpOnly`, `sameSite`, `expiry`.
-Set/delete/clear are fluent; `cookie()` returns the value. No auto-wait — it's
-state, not an actionable element.
+The domain defaults to the base-URL host and the path to `/`. Override with the options array: `domain`, `path`, `secure`, `httpOnly`, `sameSite`, `expiry`. Set/delete/clear are fluent; `cookie()` returns the value. No auto-wait — it's state, not an actionable element.
 
-> **Encrypted cookies.** Some frameworks (Laravel among them) encrypt cookies,
-> so a plaintext `setCookie('name', '1')` may be rejected on decrypt unless the
-> cookie name is excluded from encryption. That's the application's concern, not
-> Tetryon's.
+> **Encrypted cookies.** Some frameworks (Laravel among them) encrypt cookies, so a plaintext `setCookie('name', '1')` may be rejected on decrypt unless the cookie name is excluded from encryption. That's the application's concern, not Tetryon's.
 
-This is orthogonal to `loginAs()`, which establishes auth via a server-side
-session route. Use cookies for the state `loginAs()` doesn't cover — flags,
-routing, locale, banners.
+This is orthogonal to `loginAs()`, which establishes auth via a server-side session route. Use cookies for the state `loginAs()` doesn't cover — flags, routing, locale, banners.
 
 ## A complete flow
 

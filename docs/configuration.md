@@ -1,7 +1,6 @@
 # Configuration
 
-By default Tetryon reads its configuration from the environment. You can also
-override it per test class.
+By default Tetryon reads its configuration from the environment. You can also override it per test class.
 
 ## Environment variables
 
@@ -24,8 +23,7 @@ Set them in `phpunit.xml`:
 
 ## Per-test configuration
 
-Override `browserConfiguration()` to build a `Configuration` yourself — useful
-for pointing a test at a server it started on a random port:
+Override `browserConfiguration()` to build a `Configuration` yourself — useful for pointing a test at a server it started on a random port:
 
 ```php
 use Vusys\Tetryon\Core\Config\Configuration;
@@ -76,6 +74,4 @@ Configuration::fromArray([
 
 ## Selector test attributes
 
-The attributes tried first when resolving a human target (see
-[Selectors](selectors.md)). Change them via the `selectors.test_attributes`
-array key or by passing `selectorTestAttributes` to `Configuration`.
+The attributes tried first when resolving a human target (see [Selectors](selectors.md)). Change them via the `selectors.test_attributes` array key or by passing `selectorTestAttributes` to `Configuration`.
