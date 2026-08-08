@@ -85,6 +85,7 @@
         ],
         "test": "phpunit",
         "test:browser": "phpunit --testsuite Browser",
+        "todomvc:fetch": "scripts/fetch-todomvc.sh",
         "test:coverage": "XDEBUG_MODE=coverage phpunit --coverage-text",
         "test:coverage-html": "XDEBUG_MODE=coverage phpunit --coverage-html=build/coverage",
         "infection": "infection --threads=max"
@@ -92,6 +93,7 @@
     "scripts-descriptions": {
         "check": "Run every non-test gate (Pint --test, Rector --dry-run, PHPStan level 9) in one go. Halts on the first failure. Approximates CI's static-analysis lane — pass this locally before pushing.",
         "test:browser": "Run the Firefox-backed Browser suite. Requires a Firefox install and a reachable base URL (see TETRYON_BASE_URL).",
+        "todomvc:fetch": "Fetch the pinned TodoMVC example apps into tests/Fixtures/todomvc/ (gitignored) for the cross-framework compatibility suite.",
         "infection": "Run mutation testing locally. Defaults to all cores; pass `--threads=N` to limit."
     }
 }
