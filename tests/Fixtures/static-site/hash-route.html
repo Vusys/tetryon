@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Hash route</title>
+</head>
+<body>
+    <a href="#/active">Active</a>
+    <a href="#/completed">Completed</a>
+    <div data-testid="route"></div>
+    <script>
+        function render() {
+            document.querySelector('[data-testid=route]').textContent =
+                'route:' + (location.hash || '#/');
+        }
+        window.addEventListener('hashchange', render);
+        render();
+    </script>
+</body>
+</html>
