@@ -139,6 +139,22 @@ final class SelectorResolverTest extends TestCase
         self::assertSame('first', new SelectorResolver($locator)->resolve('Pick me')->sharedId);
     }
 
+    public function test_resolve_checkable_returns_the_checkbox_behind_a_label(): void
+    {
+        // checkableCandidates() emits a 'label' locator that resolves to the
+        // checkbox itself (not the label), so check() drives the right element.
+        $locator = $this->matchingOn('label', [new ElementReference('the-checkbox', 'input')]);
+
+        self::assertSame('the-checkbox', new SelectorResolver($locator)->resolveCheckable('Subscribe')->sharedId);
+    }
+
+    public function test_resolve_checkable_throws_when_nothing_matches(): void
+    {
+        $this->expectException(ElementNotFoundException::class);
+
+        new SelectorResolver($this->matchingOn('never', []))->resolveCheckable('Nope');
+    }
+
     public function test_within_passes_the_root_to_the_locator(): void
     {
         $recorder = new class implements NodeLocator

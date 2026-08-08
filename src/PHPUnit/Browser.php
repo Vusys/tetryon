@@ -375,14 +375,14 @@ final readonly class Browser
 
     public function check(string $field): self
     {
-        $this->driver->callFunctionOn($this->drivable('check', $field, 'checkable'), 'function(){ if (!this.checked) this.click(); }');
+        $this->driver->callFunctionOn($this->checkable('check', $field), 'function(){ if (!this.checked) this.click(); }');
 
         return $this;
     }
 
     public function uncheck(string $field): self
     {
-        $this->driver->callFunctionOn($this->drivable('uncheck', $field, 'checkable'), 'function(){ if (this.checked) this.click(); }');
+        $this->driver->callFunctionOn($this->checkable('uncheck', $field), 'function(){ if (this.checked) this.click(); }');
 
         return $this;
     }
@@ -932,8 +932,17 @@ final readonly class Browser
      */
     private function actionable(string $target, bool $preferInteractive = false): ElementReference
     {
-        $element = $this->resolveWaiting($target, $preferInteractive);
+        return $this->awaitActionable($this->resolveWaiting($target, $preferInteractive), $target);
+    }
 
+    /**
+     * Wait for an already-resolved element to pass the pointer-actionability
+     * probe, throwing a {@see TimeoutException} that names the last failure
+     * reason. Split out from {@see actionable()} so verbs that resolve their
+     * target specially (check()/uncheck()) can reuse the probe.
+     */
+    private function awaitActionable(ElementReference $element, string $target): ElementReference
+    {
         $reason = 'unknown';
         $ok = $this->wait(
             $this->configuration->timeouts->default,
@@ -955,7 +964,7 @@ final readonly class Browser
     private function selectOption(string $field, string $value, bool $byValueOnly): self
     {
         $matched = $this->driver->callFunctionOn(
-            $this->drivable('select', $field, 'select'),
+            $this->drivable('select', $field),
             'function(v, byValue){'
             .' for (const o of this.options) {'
             .'  if (o.value === v || (byValue !== "1" && o.text.trim() === v)) {'
@@ -1002,27 +1011,54 @@ final readonly class Browser
     }
 
     /**
-     * Resolve an actionable element for a form verb and verify it is a control
-     * the verb can actually drive, throwing {@see UndrivableElementException}
-     * otherwise rather than silently no-opping (#77).
-     *
-     * @param  'select'|'checkable'  $kind
+     * Resolve an actionable `<select>` for select()/selectByValue(), throwing
+     * {@see UndrivableElementException} rather than silently no-opping when the
+     * target isn't a native select (#77).
      */
-    private function drivable(string $verb, string $field, string $kind): ElementReference
+    private function drivable(string $verb, string $field): ElementReference
     {
         $element = $this->actionable($field);
 
         $info = $this->elementInfo($element);
-        $accepted = match ($kind) {
-            'select' => $info->tag === 'select',
-            'checkable' => $info->tag === 'input' && in_array($info->type, ['checkbox', 'radio'], true),
-        };
-
-        if (! $accepted) {
-            throw UndrivableElementException::for($verb, $field, $info->describe(), $kind);
+        if ($info->tag !== 'select') {
+            throw UndrivableElementException::for($verb, $field, $info->describe(), 'select');
         }
 
         return $element;
+    }
+
+    /**
+     * Resolve a checkbox/radio for check()/uncheck() — including one behind a
+     * text label associated by wrapping, `for=`, or adjacency (#138) — then wait
+     * for it to be actionable, and verify it really is a checkbox or radio (#77).
+     */
+    private function checkable(string $verb, string $field): ElementReference
+    {
+        $element = $this->resolveCheckableWaiting($field);
+        $this->awaitActionable($element, $field);
+
+        $info = $this->elementInfo($element);
+        if ($info->tag !== 'input' || ! in_array($info->type, ['checkbox', 'radio'], true)) {
+            throw UndrivableElementException::for($verb, $field, $info->describe(), 'checkable');
+        }
+
+        return $element;
+    }
+
+    private function resolveCheckableWaiting(string $target): ElementReference
+    {
+        $element = null;
+        $this->wait($this->configuration->timeouts->default, function () use ($target, &$element): bool {
+            try {
+                $element = $this->resolver->resolveCheckable($target);
+
+                return true;
+            } catch (ElementNotFoundException) {
+                return false;
+            }
+        });
+
+        return $element ?? $this->resolver->resolveCheckable($target);
     }
 
     private function elementInfo(ElementReference $element): ElementInfo

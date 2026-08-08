@@ -72,6 +72,30 @@ final class SelectorStrategyTest extends TestCase
         self::assertContains('id', $this->descriptions('Email'));
     }
 
+    public function test_checkable_candidates_target_the_checkbox_behind_a_label(): void
+    {
+        $candidates = new SelectorStrategy()->checkableCandidates('Subscribe', self::TEST_ATTRIBUTES);
+        $descriptions = array_map(static fn (Locator $l): string => $l->description, $candidates);
+
+        self::assertSame(['[data-testid]', '[data-test]', '[data-cy]', 'label', 'name', 'id'], $descriptions);
+
+        $xpath = $this->checkableByDescription('Subscribe', 'label')->bidi['value'];
+        self::assertIsString($xpath);
+        self::assertStringContainsString("@type='checkbox' or @type='radio'", $xpath);
+        self::assertStringContainsString('following-sibling::*[1][self::label][normalize-space()="Subscribe"]', $xpath);
+        self::assertStringContainsString('preceding-sibling::*[1][self::label][normalize-space()="Subscribe"]', $xpath);
+    }
+
+    public function test_generic_label_locator_has_no_sibling_checkbox_association(): void
+    {
+        // The adjacency association must be exclusive to checkableCandidates so it
+        // never hijacks click()/doubleClick() resolution, which want the label (#138).
+        $xpath = $this->byDescription('Buy milk', 'label')->bidi['value'];
+        self::assertIsString($xpath);
+        self::assertStringNotContainsString('following-sibling', $xpath);
+        self::assertStringNotContainsString('preceding-sibling', $xpath);
+    }
+
     public function test_xpath_literals_survive_embedded_double_quotes(): void
     {
         $link = $this->byDescription('Say "hi"', 'link text');
@@ -100,5 +124,16 @@ final class SelectorStrategyTest extends TestCase
         }
 
         self::fail("No candidate with description \"{$description}\".");
+    }
+
+    private function checkableByDescription(string $target, string $description): Locator
+    {
+        foreach (new SelectorStrategy()->checkableCandidates($target, self::TEST_ATTRIBUTES) as $locator) {
+            if ($locator->description === $description) {
+                return $locator;
+            }
+        }
+
+        self::fail("No checkable candidate with description \"{$description}\".");
     }
 }
