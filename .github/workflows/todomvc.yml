@@ -1,0 +1,67 @@
+name: TodoMVC
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+# Cross-framework compatibility against the ten real TodoMVC apps. This is
+# DELIBERATELY not part of the CI gate: it fetches third-party apps we don't
+# control (a pinned upstream SHA), so an upstream change is a signal to look,
+# not a reason to block every unrelated PR from merging. One cell is enough —
+# the apps behave the same everywhere; the point is the selector strategy, not
+# the platform matrix (that's browser.yml's job).
+jobs:
+  todomvc:
+    runs-on: ubuntu-latest
+    name: "TodoMVC compatibility / Firefox / PHP 8.4"
+    if: ${{ !startsWith(github.head_ref, 'dependabot/github_actions/') }}
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring
+          coverage: none
+          tools: composer:v2
+
+      - name: Install Firefox
+        uses: browser-actions/setup-firefox@0bc507ddf224827e3b1af68e014d5e42ab93e795 # v1.7.2
+
+      - name: Configure Composer authentication
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: composer config --global --auth github-oauth.github.com "$GH_TOKEN"
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-interaction --no-progress
+
+      # Fetch the pinned TodoMVC apps into the gitignored fixture dir. ~9.5 MB,
+      # no npm build; the suite skips itself cleanly if this ever fails to land.
+      - name: Fetch TodoMVC fixtures
+        run: composer todomvc:fetch
+
+      - name: Show Firefox version
+        run: firefox --version
+
+      - name: Run TodoMVC suite
+        run: vendor/bin/phpunit --testsuite TodoMvc
+        env:
+          TETRYON_HEADLESS: true
+
+      # On failure, ship the diagnostic bundle (screenshot, HTML, console,
+      # command trace) so a red build is debuggable without a local repro.
+      - name: Upload artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: tetryon-todomvc-artifacts
+          path: tests/Browser/Artifacts
+          if-no-files-found: ignore
+          retention-days: 5
