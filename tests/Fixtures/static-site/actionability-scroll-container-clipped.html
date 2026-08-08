@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Actionability — clipped out of a scrollable container</title>
+    <style>
+        body { margin: 0; }
+
+        .backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .5); }
+
+        .dialog {
+            position: fixed;
+            top: 5vh;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 480px;
+            height: 75vh;
+            display: flex;
+            flex-direction: column;
+            background: #fff;
+        }
+
+        .header { height: 8vh; background: #eee; }
+        .body { flex: 1; overflow-y: auto; }
+        .footer { height: 10vh; background: #eee; }
+
+        /* Taller than the body, so the last control scrolls out of the pane. */
+        .content { height: 70vh; display: flex; flex-direction: column; justify-content: space-between; }
+    </style>
+</head>
+<body>
+    <!-- A Bootstrap `modal-dialog-scrollable` in miniature (issue #117). The
+         pane runs 13vh–70vh; its content is 70vh tall, so the target's layout
+         box lands around 79vh–84vh — clipped out of the pane, but still well
+         inside a 100vh viewport. A viewport-only in-view test therefore says
+         "already visible", declines to scroll, and the hit test then finds the
+         dialog footer (or the backdrop) painted over the target's centre
+         forever. The pane has ~13vh of unused scroll, so the scroll the probe
+         declined to do is exactly the scroll that fixes it. -->
+    <div class="backdrop"></div>
+
+    <div class="dialog">
+        <div class="header">Options</div>
+        <div class="body">
+            <div class="content">
+                <p>top of the pane</p>
+                <button
+                    data-testid="target"
+                    onclick="document.getElementById('result').textContent = 'clicked'"
+                >Target</button>
+            </div>
+        </div>
+        <div class="footer">
+            <div data-testid="result" id="result"></div>
+        </div>
+    </div>
+</body>
+</html>

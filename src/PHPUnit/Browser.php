@@ -33,44 +33,82 @@ use Vusys\Tetryon\Firefox\NetworkRecord;
 final readonly class Browser
 {
     /**
-     * Injected actionability probe. Scrolls the element into view only when it
-     * is not already fully within the viewport — a target already on-screen is
-     * left exactly where it is, so the scroll can't reposition or dismiss a
-     * scroll-sensitive overlay (popover / tooltip / menu) out from under the
-     * click (issue #96). When a scroll is needed it runs instantly
-     * (`behavior: instant` overrides any `scroll-behavior: smooth` — Bootstrap
-     * Reboot sets it on :root — so the scroll can't animate under the click)
-     * centred vertically (`block: center`, to clear fixed/sticky top and bottom
-     * bars) but only as far as needed horizontally (`inline: nearest`). It then
-     * rejects invisible /
-     * transparent / pointer-event-deaf elements, waits for the bounding box to
-     * be stable across one animation frame (covering transform and size
-     * transitions, not just opacity), then hit-tests the click point so an
-     * overlay painted on top makes the action wait rather than land on the
-     * wrong element. Returns `ok` or a short failure reason.
+     * Injected actionability probe. Rejects invisible / transparent /
+     * pointer-event-deaf elements, waits for the bounding box to be stable
+     * across one animation frame (covering transform and size transitions, not
+     * just opacity), then hit-tests the click point so an overlay painted on top
+     * makes the action wait rather than land on the wrong element. Returns `ok`
+     * or a short failure reason.
+     *
+     * Scrolling is deliberately reluctant, and happens at two points:
+     *
+     * 1. Before probing, when the target is not fully in view — measured against
+     *    the viewport *and* the visible box of every scrollable ancestor, so an
+     *    element scrolled out of an `overflow: auto` pane (a scrollable modal
+     *    body, a sticky-footer panel) counts as out of view even though its
+     *    layout position is still on-screen (issue #117).
+     * 2. After the hit test fails, as a recovery — a `position: fixed` bar can
+     *    cover a target that is inside the viewport and inside every pane, and
+     *    centring is exactly what clears it. Deciding to scroll before anything
+     *    is known about occlusion is what made both shapes of #117 unfixable.
+     *
+     * A target that is already clear is therefore never moved, so the scroll
+     * can't reposition or dismiss a scroll-sensitive overlay (popover / tooltip
+     * / menu) out from under the click (issue #96). When a scroll does run it is
+     * instant (`behavior: instant` overrides any `scroll-behavior: smooth` —
+     * Bootstrap Reboot sets it on :root — so the scroll can't animate under the
+     * click), centred vertically (`block: center`, to clear fixed/sticky top and
+     * bottom bars) but only as far as needed horizontally (`inline: nearest`).
      */
     private const string ACTIONABLE_JS = <<<'JS'
         async function () {
-          const r = this.getBoundingClientRect();
-          const inView =
-            r.top >= 0 && r.left >= 0 &&
-            r.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
-            r.right <= (window.innerWidth || document.documentElement.clientWidth);
-          if (!inView) {
-            this.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'nearest' });
-          }
+          const self = this;
+          const clips = function (el) {
+            if (el === document.body || el === document.documentElement) return false;
+            const s = getComputedStyle(el);
+            if (!/^(auto|scroll|hidden|clip)$/.test(s.overflowY) && !/^(auto|scroll|hidden|clip)$/.test(s.overflowX)) return false;
+            return el.scrollHeight > el.clientHeight || el.scrollWidth > el.clientWidth;
+          };
+          const inView = function () {
+            const r = self.getBoundingClientRect();
+            const vw = window.innerWidth || document.documentElement.clientWidth;
+            const vh = window.innerHeight || document.documentElement.clientHeight;
+            if (r.top < 0 || r.left < 0 || r.bottom > vh || r.right > vw) return false;
+            for (let p = self.parentElement; p; p = p.parentElement) {
+              if (!clips(p)) continue;
+              const q = p.getBoundingClientRect();
+              if (r.top < q.top || r.left < q.left || r.bottom > q.bottom || r.right > q.right) return false;
+            }
+            return true;
+          };
+          const centre = function () {
+            self.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'nearest' });
+          };
+          const lands = function (hit) {
+            return !!hit && (hit === self || self.contains(hit) || hit.contains(self));
+          };
+          const topmost = function (r) {
+            return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          };
+
           const s = getComputedStyle(this);
           if (this.disabled) return 'disabled';
           if (s.display === 'none' || s.visibility === 'hidden') return 'hidden';
           if (parseFloat(s.opacity) === 0) return 'transparent';
           if (s.pointerEvents === 'none') return 'no-pointer-events';
+          if (!inView()) centre();
           const a = this.getBoundingClientRect();
           if (!(a.width || a.height)) return 'zero-size';
-          const b = await new Promise(res => requestAnimationFrame(() => res(this.getBoundingClientRect())));
+          let b = await new Promise(res => requestAnimationFrame(() => res(this.getBoundingClientRect())));
           if (a.x !== b.x || a.y !== b.y || a.width !== b.width || a.height !== b.height) return 'unstable';
-          const hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+          let hit = topmost(b);
+          if (!lands(hit)) {
+            centre();
+            b = this.getBoundingClientRect();
+            hit = topmost(b);
+          }
           if (!hit) return 'off-screen';
-          if (hit === this || this.contains(hit) || hit.contains(this)) return 'ok';
+          if (lands(hit)) return 'ok';
           if (hit.id) return 'occluded:#' + hit.id;
           if (typeof hit.className === 'string' && hit.className.trim()) {
             return 'occluded:.' + hit.className.trim().split(/\s+/).join('.');
@@ -183,6 +221,41 @@ final readonly class Browser
     public function hover(string $target): self
     {
         $this->driver->hoverElement($this->resolveWaiting($target));
+
+        return $this;
+    }
+
+    /**
+     * Scroll the target into view, centred vertically — scrolling every
+     * scrollable ancestor as needed, so a row inside an `overflow: auto` pane is
+     * reached as readily as one below the fold. Waits for the element to exist
+     * but not to be clickable, so a test can deliberately reach a lazily-rendered
+     * or lazily-loaded region (issue #117). The action verbs scroll on their own,
+     * so this is for the cases where the scroll itself is the behaviour under
+     * test — an infinite scroller, a scroll-spy nav, a lazy-loading list.
+     */
+    public function scrollTo(string $target): self
+    {
+        $this->driver->callFunctionOn(
+            $this->resolveWaiting($target),
+            'function(){ this.scrollIntoView({ behavior: "instant", block: "center", inline: "nearest" }); }',
+        );
+
+        return $this;
+    }
+
+    public function scrollToTop(): self
+    {
+        $this->driver->evaluateScript('window.scrollTo({ top: 0, left: 0, behavior: "instant" })');
+
+        return $this;
+    }
+
+    public function scrollToBottom(): self
+    {
+        $this->driver->evaluateScript(
+            'window.scrollTo({ top: document.documentElement.scrollHeight, left: 0, behavior: "instant" })',
+        );
 
         return $this;
     }
@@ -425,6 +498,7 @@ final readonly class Browser
             'uncheck' => $this->uncheck($first),
             'select' => $this->select($first, $second),
             'pressKey' => $this->pressKey($first),
+            'scrollTo' => $this->scrollTo($first),
             'assertSee' => $this->assertSee($first),
             'assertDontSee' => $this->assertDontSee($first),
             'assertPathIs' => $this->assertPathIs($first),
