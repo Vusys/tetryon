@@ -43,6 +43,15 @@ abstract class TodoMvcTestCase extends BrowserTestCase
             self::markTestSkipped('TodoMVC fixtures are missing; run `composer todomvc:fetch` first.');
         }
 
+        // An app that renders into shadow roots (lit) is unreachable by the
+        // light-DOM selector strategy, so only the framework-marker smoke test
+        // (which reads the light-DOM <html>) can run; the behavioural scenarios
+        // are all blocked on the same cause (#151). Skip them in one place rather
+        // than repeating the reason across every knownIssues entry.
+        if ($this->app()->usesShadowDom && $this->name() !== 'test_the_app_loads_with_its_framework_marker') {
+            self::markTestSkipped("{$this->app()->name} renders into shadow roots, unreachable by the current selector strategy (#151).");
+        }
+
         $reason = $this->app()->knownIssue($this->name());
         if ($reason !== null) {
             self::markTestSkipped("Known issue on {$this->app()->name}: {$reason}");
