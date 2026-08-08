@@ -94,4 +94,5 @@ nav:
   - Laravel: laravel.md
   - Continuous integration: ci.md
   - Compatibility: compatibility.md
+  - TodoMVC compatibility: todomvc.md
   - Troubleshooting: troubleshooting.md

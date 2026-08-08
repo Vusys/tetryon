@@ -15,7 +15,10 @@ supported surface is deliberately narrow.
 | OS | Linux, macOS |
 | Protocol | WebDriver BiDi — direct, no Selenium Server or geckodriver |
 
-The Browser suite runs against real Firefox on Linux **and** macOS in CI.
+The Browser suite runs against real Firefox on Linux **and** macOS in CI. For
+evidence that the selector strategy holds across genuinely different markup, see
+the [TodoMVC compatibility matrix](todomvc.md) — one shared behavioural suite run
+against ten frameworks.
 
 ## Not supported (by design, for v1)
 

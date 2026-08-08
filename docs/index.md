@@ -55,6 +55,8 @@ language to learn.
 - [Diagnostics](diagnostics.md) — failure artifacts, `tetryon doctor`, logging.
 - [Laravel](laravel.md) — service provider, `tetryon:install`, `loginAs()`.
 - [Continuous integration](ci.md) — running the Browser suite in CI.
+- [TodoMVC compatibility](todomvc.md) — the shared behavioural suite run against
+  ten real frameworks, with a matrix and gap triage.
 - [Compatibility](compatibility.md) — supported PHP/PHPUnit/Firefox/OS, the
   public API, and versioning.
 - [Troubleshooting](troubleshooting.md) — common problems.
