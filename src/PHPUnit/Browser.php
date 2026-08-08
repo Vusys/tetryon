@@ -6,6 +6,8 @@ namespace Vusys\Tetryon\PHPUnit;
 
 use PHPUnit\Framework\Assert;
 use Vusys\Tetryon\Core\Config\Configuration;
+use Vusys\Tetryon\Core\Dialog\DialogExpectation;
+use Vusys\Tetryon\Core\Dialog\UnhandledDialogException;
 use Vusys\Tetryon\Core\NaturalLanguage\StepParser;
 use Vusys\Tetryon\Core\NaturalLanguage\UnknownStepException;
 use Vusys\Tetryon\Core\Selector\ElementInfo;
@@ -434,6 +436,79 @@ final readonly class Browser
         );
 
         return is_string($value) ? $value : null;
+    }
+
+    // ── Native dialogs ──────────────────────────────────────────────────────
+
+    /**
+     * Answer the next `window.confirm` / `window.alert` with OK, optionally
+     * asserting its wording (a substring is enough).
+     *
+     * Arrange this **before** the action that opens the dialog. A native dialog
+     * blocks the page, so the click that triggered it does not complete until
+     * the dialog is answered — there is no "after" to answer it in:
+     *
+     *     $this->browser()
+     *         ->acceptDialog('Delete the preset')
+     *         ->press('Delete preset')
+     *         ->assertSee('deleted');
+     *
+     * A dialog nobody arranged an answer for is dismissed and the action fails
+     * with {@see UnhandledDialogException} naming it, so an unexpected
+     * confirmation is a one-line diagnosis rather than a wedged session.
+     */
+    public function acceptDialog(?string $expectedMessage = null): self
+    {
+        $this->driver->expectDialog(new DialogExpectation(accept: true, expectedMessage: $expectedMessage));
+
+        return $this;
+    }
+
+    /**
+     * Answer the next dialog with Cancel — the "keep it" branch of a destructive
+     * confirmation. Arrange it before the action, as {@see acceptDialog()}.
+     */
+    public function dismissDialog(?string $expectedMessage = null): self
+    {
+        $this->driver->expectDialog(new DialogExpectation(accept: false, expectedMessage: $expectedMessage));
+
+        return $this;
+    }
+
+    /**
+     * Answer the next `window.prompt` with text (and OK). Arrange it before the
+     * action, as {@see acceptDialog()}.
+     */
+    public function typeInDialog(string $text, ?string $expectedMessage = null): self
+    {
+        $this->driver->expectDialog(new DialogExpectation(accept: true, text: $text, expectedMessage: $expectedMessage));
+
+        return $this;
+    }
+
+    /**
+     * The message of the last dialog that appeared, or null if none has.
+     */
+    public function dialogMessage(): ?string
+    {
+        return $this->driver->lastDialog()?->message;
+    }
+
+    /**
+     * Assert on the wording of the last dialog that appeared — the phrasing of a
+     * destructive confirmation is often the thing worth testing. Runs after the
+     * action, on the dialog the arranged answer already closed.
+     */
+    public function assertDialogMessage(string $expected): self
+    {
+        $this->retry(fn (): bool => str_contains($this->dialogMessage() ?? '', $expected));
+        Assert::assertStringContainsString(
+            $expected,
+            $this->dialogMessage() ?? '',
+            'The last dialog did not say what was expected.',
+        );
+
+        return $this;
     }
 
     // ── Cookies (state, not actions — no auto-wait) ─────────────────────────
