@@ -22,7 +22,7 @@ final readonly class TodoMvcApp
     /**
      * @param  string  $name  the framework marker on `<html data-framework>`
      * @param  string  $path  the app's served directory, relative to tests/Fixtures/todomvc/
-     * @param  string  $toggleAllId  id of the toggle-all checkbox (react/jquery use `toggle-all`)
+     * @param  string  $toggleAllId  id of the toggle-all checkbox (`toggle-all` for most; `toggle-all-input` for vue; empty for angular/preact/javascript-es6, which give it no id)
      * @param  string  $allFilterHref  href of the "All" filter link (jquery uses `#/all`)
      * @param  bool  $usesShadowDom  whether the app renders into shadow roots (lit only)
      * @param  array<string, string>  $knownIssues  map of scenario method name => reason it is skipped
@@ -51,6 +51,17 @@ final readonly class TodoMvcApp
     public function url(): string
     {
         return '/'.trim($this->path, '/').'/';
+    }
+
+    /**
+     * A selector for the toggle-all checkbox: its `#id` when the app gives it
+     * one, else the stable `.toggle-all` class (angular/preact/javascript-es6
+     * render the input with no id). check()/uncheck() drive it directly, so the
+     * per-app label text and any broken label association don't matter.
+     */
+    public function toggleAllSelector(): string
+    {
+        return $this->toggleAllId !== '' ? '#'.$this->toggleAllId : '.toggle-all';
     }
 
     public function knownIssue(string $method): ?string
