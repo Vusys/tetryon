@@ -86,6 +86,29 @@ final readonly class SelectorResolver
     }
 
     /**
+     * Resolve for check()/uncheck(): the checkbox or radio a target names,
+     * including one a text label is associated with by wrapping, `for=`, or
+     * adjacency. Uses a dedicated candidate list so that association never
+     * hijacks click()/doubleClick() resolution, which want the label itself and
+     * not the (often visually hidden) checkbox beside it (#138).
+     */
+    public function resolveCheckable(string $target): ElementReference
+    {
+        $attempts = [];
+        foreach ($this->strategy->checkableCandidates($target, $this->testAttributes) as $candidate) {
+            $matches = $this->nodeLocator->locateAll($candidate, $this->root);
+            $attempts[] = new ResolutionAttempt($candidate->description, count($matches));
+
+            $picked = $this->preferVisible($this->controlsFirst($matches));
+            if ($picked instanceof ElementReference) {
+                return $picked;
+            }
+        }
+
+        throw new ElementNotFoundException($target, $attempts);
+    }
+
+    /**
      * Order matches so a non-`<label>` control comes before its `<label>` (#72),
      * preserving DOM order within each group.
      *

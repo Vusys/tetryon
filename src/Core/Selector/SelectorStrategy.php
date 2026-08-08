@@ -49,6 +49,44 @@ final class SelectorStrategy
     }
 
     /**
+     * The candidates for check()/uncheck(): the checkbox or radio a target
+     * names, including one a text label is associated with by wrapping, `for=`,
+     * or mere adjacency — the "styled label next to a hidden real input" pattern
+     * (TodoMVC's `<input class="toggle"><label>Buy milk</label>`, custom toggles).
+     *
+     * Kept separate from {@see candidates()} on purpose: the adjacency
+     * association must never hijack click()/doubleClick(), which want the label
+     * itself, not the checkbox beside it (#138).
+     *
+     * @param  list<string>  $testAttributes
+     * @return list<Locator>
+     */
+    public function checkableCandidates(string $target, array $testAttributes): array
+    {
+        $explicit = $this->explicit($target, $testAttributes);
+        if ($explicit instanceof Locator) {
+            return [$explicit];
+        }
+
+        $css = $this->cssString($target);
+        $xpath = $this->xpathString($target);
+
+        $candidates = [];
+        foreach ($testAttributes as $attribute) {
+            $candidates[] = Locator::css("[{$attribute}]", '['.$attribute.'='.$css.']');
+        }
+
+        $candidates[] = Locator::xpath('label', $this->checkboxForLabelExpression($xpath));
+        $candidates[] = Locator::css('name', '[name='.$css.']');
+
+        if (preg_match('/^[A-Za-z][\w-]*$/', $target) === 1) {
+            $candidates[] = Locator::css('id', '#'.$target);
+        }
+
+        return $candidates;
+    }
+
+    /**
      * @param  list<string>  $testAttributes
      */
     private function explicit(string $target, array $testAttributes): ?Locator
@@ -81,6 +119,22 @@ final class SelectorStrategy
             ." | .//label[normalize-space()={$xpath}]//textarea"
             ." | .//label[normalize-space()={$xpath}]//select"
             ." | .//*[@id=//label[normalize-space()={$xpath}]/@for]";
+    }
+
+    /**
+     * A checkbox/radio associated with a label of the given text — by wrapping,
+     * by `for=`, or by being the immediately adjacent sibling (either order) of
+     * a label that has neither. The adjacency branches are what make a hidden
+     * real input behind a styled label drivable by that label's text (#138);
+     * scoped to checkbox/radio and to the adjacent element so an unrelated input
+     * can't be caught.
+     */
+    private function checkboxForLabelExpression(string $xpath): string
+    {
+        return ".//label[normalize-space()={$xpath}]//input[@type='checkbox' or @type='radio']"
+            ." | .//input[(@type='checkbox' or @type='radio') and @id=//label[normalize-space()={$xpath}]/@for]"
+            ." | .//input[(@type='checkbox' or @type='radio') and following-sibling::*[1][self::label][normalize-space()={$xpath}]]"
+            ." | .//input[(@type='checkbox' or @type='radio') and preceding-sibling::*[1][self::label][normalize-space()={$xpath}]]";
     }
 
     private function buttonExpression(string $xpath): string
