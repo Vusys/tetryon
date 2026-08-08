@@ -6,6 +6,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-09
+
+Validated against ten real-world frameworks. A shared behavioural suite runs against the TodoMVC apps (React, Vue, Angular, Svelte, Preact, react-redux, Lit, jQuery, Backbone, vanilla ES6), which drove out three selector/driver fixes and confirmed the behavioural selector strategy holds across markup we didn't write. Still beta and pre-1.0 — see [`docs/compatibility.md`](docs/compatibility.md).
+
+### Fixed
+
+- **`check()` / `uncheck()` resolve the checkbox behind a sibling label** (#138). A real checkbox next to a styled label with no `for=` and no wrapping — the ubiquitous custom-toggle pattern (`<input class="toggle"><label>Buy milk</label>`) — used to resolve the label (or its row) instead of the input, so `check('Buy milk')` failed. These verbs now associate a label with an adjacent checkbox/radio (by wrapping, `for=`, or immediate adjacency). The association is deliberately kept out of `click()` / `doubleClick()` resolution, which still target the visible label next to a hidden input.
+- **`check()` / `uncheck()` drive visually-hidden custom checkboxes** (#139). These verbs toggle with a synthetic `click()`, which an `opacity: 0` / `pointer-events: none` real input still receives — but they routed through the full pointer-actionability probe and were rejected outright, so no custom checkbox, radio, or toggle on the real web was drivable. They now wait only for the element to exist and be enabled; `click()` and the other pointer verbs keep the full probe.
+
+### Changed
+
+- **`currentPath()` includes the URL fragment** (#140). It used to drop the fragment, so hash routes (`/app/#/active`) were invisible to `assertPathIs()` and `waitForPath()`. The fragment is now appended when present; a fragment-free URL is unchanged, and the query string is still excluded. If you assert a path on a URL that carries a fragment, update the expected value.
+
+### Added
+
+- **TodoMVC cross-framework compatibility suite.** An opt-in `TodoMvc` PHPUnit suite plus `composer todomvc:fetch`, running one shared behavioural suite against ten frameworks from a pinned upstream SHA. It exists to prove the selector strategy against markup we didn't author; the results, and a triage of every gap, are in [`docs/todomvc.md`](docs/todomvc.md). Gated in CI in its own workflow, out of the merge gate — it tracks third-party apps.
+
 ## [0.2.0] - 2026-08-08
 
 Auto-wait and selector resolution grow up: actions now reach targets they
@@ -190,6 +207,7 @@ first-class Laravel integration.
   and a writable artifact directory — and prints a report with fix hints,
   exiting non-zero if anything is wrong.
 
-[Unreleased]: https://github.com/Vusys/tetryon/compare/v0.2.0...master
+[Unreleased]: https://github.com/Vusys/tetryon/compare/v0.3.0...master
+[0.3.0]: https://github.com/Vusys/tetryon/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Vusys/tetryon/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Vusys/tetryon/releases/tag/v0.1.0
