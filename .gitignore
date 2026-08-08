@@ -8,5 +8,8 @@
 # Browser test artifacts (screenshots, HTML snapshots, console logs)
 /tests/Browser/Artifacts
 
+# Fetched TodoMVC example apps (see scripts/fetch-todomvc.sh)
+/tests/Fixtures/todomvc
+
 # Claude Code local agent dir
 /.claude
