@@ -645,11 +645,21 @@ final readonly class Browser
         return $this->driver->currentUrl();
     }
 
+    /**
+     * The path of the current URL, with the `#fragment` appended when one is
+     * present — so hash routes (`/app/#/active`) are assertable with
+     * {@see assertPathIs()} and {@see waitForPath()}. A fragment-free URL is
+     * unchanged (`/foo` stays `/foo`). The query string is not included.
+     */
     public function currentPath(): string
     {
-        $path = parse_url($this->driver->currentUrl(), PHP_URL_PATH);
+        $url = $this->driver->currentUrl();
+        $path = parse_url($url, PHP_URL_PATH);
+        $path = is_string($path) ? $path : '';
 
-        return is_string($path) ? $path : '';
+        $fragment = parse_url($url, PHP_URL_FRAGMENT);
+
+        return is_string($fragment) && $fragment !== '' ? $path.'#'.$fragment : $path;
     }
 
     public function title(): string
