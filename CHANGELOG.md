@@ -10,6 +10,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - **`blur()` verb** (#142). Blurs the focused element (or a given target) to drive commit-on-blur flows — inline edits, validate-on-blur fields, autosave — instead of faking it with `pressKey('Tab')`.
 - **`assertFocused()` / `assertNotFocused()` and `isFocused()`** (#141). Assert (with auto-wait) that a target is the document's focused element, so "double-click focuses the edit input" reads as behaviour rather than an `evaluate()` on `document.activeElement`.
+- **Shadow DOM piercing for CSS-based resolution** (#151). Web-component apps that render into (nested) shadow roots are now reachable: when a CSS locator — explicit CSS/id, a test attribute, `[placeholder]`, or `[name]` — finds nothing in the light DOM, resolution descends open shadow roots. Actionability's hit-test and `visibleText()` (behind `assertSee()`) are shadow-aware too. Text/label strategies (XPath) don't pierce yet (#162).
 
 ### Fixed
 

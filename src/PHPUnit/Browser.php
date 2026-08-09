@@ -90,7 +90,17 @@ final readonly class Browser
             return !!hit && (hit === self || self.contains(hit) || hit.contains(self));
           };
           const topmost = function (r) {
-            return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+            const x = r.left + r.width / 2, y = r.top + r.height / 2;
+            let el = document.elementFromPoint(x, y);
+            // elementFromPoint returns the shadow host, not the element inside it,
+            // and Node.contains() doesn't cross shadow boundaries — so descend
+            // open shadow roots to the deepest element at the point (#151).
+            while (el && el.shadowRoot) {
+              const inner = el.shadowRoot.elementFromPoint(x, y);
+              if (!inner || inner === el) break;
+              el = inner;
+            }
+            return el;
           };
 
           const s = getComputedStyle(this);
@@ -137,6 +147,27 @@ final readonly class Browser
             el.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
           }
         }
+        JS;
+
+    /**
+     * The body of {@see visibleText()}, operating on a root `r` (document.body or
+     * the scoped element). `innerText` for the light DOM, plus the text content of
+     * every open shadow root beneath it so shadow-DOM apps aren't invisible (#151).
+     */
+    private const string VISIBLE_TEXT_BODY = <<<'JS'
+        if (!r) return '';
+        let text = r.innerText || '';
+        const collect = function (node) {
+          node.querySelectorAll('*').forEach(function (el) {
+            if (el.shadowRoot) {
+              text += '\n' + (el.shadowRoot.textContent || '');
+              collect(el.shadowRoot);
+            }
+          });
+        };
+        collect(r);
+        if (r.shadowRoot) text += '\n' + (r.shadowRoot.textContent || '');
+        return text;
         JS;
 
     private SelectorResolver $resolver;
@@ -1258,11 +1289,16 @@ final readonly class Browser
             ."})({$nearJson}, {$textJson})";
     }
 
+    /**
+     * The page's (or scope's) visible text. `innerText` stops at shadow
+     * boundaries, so this also appends the text content of every open shadow root
+     * — otherwise a web-component app (#151) would look empty to assertSee().
+     */
     private function visibleText(): string
     {
         $text = $this->scope instanceof ElementReference
-            ? $this->driver->callFunctionOn($this->scope, 'function(){ return this.innerText; }')
-            : $this->driver->evaluateScript('document.body ? document.body.innerText : ""');
+            ? $this->driver->callFunctionOn($this->scope, 'function(){ const r = this; '.self::VISIBLE_TEXT_BODY.' }')
+            : $this->driver->evaluateScript('(function(){ const r = document.body; '.self::VISIBLE_TEXT_BODY.' })()');
 
         return is_string($text) ? $text : '';
     }

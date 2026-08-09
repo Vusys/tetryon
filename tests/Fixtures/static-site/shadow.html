@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Shadow DOM</title>
+</head>
+<body>
+    <!-- The whole form lives in nested shadow roots (like a web-component app). -->
+    <my-form></my-form>
+    <script>
+        class InnerField extends HTMLElement {
+            constructor() {
+                super();
+                this.attachShadow({ mode: 'open' }).innerHTML =
+                    '<input placeholder="Email" data-testid="email">';
+            }
+        }
+        customElements.define('inner-field', InnerField);
+
+        class MyForm extends HTMLElement {
+            constructor() {
+                super();
+                const root = this.attachShadow({ mode: 'open' });
+                root.innerHTML =
+                    '<inner-field></inner-field>' +
+                    '<button data-testid="save">Save</button>' +
+                    '<div data-testid="msg">idle</div>';
+                root.querySelector('[data-testid=save]').addEventListener('click', () => {
+                    const value = root.querySelector('inner-field').shadowRoot.querySelector('input').value;
+                    root.querySelector('[data-testid=msg]').textContent = 'saved:' + value;
+                });
+            }
+        }
+        customElements.define('my-form', MyForm);
+    </script>
+</body>
+</html>
