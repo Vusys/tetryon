@@ -1,13 +1,10 @@
 # Diagnostics
 
-Bad errors kill browser-testing adoption, so Tetryon treats diagnostics as a
-feature.
+Bad errors kill browser-testing adoption, so Tetryon treats diagnostics as a feature.
 
 ## Failure artifacts
 
-When a browser test **fails**, Tetryon captures a diagnostic bundle into a
-per-test directory under the artifacts path (`tests/Browser/Artifacts` by
-default) and prints a report pointing at it:
+When a browser test **fails**, Tetryon captures a diagnostic bundle into a per-test directory under the artifacts path (`tests/Browser/Artifacts` by default) and prints a report pointing at it:
 
 ```text
 Tetryon browser diagnostics
@@ -27,8 +24,7 @@ The bundle contains:
 - `screenshot.png` — the page at the moment of failure.
 - `page.html` — the rendered DOM.
 - `console.log` — browser console messages.
-- `network.log` — the requests observed, with method, URL, and response status
-  (the request that 404'd, 500'd, or never fired is often the real cause).
+- `network.log` — the requests observed, with method, URL, and response status (the request that 404'd, 500'd, or never fired is often the real cause).
 - `trace.log` — the recent BiDi command trace (what the browser was doing).
 - `browser-stderr.log` — Firefox's own stderr.
 - `info.txt` — current URL and viewport.
@@ -47,10 +43,7 @@ Run a preflight check of the whole environment:
 vendor/bin/tetryon doctor
 ```
 
-It verifies PHP, the required extensions, that Firefox is found, that it can
-actually launch headless and complete a WebDriver BiDi handshake, and that the
-artifact directory is writable. Failures print a fix hint and `doctor` exits
-non-zero — handy as a CI gate before the Browser suite.
+It verifies PHP, the required extensions, that Firefox is found, that it can actually launch headless and complete a WebDriver BiDi handshake, and that the artifact directory is writable. Failures print a fix hint and `doctor` exits non-zero — handy as a CI gate before the Browser suite.
 
 ## Verbose logging
 
@@ -60,9 +53,7 @@ Set `TETRYON_DEBUG` to stream the BiDi command log to stderr while tests run:
 TETRYON_DEBUG=1 vendor/bin/phpunit --testsuite Browser
 ```
 
-Tetryon logs through PSR-3. To plug in your own logger (Monolog, etc.),
-override `browserLogger()` in your test class. You can also read the recent
-command trace directly:
+Tetryon logs through PSR-3. To plug in your own logger (Monolog, etc.), override `browserLogger()` in your test class. You can also read the recent command trace directly:
 
 ```php
 $trace = $this->browser()->trace();

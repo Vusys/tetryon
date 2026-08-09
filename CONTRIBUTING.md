@@ -1,8 +1,6 @@
 # Contributing
 
-Thanks for considering a contribution. Tetryon is a browser-testing library for
-PHPUnit. Issues and PRs are most useful when they ship with tests against the
-package's own suite.
+Thanks for considering a contribution. Tetryon is a browser-testing library for PHPUnit. Issues and PRs are most useful when they ship with tests against the package's own suite.
 
 ## Quick start
 
@@ -15,13 +13,11 @@ composer rector:check  # Rector dry-run
 composer check         # all three static gates, halts on first failure
 ```
 
-Open issues live at <https://github.com/Vusys/tetryon/issues>. Pre-1.0, so
-backwards-compat breaks are acceptable when called out.
+Open issues live at [https://github.com/Vusys/tetryon/issues](https://github.com/Vusys/tetryon/issues). Pre-1.0, so backwards-compat breaks are acceptable when called out.
 
 ## Running browser tests locally
 
-The `Browser` suite drives a real Firefox over WebDriver BiDi, so it is opt-in
-and not part of the default `composer test` run:
+The `Browser` suite drives a real Firefox over WebDriver BiDi, so it is opt-in and not part of the default `composer test` run:
 
 ```bash
 # 1. Start whatever app you want to test against, e.g.:
@@ -31,8 +27,7 @@ php -S 127.0.0.1:8000 -t tests/Fixtures/static-site
 TETRYON_BASE_URL=http://127.0.0.1:8000 composer test:browser
 ```
 
-Prerequisites: a Firefox install on `PATH` (stable or ESR), on macOS or Linux.
-`TETRYON_HEADLESS=false` runs headed for debugging.
+Prerequisites: a Firefox install on `PATH` (stable or ESR), on macOS or Linux. `TETRYON_HEADLESS=false` runs headed for debugging.
 
 ## Other useful commands
 
@@ -48,6 +43,4 @@ See [`CLAUDE.md`](CLAUDE.md) for project-level architecture notes.
 
 ## Changelog
 
-User-facing changes go in [`CHANGELOG.md`](CHANGELOG.md) under **Unreleased**
-(Keep a Changelog format). Call out any pre-1.0 backwards-compatibility break
-under **Changed** / **Removed**.
+User-facing changes go in [`CHANGELOG.md`](CHANGELOG.md) under **Unreleased** (Keep a Changelog format). Call out any pre-1.0 backwards-compatibility break under **Changed** / **Removed**.

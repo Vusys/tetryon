@@ -1,12 +1,10 @@
 # Writing tests
 
-Tetryon tests are normal PHPUnit tests. PHPUnit owns discovery, filtering,
-failures, grouping, and exit codes; Tetryon owns the browser.
+Tetryon tests are normal PHPUnit tests. PHPUnit owns discovery, filtering, failures, grouping, and exit codes; Tetryon owns the browser.
 
 ## Bring your own server
 
-Tetryon never serves your app — you start it however you like, then point
-Tetryon at the URL:
+Tetryon never serves your app — you start it however you like, then point Tetryon at the URL:
 
 ```bash
 php artisan serve            # Laravel
@@ -16,8 +14,7 @@ docker compose up
 npm run dev
 ```
 
-Tell Tetryon the base URL with the `TETRYON_BASE_URL` environment variable
-(default `http://127.0.0.1:8000`). See [Configuration](configuration.md).
+Tell Tetryon the base URL with the `TETRYON_BASE_URL` environment variable (default `http://127.0.0.1:8000`). See [Configuration](configuration.md).
 
 ## The base class
 
@@ -40,8 +37,7 @@ final class LoginTest extends BrowserTestCase
 }
 ```
 
-`$this->browser()` launches a fresh, isolated Firefox the first time it is
-called in a test, and the browser is torn down automatically after the test.
+`$this->browser()` launches a fresh, isolated Firefox the first time it is called in a test, and the browser is torn down automatically after the test.
 
 ## The trait (escape hatch)
 
@@ -66,9 +62,7 @@ The base class is the recommended path; the trait is the escape hatch.
 
 ## Isolation
 
-Every test that calls `browser()` gets its **own** Firefox instance with a
-fresh temporary profile — fresh cookies, local storage, and session storage,
-with no leakage between tests. The profile is deleted on teardown.
+Every test that calls `browser()` gets its **own** Firefox instance with a fresh temporary profile — fresh cookies, local storage, and session storage, with no leakage between tests. The profile is deleted on teardown.
 
 ## The fluent API at a glance
 

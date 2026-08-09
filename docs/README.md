@@ -1,22 +1,17 @@
 # Tetryon documentation
 
-PHP-native browser testing for PHPUnit. Firefox-first, WebDriver BiDi — no
-Node, Selenium, ChromeDriver, or Dusk-style setup.
+PHP-native browser testing for PHPUnit. Firefox-first, WebDriver BiDi — no Node, Selenium, ChromeDriver, or Dusk-style setup.
 
-> **Status: pre-alpha.** The API below ships and is exercised against real
-> Firefox in CI (Linux + macOS), but nothing is tagged yet and breaking changes
-> are expected before 1.0.
+> **Status: pre-alpha.** The API below ships and is exercised against real Firefox in CI (Linux + macOS), but nothing is tagged yet and breaking changes are expected before 1.0.
 
 ## Start here
 
 - [Installation](installation.md) — Composer, Firefox, the `doctor` check.
-- [Writing tests](writing-tests.md) — `BrowserTestCase`, the fluent API, the
-  anatomy of a test.
+- [Writing tests](writing-tests.md) — `BrowserTestCase`, the fluent API, the anatomy of a test.
 
 ## Reference
 
-- [Selectors](selectors.md) — how a human target ("Email", "Save") resolves to
-  an element, and the explicit escape hatches.
+- [Selectors](selectors.md) — how a human target ("Email", "Save") resolves to an element, and the explicit escape hatches.
 - [Interactions](interactions.md) — navigation, clicking, typing, forms.
 - [Natural-language steps](natural-language.md) — `->step()` and `->scenario()`.
 - [Waiting](waiting.md) — auto-waiting, explicit waits, timeouts.
@@ -25,8 +20,7 @@ Node, Selenium, ChromeDriver, or Dusk-style setup.
 - [Diagnostics](diagnostics.md) — failure artifacts, `tetryon doctor`, logging.
 - [Laravel](laravel.md) — service provider, `tetryon:install`, `loginAs()`.
 - [Continuous integration](ci.md) — running the Browser suite in CI.
-- [Compatibility](compatibility.md) — supported PHP/PHPUnit/Firefox/OS, the
-  public API, and versioning.
+- [Compatibility](compatibility.md) — supported PHP/PHPUnit/Firefox/OS, the public API, and versioning.
 - [Troubleshooting](troubleshooting.md) — common problems.
 
 ## The shape of a test

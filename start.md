@@ -371,18 +371,27 @@ Rather than:
 Element lookup order:
 
 1. Explicit selector, if marked as selector.
+
 2. Configured test attributes:
 
    * `data-testid`
    * `data-test`
    * `data-cy`
+
 3. Associated label text.
+
 4. Accessible name / ARIA label.
+
 5. Placeholder.
+
 6. Button text.
+
 7. Link text.
+
 8. Input `name`.
+
 9. Input `id`.
+
 10. Visible text fallback.
 
 Support explicit selectors when needed:

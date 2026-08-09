@@ -1,8 +1,6 @@
 # Assertions
 
-Every assertion retries until it passes or the assertion timeout elapses (see
-[Waiting](waiting.md)), then delegates to PHPUnit — so a failure is a normal
-PHPUnit failure, and a flaky-by-timing assertion just waits.
+Every assertion retries until it passes or the assertion timeout elapses (see [Waiting](waiting.md)), then delegates to PHPUnit — so a failure is a normal PHPUnit failure, and a flaky-by-timing assertion just waits.
 
 ## Text
 
@@ -12,8 +10,7 @@ PHPUnit failure, and a flaky-by-timing assertion just waits.
 ->assertTextNear('Status:', 'Active'); // "Active" appears near "Status:"
 ```
 
-`assertSee` / `assertDontSee` match against the page's **visible** text
-(`innerText`), so hidden content is not "seen".
+`assertSee` / `assertDontSee` match against the page's **visible** text (`innerText`), so hidden content is not "seen".
 
 ## Visibility
 
@@ -38,10 +35,7 @@ PHPUnit failure, and a flaky-by-timing assertion just waits.
 
 ## Form-control state
 
-`assertValue` covers an input's text; these cover the **state** of toggles and
-selects — a checkbox's `value` attribute is `"on"`, not its checked state, so
-these read `this.checked` / the selected option instead. Like every assertion,
-they retry until they pass, so async-rendered forms need no manual wait.
+`assertValue` covers an input's text; these cover the **state** of toggles and selects — a checkbox's `value` attribute is `"on"`, not its checked state, so these read `this.checked` / the selected option instead. Like every assertion, they retry until they pass, so async-rendered forms need no manual wait.
 
 ```php
 ->assertChecked('Remember me')          // checkbox / radio is checked
@@ -67,27 +61,22 @@ $browser->selected('Country');          // ?string — the selected option's val
 $browser->attribute('@nav-home', 'data-state'); // ?string — null if absent
 ```
 
-`attribute()` reads the literal attribute (`href`, `src`, `title`, `data-*`,
-`aria-*`, …), so `href="/x"` reads back as `/x`, not the resolved absolute URL.
+`attribute()` reads the literal attribute (`href`, `src`, `title`, `data-*`, `aria-*`, …), so `href="/x"` reads back as `/x`, not the resolved absolute URL.
 
 ## Network
 
-Assert which requests did or didn't fire (substring or `*`-glob match). Useful
-for telling "the request returned empty" apart from "the request never fired":
+Assert which requests did or didn't fire (substring or `*`-glob match). Useful for telling "the request returned empty" apart from "the request never fired":
 
 ```php
 ->assertRequested('/api/search')
 ->assertNotRequested('/api/telemetry');
 ```
 
-To *wait* on a request/response rather than assert after the fact, see
-`waitForRequest` / `waitForResponse` in [Waiting](waiting.md). A network log is
-also captured in the [failure artifacts](diagnostics.md).
+To *wait* on a request/response rather than assert after the fact, see `waitForRequest` / `waitForResponse` in [Waiting](waiting.md). A network log is also captured in the [failure artifacts](diagnostics.md).
 
 ## Grouping with `tap()`
 
-`tap()` hands your callback the browser and returns it, so you can group related
-assertions or extract reusable, named helpers without breaking the chain:
+`tap()` hands your callback the browser and returns it, so you can group related assertions or extract reusable, named helpers without breaking the chain:
 
 ```php
 $this->browser()
@@ -107,10 +96,7 @@ $this->browser()->visit('/')->tap($assertHeader);
 
 ## Scoping with `within()`
 
-`within('@container', fn ($b) => …)` scopes both element resolution **and**
-text assertions to inside one element — so identical elements in sibling
-components are disambiguated. The outer chain continues unscoped after the
-callback returns.
+`within('@container', fn ($b) => …)` scopes both element resolution **and** text assertions to inside one element — so identical elements in sibling components are disambiguated. The outer chain continues unscoped after the callback returns.
 
 ```php
 $this->browser()

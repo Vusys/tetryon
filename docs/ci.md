@@ -1,7 +1,6 @@
 # Continuous integration
 
-The Browser suite runs anywhere Firefox can be installed and your app can be
-served. Headless Firefox needs no display.
+The Browser suite runs anywhere Firefox can be installed and your app can be served. Headless Firefox needs no display.
 
 The pattern is always the same:
 
@@ -66,9 +65,7 @@ jobs:
           if-no-files-found: ignore
 ```
 
-**macOS runners work too** — `browser-actions/setup-firefox` installs Firefox
-on `macos-latest`, and the suite runs unchanged. Tetryon's own CI exercises
-Linux and macOS.
+**macOS runners work too** — `browser-actions/setup-firefox` installs Firefox on `macos-latest`, and the suite runs unchanged. Tetryon's own CI exercises Linux and macOS.
 
 ## Docker
 
@@ -121,28 +118,18 @@ browser-tests:
 
 ## Running in parallel
 
-Each test that calls `browser()` gets its **own** Firefox with a fresh
-temporary profile, so browser state never leaks between parallel workers. The
-contention to watch is shared resources — the database and the single served
-app instance.
+Each test that calls `browser()` gets its **own** Firefox with a fresh temporary profile, so browser state never leaks between parallel workers. The contention to watch is shared resources — the database and the single served app instance.
 
-PHPUnit does not parallelise on its own; use a runner such as
-[`brianium/paratest`](https://github.com/paratestphp/paratest):
+PHPUnit does not parallelise on its own; use a runner such as [`brianium/paratest`](https://github.com/paratestphp/paratest):
 
 ```bash
 vendor/bin/paratest --testsuite Browser --processes 4
 ```
 
-For Laravel, give each worker its own database (Laravel's parallel testing
-already does this with `php artisan test --parallel`), and make sure the served
-app points at the same database the test process seeds.
+For Laravel, give each worker its own database (Laravel's parallel testing already does this with `php artisan test --parallel`), and make sure the served app points at the same database the test process seeds.
 
 ## Diagnostics in CI
 
-- **Always upload `tests/Browser/Artifacts` on failure** so a red build comes
-  with the screenshot, HTML, console log, and command trace. See
-  [Diagnostics](diagnostics.md).
-- **Run `tetryon doctor` first** — it fails fast with a clear message if Firefox
-  or the environment is wrong, before the suite even starts.
-- **Set `TETRYON_DEBUG=1`** to stream the BiDi command log to stderr when you
-  need to see exactly what the browser did.
+- **Always upload `tests/Browser/Artifacts` on failure** so a red build comes with the screenshot, HTML, console log, and command trace. See [Diagnostics](diagnostics.md).
+- **Run `tetryon doctor` first** — it fails fast with a clear message if Firefox or the environment is wrong, before the suite even starts.
+- **Set `TETRYON_DEBUG=1`** to stream the BiDi command log to stderr when you need to see exactly what the browser did.
