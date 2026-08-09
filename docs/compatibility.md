@@ -1,6 +1,6 @@
 # Compatibility & supported surface
 
-Tetryon is **beta** and **pre-1.0** (current release: 0.4.0): the public API may still change before 1.0, and changes are called out in the [changelog](https://github.com/Vusys/tetryon/blob/master/CHANGELOG.md). The supported surface is deliberately narrow.
+Tetryon is **beta** and **pre-1.0** (current release: 0.5.0): the public API may still change before 1.0, and changes are called out in the [changelog](https://github.com/Vusys/tetryon/blob/master/CHANGELOG.md). The supported surface is deliberately narrow.
 
 ## Supported
 

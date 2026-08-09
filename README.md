@@ -10,7 +10,7 @@ It is **Firefox-first** and **PHPUnit-first**. You run your app however you
 like; Tetryon drives the browser.
 
 > [!NOTE]
-> **Status: 0.4.0 — beta, pre-1.0.** The API below ships and is exercised
+> **Status: 0.5.0 — beta, pre-1.0.** The API below ships and is exercised
 > against real Firefox on Linux and macOS in CI — including a real Vue 3
 > single-page app — but it may still change before 1.0. See
 > [compatibility](docs/compatibility.md).
