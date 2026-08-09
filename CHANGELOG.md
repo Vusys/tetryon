@@ -6,6 +6,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-09
+
+Focus and shadow DOM — the two gaps the TodoMVC epic surfaced. Commit-on-blur flows work in headless, there's a first-class `blur()` and `assertFocused()`, and web-component apps that render into shadow roots are drivable by CSS/test-id/placeholder. Still beta and pre-1.0 — see [`docs/compatibility.md`](docs/compatibility.md).
+
 ### Added
 
 - **`blur()` verb** (#142). Blurs the focused element (or a given target) to drive commit-on-blur flows — inline edits, validate-on-blur fields, autosave — instead of faking it with `pressKey('Tab')`.
@@ -217,7 +221,8 @@ first-class Laravel integration.
   and a writable artifact directory — and prints a report with fix hints,
   exiting non-zero if anything is wrong.
 
-[Unreleased]: https://github.com/Vusys/tetryon/compare/v0.3.0...master
+[Unreleased]: https://github.com/Vusys/tetryon/compare/v0.4.0...master
+[0.4.0]: https://github.com/Vusys/tetryon/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Vusys/tetryon/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Vusys/tetryon/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Vusys/tetryon/releases/tag/v0.1.0
