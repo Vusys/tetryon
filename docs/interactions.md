@@ -84,7 +84,20 @@ It works in **headless** Firefox, which is the catch: headless never treats its 
 
 `select()` matches an option by its **visible label or its value** — handy when values are opaque ids. Use `selectByValue()` to match the value only. Either throws `OptionNotFoundException` if no option matches, rather than silently selecting nothing.
 
-These verbs drive **native** form controls. If one resolves an element it can't drive — `fill()` on a `<div contenteditable>`, `select()` on a custom dropdown that isn't a `<select>`, `check()` on something that isn't a checkbox — it throws `UndrivableElementException` naming the element, instead of silently doing nothing and failing later at an unrelated assertion. Drive a custom widget by composing `click()` with `evaluate()` (or `within()` + `click()`).
+### Custom dropdowns (comboboxes)
+
+`select()` only drives a native `<select>`. Component libraries usually render a custom searchable dropdown instead — the WAI-ARIA pattern of a trigger (or `role="combobox"` input) revealing a `role="listbox"` of `role="option"` elements. `chooseFromDropdown()` drives that: it opens the control and clicks the option by its visible text.
+
+```php
+->chooseFromDropdown('Fruit', 'Banana');   // open, then pick the option
+
+->fill('Fruit', 'Ban')                     // type-to-filter comboboxes: narrow first,
+->chooseFromDropdown('Fruit', 'Banana');   // then pick
+```
+
+The option is matched globally by `role="option"`, so it works even when the list is portalled to the end of `<body>`.
+
+These verbs drive **native** form controls (except `chooseFromDropdown()`, which is for custom ones). If one resolves an element it can't drive — `fill()` on a `<div contenteditable>`, `select()` on a custom dropdown that isn't a `<select>`, `check()` on something that isn't a checkbox — it throws `UndrivableElementException` naming the element, instead of silently doing nothing and failing later at an unrelated assertion.
 
 ## Native dialogs
 

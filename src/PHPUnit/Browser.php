@@ -447,6 +447,26 @@ final readonly class Browser
         return $this->selectOption($field, $value, byValueOnly: true);
     }
 
+    /**
+     * Choose an option from a **custom** (non-native) dropdown / combobox — the
+     * WAI-ARIA pattern component libraries render instead of a `<select>`: a
+     * trigger (or `role="combobox"` input) that reveals a `role="listbox"` of
+     * `role="option"` elements. {@see select()} only drives a native `<select>`;
+     * this opens the control by clicking `$field`, then clicks the option whose
+     * visible text matches `$option`.
+     *
+     * The option is matched globally by `role="option"`, so it works even when the
+     * list is portalled to the end of `<body>`. For a type-to-filter combobox,
+     * `fill()` the field first to narrow the list, then call this.
+     */
+    public function chooseFromDropdown(string $field, string $option): self
+    {
+        $this->click($field);
+        $this->click(sprintf('//*[@role="option"][normalize-space()=%s]', $this->xpathLiteral($option)));
+
+        return $this;
+    }
+
     public function check(string $field): self
     {
         $this->driver->callFunctionOn($this->checkable('check', $field), 'function(){ if (!this.checked) this.click(); }');
@@ -1321,6 +1341,23 @@ final readonly class Browser
     private function cssQuote(string $value): string
     {
         return '"'.addcslashes($value, '"\\').'"';
+    }
+
+    /**
+     * An XPath string literal that survives embedded quotes (via `concat()` when
+     * the value contains both kinds).
+     */
+    private function xpathLiteral(string $value): string
+    {
+        if (! str_contains($value, '"')) {
+            return '"'.$value.'"';
+        }
+
+        if (! str_contains($value, "'")) {
+            return "'".$value."'";
+        }
+
+        return 'concat("'.str_replace('"', '",\'"\',"', $value).'")';
     }
 
     /**

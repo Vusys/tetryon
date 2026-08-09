@@ -8,6 +8,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`chooseFromDropdown()` for custom (non-native) comboboxes** (#81). `select()` only drives a native `<select>`; component libraries usually render the WAI-ARIA pattern instead (a trigger / `role="combobox"` input revealing a `role="listbox"` of `role="option"`s). `chooseFromDropdown($field, $option)` opens the control and clicks the option by visible text, matched globally so it works even when the list is portalled to `<body>`. `select()` continues to fail loudly (`UndrivableElementException`) when pointed at a non-`<select>`.
 - **`assertFocused()`/`isFocused()` descend shadow roots** (#165). When focus is inside a shadow root, `document.activeElement` reports the host, not the focused element; these now walk `shadowRoot.activeElement` to the real one. Combined with the suite reading state through a shadow-piercing helper, this lets the TodoMVC behavioural suite run against Lit — a web-component app where each todo is its own shadow root — like any other app. Lit's remaining skips are genuine Lit behaviours (commits edits on blur not Enter; no trim/reject of whitespace input; `autofocus`-based edit focus headless doesn't honor), not selector gaps.
 
 ## [0.5.0] - 2026-08-09
