@@ -56,4 +56,15 @@ final class ShadowDomTest extends StaticSiteTestCase
             ->assertChecked('.accept')
             ->assertSee('accepted');
     }
+
+    public function test_assert_focused_sees_into_shadow_roots(): void
+    {
+        // document.activeElement reports the shadow host; assertFocused() descends
+        // shadow roots to the real focused element (#141 + shadow).
+        $this->browser()
+            ->visit('/shadow.html')
+            ->assertNotFocused('@email')
+            ->click('@email')
+            ->assertFocused('@email');
+    }
 }

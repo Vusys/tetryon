@@ -6,6 +6,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **`assertFocused()`/`isFocused()` descend shadow roots** (#165). When focus is inside a shadow root, `document.activeElement` reports the host, not the focused element; these now walk `shadowRoot.activeElement` to the real one. Combined with the suite reading state through a shadow-piercing helper, this lets the TodoMVC behavioural suite run against Lit — a web-component app where each todo is its own shadow root — like any other app. Lit's remaining skips are genuine Lit behaviours (commits edits on blur not Enter; no trim/reject of whitespace input; `autofocus`-based edit focus headless doesn't honor), not selector gaps.
+
 ## [0.5.0] - 2026-08-09
 
 Shadow DOM, all the way. Following 0.4.0's CSS-based piercing, the behavioural text/label strategies pierce open shadow roots too — so a web-component app is drivable the way Tetryon is meant to be, by link text, button text, and label. Still beta and pre-1.0 — see [`docs/compatibility.md`](docs/compatibility.md).
