@@ -511,7 +511,9 @@ final readonly class Browser
     {
         return $this->driver->callFunctionOn(
             $this->resolveWaiting($target),
-            'function(){ return document.activeElement === this; }',
+            // When focus is inside a shadow root, document.activeElement is the
+            // host, not the focused element — descend shadow roots to the real one.
+            'function(){ let a = document.activeElement; while (a && a.shadowRoot && a.shadowRoot.activeElement) { a = a.shadowRoot.activeElement; } return a === this; }',
         ) === true;
     }
 

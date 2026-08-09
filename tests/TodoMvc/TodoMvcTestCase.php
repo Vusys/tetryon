@@ -43,15 +43,6 @@ abstract class TodoMvcTestCase extends BrowserTestCase
             self::markTestSkipped('TodoMVC fixtures are missing; run `composer todomvc:fetch` first.');
         }
 
-        // An app that renders into shadow roots (lit) is unreachable by the
-        // light-DOM selector strategy, so only the framework-marker smoke test
-        // (which reads the light-DOM <html>) can run; the behavioural scenarios
-        // are all blocked on the same cause (#151). Skip them in one place rather
-        // than repeating the reason across every knownIssues entry.
-        if ($this->app()->usesShadowDom && $this->name() !== 'test_the_app_loads_with_its_framework_marker') {
-            self::markTestSkipped("{$this->app()->name} renders into shadow roots; resolution now pierces them (#151, #162) so it's drivable, but these scenarios read state via document.querySelectorAll in evaluate(), which doesn't pierce — full run tracked in #165.");
-        }
-
         $reason = $this->app()->knownIssue($this->name());
         if ($reason !== null) {
             self::markTestSkipped("Known issue on {$this->app()->name}: {$reason}");
@@ -99,12 +90,27 @@ abstract class TodoMvcTestCase extends BrowserTestCase
     // no accessible text (a completed row, the edit box, the selection) is read
     // via the stable TodoMVC CSS contract: `.new-todo`, `.todo-list li`, `.edit`,
     // `.destroy`, `.todo-count`, `.clear-completed`; `li.completed`, `li.editing`,
-    // `a.selected`. The `// falls back` notes mark the two API gaps this suite
-    // surfaced (#141 assertFocused, #142 blur).
+    // `a.selected`. Those state reads go through pierce() so they see into shadow
+    // roots (Lit) as well as the light DOM (#165).
 
     protected function newTodo(Browser $browser, string $text): Browser
     {
         return $browser->fill('What needs to be done?', $text)->pressKey('Enter');
+    }
+
+    /**
+     * A JS expression yielding an array of elements matching $selector across the
+     * light DOM **and** every open shadow root. `document.querySelectorAll` in
+     * page script stops at shadow boundaries, so a scenario's state assertions
+     * would see nothing in a web-component app (Lit) without this (#165). For a
+     * light-DOM app it is exactly `querySelectorAll`.
+     */
+    protected function pierce(string $selector): string
+    {
+        $sel = json_encode($selector, JSON_THROW_ON_ERROR);
+
+        return "(()=>{const out=[];const walk=r=>{out.push(...r.querySelectorAll({$sel}));"
+            ."r.querySelectorAll('*').forEach(e=>{if(e.shadowRoot)walk(e.shadowRoot);});};walk(document);return out;})()";
     }
 
     public function test_empty_state_hides_the_main_and_footer(): void
@@ -134,7 +140,7 @@ abstract class TodoMvcTestCase extends BrowserTestCase
         $browser = $this->visitApp();
         $this->newTodo($browser, '   Buy milk   ')
             ->assertSee('1 item left')
-            ->assertExpression("[...document.querySelectorAll('.todo-list li label')].some(l => l.textContent.trim() === 'Buy milk')");
+            ->assertExpression($this->pierce('label').".some(l => l.textContent.trim() === 'Buy milk')");
         $this->newTodo($browser, '     ')->assertSee('1 item left');
     }
 
@@ -145,7 +151,7 @@ abstract class TodoMvcTestCase extends BrowserTestCase
         $this->newTodo($browser, 'Walk the dog')
             ->check('Buy milk')
             ->assertSee('1 item left')
-            ->assertExpression("[...document.querySelectorAll('.todo-list li')].some(li => li.classList.contains('completed') && li.textContent.includes('Buy milk'))");
+            ->assertExpression($this->pierce('li').".some(li => li.classList.contains('completed') && li.textContent.includes('Buy milk'))");
     }
 
     public function test_toggle_all_completes_and_uncompletes_everything(): void
@@ -169,15 +175,15 @@ abstract class TodoMvcTestCase extends BrowserTestCase
     {
         $this->newTodo($this->visitApp(), 'Buy milk')
             ->doubleClick('Buy milk')
-            ->assertExpression("[...document.querySelectorAll('.todo-list li')].some(li => li.classList.contains('editing') && li.textContent.includes('Buy milk'))")
-            ->assertFocused('.todo-list li.editing .edit');
+            ->assertExpression($this->pierce('li').".some(li => li.classList.contains('editing') && li.textContent.includes('Buy milk'))")
+            ->assertFocused('.editing .edit');
     }
 
     public function test_enter_saves_an_edit(): void
     {
         $this->newTodo($this->visitApp(), 'Buy milk')
             ->doubleClick('Buy milk')
-            ->fill('.todo-list li.editing .edit', 'Buy oat milk')
+            ->fill('.editing .edit', 'Buy oat milk')
             ->pressKey('Enter')
             ->assertSee('Buy oat milk')
             ->assertDontSee('Buy milk');
@@ -187,7 +193,7 @@ abstract class TodoMvcTestCase extends BrowserTestCase
     {
         $this->newTodo($this->visitApp(), 'Buy milk')
             ->doubleClick('Buy milk')
-            ->fill('.todo-list li.editing .edit', 'Discarded change')
+            ->fill('.editing .edit', 'Discarded change')
             ->pressKey('Escape')
             ->assertSee('Buy milk')
             ->assertDontSee('Discarded change');
@@ -197,8 +203,8 @@ abstract class TodoMvcTestCase extends BrowserTestCase
     {
         $this->newTodo($this->visitApp(), 'Buy milk')
             ->doubleClick('Buy milk')
-            ->fill('.todo-list li.editing .edit', 'Buy oat milk')
-            ->blur('.todo-list li.editing .edit')
+            ->fill('.editing .edit', 'Buy oat milk')
+            ->blur('.editing .edit')
             ->assertSee('Buy oat milk');
     }
 
@@ -206,7 +212,7 @@ abstract class TodoMvcTestCase extends BrowserTestCase
     {
         $this->newTodo($this->visitApp(), 'Buy milk')
             ->doubleClick('Buy milk')
-            ->fill('.todo-list li.editing .edit', '')
+            ->fill('.editing .edit', '')
             ->pressKey('Enter')
             ->assertDontSee('Buy milk')
             ->assertMissing('.todo-list li');
@@ -220,7 +226,7 @@ abstract class TodoMvcTestCase extends BrowserTestCase
             ->hover('Walk the dog')
             // .destroy carries no accessible text, so the CSS contract is the only
             // handle; only the hovered row's button is clickable, so it wins.
-            ->click('.todo-list li .destroy')
+            ->click('.destroy')
             ->assertDontSee('Walk the dog')
             ->assertSee('Buy milk');
     }
@@ -233,7 +239,7 @@ abstract class TodoMvcTestCase extends BrowserTestCase
             ->check('Buy milk')
             ->click('Active')
             ->assertSee('Walk the dog')->assertDontSee('Buy milk')
-            ->assertExpression("document.querySelector('.filters a.selected').textContent.trim() === 'Active'")
+            ->assertExpression($this->pierce('.filters a.selected')."[0]?.textContent.trim() === 'Active'")
             ->click('Completed')
             ->assertSee('Buy milk')->assertDontSee('Walk the dog')
             ->click('All')

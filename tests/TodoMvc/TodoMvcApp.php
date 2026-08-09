@@ -24,7 +24,6 @@ final readonly class TodoMvcApp
      * @param  string  $path  the app's served directory, relative to tests/Fixtures/todomvc/
      * @param  string  $toggleAllId  id of the toggle-all checkbox (`toggle-all` for most; `toggle-all-input` for vue; empty for angular/preact/javascript-es6, which give it no id)
      * @param  string  $allFilterHref  href of the "All" filter link (jquery uses `#/all`)
-     * @param  bool  $usesShadowDom  whether the app renders into shadow roots (lit only)
      * @param  array<string, string>  $knownIssues  map of scenario method name => reason it is skipped
      */
     public function __construct(
@@ -32,7 +31,6 @@ final readonly class TodoMvcApp
         public string $path,
         public string $toggleAllId = 'toggle-all',
         public string $allFilterHref = '#/',
-        public bool $usesShadowDom = false,
         public array $knownIssues = [],
     ) {
         if ($name === '') {
