@@ -6,6 +6,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-09
+
+Shadow DOM, all the way. Following 0.4.0's CSS-based piercing, the behavioural text/label strategies pierce open shadow roots too — so a web-component app is drivable the way Tetryon is meant to be, by link text, button text, and label. Still beta and pre-1.0 — see [`docs/compatibility.md`](docs/compatibility.md).
+
 ### Added
 
 - **Shadow-DOM piercing for the text/label strategies** (#162). Following #151 (CSS-based piercing), the behavioural strategies now pierce open shadow roots too — button text, link text, and label association (wrapping, `for=`, adjacency). XPath can't cross shadow boundaries, so each carries a JavaScript matcher the driver runs inside every shadow root when the native locate finds nothing. Web-component apps are now drivable behaviourally (`click('Go')`, `press('Save')`, `check('Accept terms')`). The accessible-name locator still doesn't pierce.
@@ -225,7 +229,8 @@ first-class Laravel integration.
   and a writable artifact directory — and prints a report with fix hints,
   exiting non-zero if anything is wrong.
 
-[Unreleased]: https://github.com/Vusys/tetryon/compare/v0.4.0...master
+[Unreleased]: https://github.com/Vusys/tetryon/compare/v0.5.0...master
+[0.5.0]: https://github.com/Vusys/tetryon/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Vusys/tetryon/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Vusys/tetryon/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Vusys/tetryon/compare/v0.1.0...v0.2.0
