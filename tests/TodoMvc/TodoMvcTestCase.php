@@ -49,7 +49,7 @@ abstract class TodoMvcTestCase extends BrowserTestCase
         // are all blocked on the same cause (#151). Skip them in one place rather
         // than repeating the reason across every knownIssues entry.
         if ($this->app()->usesShadowDom && $this->name() !== 'test_the_app_loads_with_its_framework_marker') {
-            self::markTestSkipped("{$this->app()->name} renders into shadow roots, unreachable by the current selector strategy (#151).");
+            self::markTestSkipped("{$this->app()->name} renders into shadow roots; CSS-based resolution now pierces them (#151), but this suite drives by text/label, which does not yet (#162).");
         }
 
         $reason = $this->app()->knownIssue($this->name());

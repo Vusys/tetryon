@@ -60,6 +60,31 @@ final class FirefoxBiDiDriver implements NodeLocator, VisibilityProbe
         }
         JS;
 
+    /**
+     * Collect CSS matches across open shadow roots, in document order, de-duped.
+     * Bound to a start node when scoping under `within()`, else searches the whole
+     * document. Returns the elements as node remote values so the caller gets
+     * shared references (#151).
+     */
+    private const string PIERCE_CSS_JS = <<<'JS'
+        function (selector) {
+          const start = (this && this.querySelectorAll) ? this : document;
+          const out = [];
+          const seen = new Set();
+          const visit = function (node) {
+            node.querySelectorAll(selector).forEach(function (el) {
+              if (!seen.has(el)) { seen.add(el); out.push(el); }
+            });
+            node.querySelectorAll('*').forEach(function (el) {
+              if (el.shadowRoot) visit(el.shadowRoot);
+            });
+          };
+          visit(start);
+          if (start.shadowRoot) visit(start.shadowRoot);
+          return out;
+        }
+        JS;
+
     private ?FirefoxProcess $process = null;
 
     private ?WebSocketClient $socket = null;
@@ -182,6 +207,63 @@ final class FirefoxBiDiDriver implements NodeLocator, VisibilityProbe
             $value = $node['value'] ?? null;
             $localName = is_array($value) && is_string($value['localName'] ?? null) ? $value['localName'] : null;
             $references[] = new ElementReference($node['sharedId'], $localName);
+        }
+
+        // browsingContext.locateNodes only sees the light DOM, so an app that
+        // renders into shadow roots (web components) is invisible to it. When a
+        // CSS locator finds nothing there, retry with a script that descends open
+        // shadow roots (#151). XPath/accessibility locators can't pierce, so they
+        // are left to the native path.
+        if ($references === [] && $locator->bidi['type'] === 'css' && is_string($locator->bidi['value'])) {
+            return $this->locatePiercingCss($locator->bidi['value'], $within);
+        }
+
+        return $references;
+    }
+
+    /**
+     * Locate CSS matches across open shadow roots, returning shared references
+     * the input/script commands can drive. The fallback for {@see locateAll()}
+     * on shadow-DOM apps (#151).
+     *
+     * @return list<ElementReference>
+     */
+    private function locatePiercingCss(string $selector, ?ElementReference $within): array
+    {
+        $params = [
+            'functionDeclaration' => self::PIERCE_CSS_JS,
+            'arguments' => [['type' => 'string', 'value' => $selector]],
+            'target' => ['context' => $this->context()],
+            'awaitPromise' => false,
+        ];
+        if ($within instanceof ElementReference) {
+            $params['this'] = ['sharedId' => $within->sharedId];
+        }
+
+        $result = $this->connection()->send('script.callFunction', $params);
+        if (($result['type'] ?? null) === 'exception') {
+            throw new BiDiException('Shadow-piercing locate threw: '.$this->exceptionText($result));
+        }
+
+        $remote = $result['result'] ?? null;
+        if (! is_array($remote) || ($remote['type'] ?? null) !== 'array' || ! is_array($remote['value'] ?? null)) {
+            return [];
+        }
+
+        $references = [];
+        foreach ($remote['value'] as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+            if (($item['type'] ?? null) !== 'node') {
+                continue;
+            }
+            if (! is_string($item['sharedId'] ?? null)) {
+                continue;
+            }
+            $value = $item['value'] ?? null;
+            $localName = is_array($value) && is_string($value['localName'] ?? null) ? $value['localName'] : null;
+            $references[] = new ElementReference($item['sharedId'], $localName);
         }
 
         return $references;
