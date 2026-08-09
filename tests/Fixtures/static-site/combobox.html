@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Custom combobox</title>
+    <style>
+        [role="listbox"][hidden] { display: none; }
+        [role="option"][hidden] { display: none; }
+    </style>
+</head>
+<body>
+    <!--
+        A custom searchable combobox (WAI-ARIA), not a native <select>: a
+        role="combobox" input that reveals a role="listbox" of role="option"s,
+        with type-to-filter. Driven by chooseFromDropdown() (#81).
+    -->
+    <label for="fruit">Fruit</label>
+    <input id="fruit" role="combobox" aria-controls="fruit-list" aria-expanded="false" autocomplete="off">
+    <ul id="fruit-list" role="listbox" hidden>
+        <li role="option">Apple</li>
+        <li role="option">Apricot</li>
+        <li role="option">Banana</li>
+        <li role="option">Cherry</li>
+    </ul>
+    <div data-testid="chosen">none</div>
+    <script>
+        const input = document.getElementById('fruit');
+        const list = document.getElementById('fruit-list');
+        const options = () => list.querySelectorAll('[role=option]');
+        const open = () => { list.hidden = false; input.setAttribute('aria-expanded', 'true'); };
+        const close = () => { list.hidden = true; input.setAttribute('aria-expanded', 'false'); };
+
+        input.addEventListener('focus', open);
+        input.addEventListener('click', open);
+        input.addEventListener('input', () => {
+            const q = input.value.toLowerCase();
+            options().forEach(o => { o.hidden = !o.textContent.toLowerCase().includes(q); });
+            open();
+        });
+        options().forEach(o => o.addEventListener('click', () => {
+            input.value = o.textContent;
+            document.querySelector('[data-testid=chosen]').textContent = 'chosen:' + o.textContent;
+            close();
+        }));
+    </script>
+</body>
+</html>
