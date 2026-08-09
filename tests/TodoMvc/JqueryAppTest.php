@@ -29,7 +29,6 @@ final class JqueryAppTest extends TodoMvcTestCase
                 // Every jQuery edit commit runs through `focusout` — Enter and
                 // Escape both just call `blur()` — and headless Firefox never
                 // fires blur/focusout (#143), so all four edit flows are blocked.
-                'test_blur_saves_an_edit' => 'edit commits on focusout, which headless Firefox does not fire (#143)',
                 'test_enter_saves_an_edit' => 'Enter commits via focusout (it calls blur()), which headless Firefox does not fire (#143)',
                 'test_escape_discards_an_edit' => 'Escape discards via focusout (it calls blur()), which headless Firefox does not fire (#143)',
                 'test_editing_to_empty_destroys_the_item' => 'edit-to-empty destroys via focusout, which headless Firefox does not fire (#143)',

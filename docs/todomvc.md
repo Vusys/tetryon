@@ -29,14 +29,14 @@ Apps: **es6** javascript-es6 · **rea** react · **r-r** react-redux · **vue** 
 | double-click edits + focuses input | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⊘⁴ | ✅ | ✅ |
 | Enter saves an edit | ⊘¹ | ✅ | ✅ | ✅ | ✅ | ⊘¹ | ✅ | ⊘⁴ | ⊘¹ | ✅ |
 | Escape discards an edit | ✅ | ⊘² | ✅ | ✅ | ✅ | ✅ | ✅ | ⊘⁴ | ⊘¹ | ✅ |
-| blur saves an edit | ⊘¹ | ⊘¹ | ⊘¹ | ⊘¹ | ⊘¹ | ⊘¹ | ⊘¹ | ⊘⁴ | ⊘¹ | ⊘¹ |
+| blur saves an edit | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⊘⁴ | ✅ | ✅ |
 | editing to empty destroys item | ⊘¹ | ✅ | ⊘⁵ | ✅ | ✅ | ⊘¹ | ✅ | ⊘⁴ | ⊘¹ | ✅ |
 | hover reveals destroy + removes | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⊘⁴ | ✅ | ✅ |
 | filters move selection + filter | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⊘⁴ | ✅ | ✅ |
 | clear-completed removes + hides | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⊘⁴ | ✅ | ✅ |
 | active filter (hash) survives reload | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⊘⁴ | ✅ | ✅ |
 
-**Skip key** — ¹ headless blur (#143) · ² React Escape deviation · ³ es6 toggle-all deviation · ⁴ shadow DOM (#151) · ⁵ react-redux empty-destroy deviation.
+**Skip key** — ¹ app commits via an internal blur on Enter/Escape, dropped in headless (#143) · ² React Escape deviation · ³ es6 toggle-all deviation · ⁴ shadow DOM (#151) · ⁵ react-redux empty-destroy deviation.
 
 ## Triage of every gap
 
@@ -44,7 +44,7 @@ The whole point of the epic was that the *selector strategy* — the thing Tetry
 
 ### Tetryon bugs (fix)
 
-- **Commit-on-blur doesn't work in headless — [#143](https://github.com/Vusys/tetryon/issues/143).** The dominant gap. In headless Firefox `document.hasFocus()` is `false` and moving focus fires no `blur`/`focusout` event, so any commit-on-blur pattern no-ops. This blocks *blur saves* on all ten, and also *Enter saves* / *Escape discards* / *edit-to-empty* on the apps that route those through blur (es6, svelte, jquery). Tetryon's keys are fine — `pressKey('Enter')` fires `keydown`+`keypress` correctly; the browser simply never dispatches the blur the app listens for.
+- **Commit-on-blur under headless — [#143](https://github.com/Vusys/tetryon/issues/143), mitigated.** In headless Firefox `document.hasFocus()` is `false` and moving focus fires no `blur`/`focusout` event, so any commit-on-blur pattern no-ops. The [`blur()`](../blob/master/docs/interactions.md) verb now dispatches those events itself, so *blur saves* passes on all nine reachable apps. What remains is what Tetryon can't intercept: es6, svelte, and jquery commit by calling the field's *own* `blur()` internally on Enter/Escape, and that internal blur is still dropped headless — so *Enter saves* / *Escape discards* / *edit-to-empty* on those apps need a focused window (run headed, or under Xvfb in CI — see [Continuous integration](../blob/master/docs/ci.md)). Tetryon's keys are fine either way: `pressKey('Enter')` fires `keydown`+`keypress` correctly.
 - **Shadow DOM is unreachable — [#151](https://github.com/Vusys/tetryon/issues/151).** Lit renders the whole app into nested shadow roots; every light-DOM strategy misses it. Out of scope for v1, tracked for a piercing resolver.
 
 ### Upstream app deviations (record, don't fix)
@@ -69,4 +69,4 @@ Three blockers surfaced by the initial probe were **fixed** as part of this work
 - visually-hidden custom checkboxes being undrivable — [#139](https://github.com/Vusys/tetryon/issues/139).
 - `currentPath()` dropping the URL fragment, so hash routes couldn't be asserted — [#140](https://github.com/Vusys/tetryon/issues/140).
 
-Two smaller API gaps were filed for follow-up: [`assertFocused()`](https://github.com/Vusys/tetryon/issues/141) and [`blur()`](https://github.com/Vusys/tetryon/issues/142).
+Two smaller API gaps the suite reached for: [`blur()`](https://github.com/Vusys/tetryon/issues/142) (now shipped — it also mitigates #143) and [`assertFocused()`](https://github.com/Vusys/tetryon/issues/141).

@@ -6,6 +6,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **`blur()` verb** (#142). Blurs the focused element (or a given target) to drive commit-on-blur flows — inline edits, validate-on-blur fields, autosave — instead of faking it with `pressKey('Tab')`.
+
+### Fixed
+
+- **Commit-on-blur works in headless** (#143). Headless Firefox never treats its window as focused (`document.hasFocus()` is `false`) and drops every `blur`/`focusout` event, so save-on-blur handlers never ran. `blur()` now dispatches those events itself when the browser didn't — exactly once, headless or headed. An application that commits by calling the field's own `blur()` internally (e.g. on `Enter`) still needs a focused window; run headed or under Xvfb in CI (see [`docs/ci.md`](docs/ci.md)).
+
 ## [0.3.0] - 2026-08-09
 
 Validated against ten real-world frameworks. A shared behavioural suite runs against the TodoMVC apps (React, Vue, Angular, Svelte, Preact, react-redux, Lit, jQuery, Backbone, vanilla ES6), which drove out three selector/driver fixes and confirmed the behavioural selector strategy holds across markup we didn't write. Still beta and pre-1.0 — see [`docs/compatibility.md`](docs/compatibility.md).

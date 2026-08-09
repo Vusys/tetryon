@@ -199,8 +199,7 @@ abstract class TodoMvcTestCase extends BrowserTestCase
         $this->newTodo($this->visitApp(), 'Buy milk')
             ->doubleClick('Buy milk')
             ->fill('.todo-list li.editing .edit', 'Buy oat milk')
-            // falls back to pressKey('Tab') as a blur stand-in — no blur() verb yet, see #142
-            ->pressKey('Tab')
+            ->blur('.todo-list li.editing .edit')
             ->assertSee('Buy oat milk');
     }
 

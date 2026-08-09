@@ -128,6 +128,23 @@ vendor/bin/paratest --testsuite Browser --processes 4
 
 For Laravel, give each worker its own database (Laravel's parallel testing already does this with `php artisan test --parallel`), and make sure the served app points at the same database the test process seeds.
 
+## Focus events (commit-on-blur) under headless
+
+Headless Firefox never treats its window as focused — `document.hasFocus()` is `false` — and Gecko then drops every `blur`/`focusout` event, even the ones a real click or `Tab` would fire. Most tests never notice. Tests that rely on **commit-on-blur** do: an inline edit or a validate-on-blur field that saves when it loses focus won't save.
+
+Tetryon's [`blur()`](interactions.md) verb handles this by dispatching the events itself, so `->blur()` commits headless. What it can't reach is an application that calls the field's *own* `blur()` internally (some frameworks do this on `Enter`) — that internal blur is still dropped.
+
+To exercise those flows in CI, run Firefox **headed under a virtual display** so the window is genuinely focused:
+
+```yaml
+      - name: Run browser tests (headed under Xvfb)
+        run: xvfb-run --auto-servernum vendor/bin/phpunit --testsuite Browser
+        env:
+          TETRYON_HEADLESS: false
+```
+
+`xvfb` is preinstalled on GitHub's `ubuntu-latest` runners. Locally, the same flows pass with `TETRYON_HEADLESS=false` on a normal desktop session.
+
 ## Diagnostics in CI
 
 - **Always upload `tests/Browser/Artifacts` on failure** so a red build comes with the screenshot, HTML, console log, and command trace. See [Diagnostics](diagnostics.md).

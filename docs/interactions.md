@@ -57,6 +57,20 @@ Actions scroll on their own — `click()` brings its target into view, including
 
 `pressKey` sends to the focused element. Named keys (`Enter`, `Tab`, `Escape`, `Backspace`, `Delete`, `ArrowUp`/`Down`/`Left`/`Right`, `Home`, `End`, `PageUp`/`PageDown`, …) are translated to the right key codes; a single character is sent literally.
 
+### Committing on blur
+
+```php
+->fill('Display name', 'Ada')
+->blur()                        // blur the focused field — commits a save-on-blur input
+->assertSee('Saved');
+
+->blur('Display name');         // or blur a specific target
+```
+
+`blur()` drives "commit on blur" flows — inline edits, validate-on-blur fields, autosave — so you don't have to fake it with `pressKey('Tab')`. With no argument it blurs the currently-focused element; pass a target to blur that one.
+
+It works in **headless** Firefox, which is the catch: headless never treats its window as focused (`document.hasFocus()` is `false`), so it silently drops every `blur`/`focusout` event — a real blur would commit nothing. `blur()` dispatches the events itself when the browser didn't, so the handler runs exactly once headless or headed. The limit is what Tetryon can't see: if the **application** commits by calling the field's own `blur()` internally (some frameworks do this on `Enter`), that internal blur is still dropped headless. Run those cases headed — locally with `TETRYON_HEADLESS=false`, or under a virtual display in CI (see [Continuous integration](ci.md)).
+
 ## Forms
 
 ```php

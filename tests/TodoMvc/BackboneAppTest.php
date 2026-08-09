@@ -23,9 +23,6 @@ final class BackboneAppTest extends TodoMvcTestCase
         return new TodoMvcApp(
             name: 'backbone',
             path: 'examples/backbone/dist/',
-            knownIssues: [
-                'test_blur_saves_an_edit' => 'edit commits on blur, which headless Firefox does not fire (#143)',
-            ],
         );
     }
 }
