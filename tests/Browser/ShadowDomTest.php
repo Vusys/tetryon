@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace Vusys\Tetryon\Tests\Browser;
 
 /**
- * Resolution pierces open shadow roots for CSS-based targets — test attributes,
- * placeholder, name, explicit CSS/id — so a web-component app rendered into
- * nested shadow roots is drivable (#151). XPath strategies (label/button/link
- * text) still don't pierce.
+ * Resolution pierces open shadow roots — for CSS-based targets (test attributes,
+ * placeholder, name, explicit CSS/id) (#151) and for the text/label strategies
+ * (button/link text, label association) via a JS matcher, since XPath can't cross
+ * shadow boundaries (#162). So a web-component app in nested shadow roots is
+ * drivable behaviourally.
  */
 final class ShadowDomTest extends StaticSiteTestCase
 {
@@ -28,5 +29,31 @@ final class ShadowDomTest extends StaticSiteTestCase
             ->fill('Email', 'grace@example.com')
             ->click('@save')
             ->assertSee('saved:grace@example.com');
+    }
+
+    public function test_click_by_link_text_pierces_shadow(): void
+    {
+        $this->browser()
+            ->visit('/shadow.html')
+            ->click('Go')
+            ->assertSee('linked');
+    }
+
+    public function test_press_by_button_text_pierces_shadow(): void
+    {
+        $this->browser()
+            ->visit('/shadow.html')
+            ->fill('@email', 'ada@example.com')
+            ->press('Save')
+            ->assertSee('saved:ada@example.com');
+    }
+
+    public function test_check_by_sibling_label_pierces_shadow(): void
+    {
+        $this->browser()
+            ->visit('/shadow.html')
+            ->check('Accept terms')
+            ->assertChecked('.accept')
+            ->assertSee('accepted');
     }
 }

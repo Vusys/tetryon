@@ -32,18 +32,18 @@ final class SelectorStrategy
             $candidates[] = Locator::css("[{$attribute}]", '['.$attribute.'='.$css.']');
         }
 
-        $candidates[] = Locator::xpath('label', $this->labelExpression($xpath));
+        $candidates[] = Locator::xpath('label', $this->labelExpression($xpath), $this->labelPierce($target));
         $candidates[] = Locator::accessibleName($target);
         $candidates[] = Locator::css('placeholder', '[placeholder='.$css.']');
-        $candidates[] = Locator::xpath('button text', $this->buttonExpression($xpath));
-        $candidates[] = Locator::xpath('link text', './/a[normalize-space()='.$xpath.']');
+        $candidates[] = Locator::xpath('button text', $this->buttonExpression($xpath), $this->buttonPierce($target));
+        $candidates[] = Locator::xpath('link text', './/a[normalize-space()='.$xpath.']', $this->linkPierce($target));
         $candidates[] = Locator::css('name', '[name='.$css.']');
 
         if (preg_match('/^[A-Za-z][\w-]*$/', $target) === 1) {
             $candidates[] = Locator::css('id', '#'.$target);
         }
 
-        $candidates[] = Locator::xpath('visible text', './/*[normalize-space(text())='.$xpath.']');
+        $candidates[] = Locator::xpath('visible text', './/*[normalize-space(text())='.$xpath.']', $this->visibleTextPierce($target));
 
         return $candidates;
     }
@@ -76,7 +76,7 @@ final class SelectorStrategy
             $candidates[] = Locator::css("[{$attribute}]", '['.$attribute.'='.$css.']');
         }
 
-        $candidates[] = Locator::xpath('label', $this->checkboxForLabelExpression($xpath));
+        $candidates[] = Locator::xpath('label', $this->checkboxForLabelExpression($xpath), $this->checkboxForLabelPierce($target));
         $candidates[] = Locator::css('name', '[name='.$css.']');
 
         if (preg_match('/^[A-Za-z][\w-]*$/', $target) === 1) {
@@ -141,6 +141,71 @@ final class SelectorStrategy
     {
         return ".//button[normalize-space()={$xpath}]"
             ." | .//input[(@type='submit' or @type='button' or @type='reset') and @value={$xpath}]";
+    }
+
+    // ── Shadow-piercing matchers ────────────────────────────────────────────
+    //
+    // XPath can't cross shadow boundaries, so each text/label strategy carries a
+    // JS equivalent — a `(root) => Element[]` the driver runs inside every open
+    // shadow root when the native XPath finds nothing (#162). Each mirrors its
+    // XPath twin's semantics (normalize-space text comparison).
+
+    private function labelPierce(string $target): string
+    {
+        $t = $this->jsString($target);
+
+        return "(root)=>{const ns=s=>(s||'').replace(/\\s+/g,' ').trim();const out=[];"
+            ."root.querySelectorAll('label').forEach(l=>{if(ns(l.textContent)!=={$t})return;"
+            ."l.querySelectorAll('input,textarea,select').forEach(c=>out.push(c));"
+            ."const f=l.getAttribute('for');if(f){const t=root.querySelector('#'+CSS.escape(f));if(t)out.push(t);}});"
+            .'return out;}';
+    }
+
+    private function checkboxForLabelPierce(string $target): string
+    {
+        $t = $this->jsString($target);
+
+        return "(root)=>{const ns=s=>(s||'').replace(/\\s+/g,' ').trim();"
+            ."const cr=el=>el&&el.tagName==='INPUT'&&(el.type==='checkbox'||el.type==='radio');const out=[];"
+            ."root.querySelectorAll('label').forEach(l=>{if(ns(l.textContent)!=={$t})return;"
+            ."l.querySelectorAll('input').forEach(c=>{if(cr(c))out.push(c);});"
+            ."const f=l.getAttribute('for');if(f){const t=root.querySelector('#'+CSS.escape(f));if(cr(t))out.push(t);}"
+            .'const p=l.previousElementSibling,n=l.nextElementSibling;if(cr(p))out.push(p);if(cr(n))out.push(n);});'
+            .'return out;}';
+    }
+
+    private function buttonPierce(string $target): string
+    {
+        $t = $this->jsString($target);
+
+        return "(root)=>{const ns=s=>(s||'').replace(/\\s+/g,' ').trim();const out=[];"
+            ."root.querySelectorAll('button').forEach(b=>{if(ns(b.textContent)==={$t})out.push(b);});"
+            ."root.querySelectorAll('input[type=submit],input[type=button],input[type=reset]').forEach(i=>{if(i.value==={$t})out.push(i);});"
+            .'return out;}';
+    }
+
+    private function linkPierce(string $target): string
+    {
+        $t = $this->jsString($target);
+
+        return "(root)=>{const ns=s=>(s||'').replace(/\\s+/g,' ').trim();"
+            ."return Array.from(root.querySelectorAll('a')).filter(a=>ns(a.textContent)==={$t});}";
+    }
+
+    private function visibleTextPierce(string $target): string
+    {
+        $t = $this->jsString($target);
+
+        return "(root)=>{const ns=s=>(s||'').replace(/\\s+/g,' ').trim();const out=[];"
+            ."root.querySelectorAll('*').forEach(el=>{"
+            ."const t=ns(Array.from(el.childNodes).filter(n=>n.nodeType===3).map(n=>n.textContent).join(''));"
+            ."if(t==={$t})out.push(el);});"
+            .'return out;}';
+    }
+
+    private function jsString(string $value): string
+    {
+        return json_encode($value, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 
     private function cssString(string $value): string

@@ -61,28 +61,26 @@ final class FirefoxBiDiDriver implements NodeLocator, VisibilityProbe
         JS;
 
     /**
-     * Collect CSS matches across open shadow roots, in document order, de-duped.
-     * Bound to a start node when scoping under `within()`, else searches the whole
-     * document. Returns the elements as node remote values so the caller gets
-     * shared references (#151).
+     * The body of {@see locatePiercing()}: apply a `match(root)` matcher inside
+     * the start node and every open shadow root beneath it, de-duped, and return
+     * the elements as node remote values so the caller gets shared references
+     * (#151, #162). `this` is the `within()` scope when set, else the document.
      */
-    private const string PIERCE_CSS_JS = <<<'JS'
-        function (selector) {
-          const start = (this && this.querySelectorAll) ? this : document;
-          const out = [];
-          const seen = new Set();
-          const visit = function (node) {
-            node.querySelectorAll(selector).forEach(function (el) {
-              if (!seen.has(el)) { seen.add(el); out.push(el); }
-            });
-            node.querySelectorAll('*').forEach(function (el) {
-              if (el.shadowRoot) visit(el.shadowRoot);
-            });
-          };
-          visit(start);
-          if (start.shadowRoot) visit(start.shadowRoot);
-          return out;
-        }
+    private const string PIERCE_WALK_JS = <<<'JS'
+        const start = (this && this.querySelectorAll) ? this : document;
+        const out = [];
+        const seen = new Set();
+        const visit = function (node) {
+          (match(node) || []).forEach(function (el) {
+            if (!seen.has(el)) { seen.add(el); out.push(el); }
+          });
+          node.querySelectorAll('*').forEach(function (el) {
+            if (el.shadowRoot) visit(el.shadowRoot);
+          });
+        };
+        visit(start);
+        if (start.shadowRoot) visit(start.shadowRoot);
+        return out;
         JS;
 
     private ?FirefoxProcess $process = null;
@@ -210,29 +208,50 @@ final class FirefoxBiDiDriver implements NodeLocator, VisibilityProbe
         }
 
         // browsingContext.locateNodes only sees the light DOM, so an app that
-        // renders into shadow roots (web components) is invisible to it. When a
-        // CSS locator finds nothing there, retry with a script that descends open
-        // shadow roots (#151). XPath/accessibility locators can't pierce, so they
-        // are left to the native path.
-        if ($references === [] && $locator->bidi['type'] === 'css' && is_string($locator->bidi['value'])) {
-            return $this->locatePiercingCss($locator->bidi['value'], $within);
+        // renders into shadow roots (web components) is invisible to it. When the
+        // native locate finds nothing, retry with a matcher run inside every open
+        // shadow root: CSS via querySelectorAll (#151), and the text/label
+        // strategies via the JS twin the locator carries (#162). Accessibility
+        // locators have no piercing matcher, so they stay on the native path.
+        if ($references === []) {
+            $matcher = $this->piercingMatcher($locator);
+            if ($matcher !== null) {
+                return $this->locatePiercing($matcher, $within);
+            }
         }
 
         return $references;
     }
 
     /**
-     * Locate CSS matches across open shadow roots, returning shared references
-     * the input/script commands can drive. The fallback for {@see locateAll()}
-     * on shadow-DOM apps (#151).
+     * The `(root) => Element[]` matcher to run across shadow roots for a locator:
+     * the locator's own `pierce` twin (text/label strategies), or a
+     * querySelectorAll for a CSS locator. Null when the locator can't pierce.
+     */
+    private function piercingMatcher(Locator $locator): ?string
+    {
+        if ($locator->pierce !== null) {
+            return $locator->pierce;
+        }
+
+        if ($locator->bidi['type'] === 'css' && is_string($locator->bidi['value'])) {
+            return '(root)=>Array.from(root.querySelectorAll('.json_encode($locator->bidi['value'], JSON_THROW_ON_ERROR).'))';
+        }
+
+        return null;
+    }
+
+    /**
+     * Run a `(root) => Element[]` matcher inside every open shadow root (and the
+     * light DOM), returning shared references the input/script commands can drive.
+     * The shadow-piercing fallback for {@see locateAll()} (#151, #162).
      *
      * @return list<ElementReference>
      */
-    private function locatePiercingCss(string $selector, ?ElementReference $within): array
+    private function locatePiercing(string $matcher, ?ElementReference $within): array
     {
         $params = [
-            'functionDeclaration' => self::PIERCE_CSS_JS,
-            'arguments' => [['type' => 'string', 'value' => $selector]],
+            'functionDeclaration' => 'function () { const match = ('.$matcher.'); '.self::PIERCE_WALK_JS.' }',
             'target' => ['context' => $this->context()],
             'awaitPromise' => false,
         ];

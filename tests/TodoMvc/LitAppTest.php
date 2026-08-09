@@ -9,11 +9,12 @@ use PHPUnit\Framework\Attributes\Group;
 
 /**
  * Lit — the whole app is a `<todo-app>` custom element rendering into nested
- * shadow roots. Resolution now pierces shadow roots for CSS-based targets (#151),
- * so a web-component app is drivable by test-id / placeholder / CSS — but this
- * suite drives behaviourally by text and label, which resolve via XPath and don't
- * pierce yet (#162). So `usesShadowDom` keeps the behavioural scenarios skipped
- * with one reason; only the framework-marker smoke test runs.
+ * shadow roots. Resolution pierces shadow roots for both CSS (#151) and
+ * text/label (#162) strategies, so the app is drivable by placeholder, link
+ * text, button text, or sibling label. What still blocks a full run is that
+ * these scenarios read state via `document.querySelectorAll` in `evaluate()`,
+ * which doesn't pierce (#165). So `usesShadowDom` keeps the behavioural scenarios
+ * skipped with one reason; only the framework-marker smoke test runs.
  */
 #[Group('todomvc')]
 final class LitAppTest extends TodoMvcTestCase
