@@ -24,9 +24,6 @@ final class VueAppTest extends TodoMvcTestCase
             name: 'vue',
             path: 'examples/vue/dist/',
             toggleAllId: 'toggle-all-input',
-            knownIssues: [
-                'test_blur_saves_an_edit' => 'edit commits on blur, which headless Firefox does not fire (#143)',
-            ],
         );
     }
 }

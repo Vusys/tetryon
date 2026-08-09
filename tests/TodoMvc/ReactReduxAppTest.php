@@ -23,7 +23,6 @@ final class ReactReduxAppTest extends TodoMvcTestCase
             name: 'react-redux',
             path: 'examples/react-redux/dist/',
             knownIssues: [
-                'test_blur_saves_an_edit' => 'edit commits on blur, which headless Firefox does not fire (#143)',
                 'test_editing_to_empty_destroys_the_item' => 'react-redux exits edit on Enter but does not destroy an emptied todo (upstream deviation)',
             ],
         );

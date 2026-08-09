@@ -21,9 +21,6 @@ final class PreactAppTest extends TodoMvcTestCase
             name: 'preact',
             path: 'examples/preact/dist/',
             toggleAllId: '',
-            knownIssues: [
-                'test_blur_saves_an_edit' => 'edit commits on blur, which headless Firefox does not fire (#143)',
-            ],
         );
     }
 }

@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Blur to commit</title>
+</head>
+<body>
+    <!--
+        Commit-on-blur: the field saves when it loses focus. Headless Firefox
+        never fires blur/focusout on its own, so blur() must dispatch them (#143).
+    -->
+    <input data-testid="editor" value="draft">
+    <div data-testid="saved">unsaved</div>
+    <script>
+        const editor = document.querySelector('[data-testid=editor]');
+        editor.addEventListener('focusout', function () {
+            document.querySelector('[data-testid=saved]').textContent = 'saved:' + editor.value;
+        });
+    </script>
+</body>
+</html>

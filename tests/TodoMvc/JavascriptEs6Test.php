@@ -26,7 +26,6 @@ final class JavascriptEs6Test extends TodoMvcTestCase
                 // This app commits an inline edit on blur (Enter calls blur()),
                 // and headless Firefox never fires blur/focusout (#143).
                 'test_enter_saves_an_edit' => 'edit commits on blur, which headless Firefox does not fire (#143)',
-                'test_blur_saves_an_edit' => 'edit commits on blur, which headless Firefox does not fire (#143)',
                 'test_editing_to_empty_destroys_the_item' => 'edit commits on blur, which headless Firefox does not fire (#143)',
                 // Unlike every other app, toggle-all binds its handler to the
                 // label's click (which then clicks the input), not to the input's

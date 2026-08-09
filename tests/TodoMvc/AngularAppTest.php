@@ -22,9 +22,6 @@ final class AngularAppTest extends TodoMvcTestCase
             name: 'angular',
             path: 'examples/angular/dist/browser/',
             toggleAllId: '',
-            knownIssues: [
-                'test_blur_saves_an_edit' => 'edit commits on blur, which headless Firefox does not fire (#143)',
-            ],
         );
     }
 }

@@ -119,6 +119,26 @@ final readonly class Browser
         }
         JS;
 
+    /**
+     * The body of {@see blur()}, operating on a local `el`. Fires the real blur,
+     * and only if the browser didn't dispatch one (headless Firefox never does)
+     * synthesises `blur` + bubbling `focusout` so commit-on-blur handlers run
+     * exactly once in both headless and headed modes.
+     */
+    private const string BLUR_BODY = <<<'JS'
+        if (el && el !== document.body) {
+          let fired = false;
+          const mark = function () { fired = true; };
+          el.addEventListener('blur', mark, { once: true, capture: true });
+          el.blur();
+          el.removeEventListener('blur', mark, { capture: true });
+          if (!fired) {
+            el.dispatchEvent(new FocusEvent('blur'));
+            el.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+          }
+        }
+        JS;
+
     private SelectorResolver $resolver;
 
     public function __construct(
@@ -265,6 +285,29 @@ final readonly class Browser
     public function pressKey(string $key): self
     {
         $this->driver->pressKeys($key);
+
+        return $this;
+    }
+
+    /**
+     * Blur an element (or the currently-focused element when no target is given),
+     * so "commit on blur" flows — inline edits, validate-on-blur fields — read as
+     * behaviour rather than a `pressKey('Tab')` trick.
+     *
+     * Headless Firefox does not fire `blur`/`focusout` (the window is never
+     * "focused": `document.hasFocus()` is false), so a real blur would silently
+     * no-op and the commit would never run. This dispatches the events itself
+     * **only when the browser didn't** — so it works headless, and does not
+     * double-fire when running headed. See {@see currentPath()} neighbours in the
+     * docs for the wider headless-focus note.
+     */
+    public function blur(?string $target = null): self
+    {
+        if ($target === null) {
+            $this->driver->evaluateScript('(function () { const el = document.activeElement; '.self::BLUR_BODY.' })()');
+        } else {
+            $this->driver->callFunctionOn($this->resolveWaiting($target), 'function () { const el = this; '.self::BLUR_BODY.' }');
+        }
 
         return $this;
     }

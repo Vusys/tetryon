@@ -23,7 +23,6 @@ final class SvelteAppTest extends TodoMvcTestCase
             name: 'svelte',
             path: 'examples/svelte/dist/',
             knownIssues: [
-                'test_blur_saves_an_edit' => 'edit commits on blur, which headless Firefox does not fire (#143)',
                 'test_enter_saves_an_edit' => 'this app commits edits on blur only; Enter does not commit, and headless Firefox does not fire blur (#143)',
                 'test_editing_to_empty_destroys_the_item' => 'this app commits edits on blur only; Enter does not commit, and headless Firefox does not fire blur (#143)',
             ],
