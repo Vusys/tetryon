@@ -9,6 +9,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - **`blur()` verb** (#142). Blurs the focused element (or a given target) to drive commit-on-blur flows — inline edits, validate-on-blur fields, autosave — instead of faking it with `pressKey('Tab')`.
+- **`assertFocused()` / `assertNotFocused()` and `isFocused()`** (#141). Assert (with auto-wait) that a target is the document's focused element, so "double-click focuses the edit input" reads as behaviour rather than an `evaluate()` on `document.activeElement`.
 
 ### Fixed
 

@@ -170,8 +170,7 @@ abstract class TodoMvcTestCase extends BrowserTestCase
         $this->newTodo($this->visitApp(), 'Buy milk')
             ->doubleClick('Buy milk')
             ->assertExpression("[...document.querySelectorAll('.todo-list li')].some(li => li.classList.contains('editing') && li.textContent.includes('Buy milk'))")
-            // falls back to evaluate() — no assertFocused() verb yet, see #141
-            ->assertExpression("document.activeElement === document.querySelector('.todo-list li.editing .edit')");
+            ->assertFocused('.todo-list li.editing .edit');
     }
 
     public function test_enter_saves_an_edit(): void

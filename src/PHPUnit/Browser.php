@@ -452,6 +452,19 @@ final readonly class Browser
     }
 
     /**
+     * Whether the target is the document's currently-focused element. Works in
+     * headless (`document.activeElement` tracks focus even when the window
+     * itself is not focused).
+     */
+    public function isFocused(string $target): bool
+    {
+        return $this->driver->callFunctionOn(
+            $this->resolveWaiting($target),
+            'function(){ return document.activeElement === this; }',
+        ) === true;
+    }
+
+    /**
      * The selected option's value of a `<select>`, or null if the element is not
      * a select.
      */
@@ -827,6 +840,22 @@ final readonly class Browser
     {
         $this->retry(fn (): bool => ! $this->isChecked($target));
         Assert::assertFalse($this->isChecked($target), "Expected \"{$target}\" not to be checked.");
+
+        return $this;
+    }
+
+    public function assertFocused(string $target): self
+    {
+        $this->retry(fn (): bool => $this->isFocused($target));
+        Assert::assertTrue($this->isFocused($target), "Expected \"{$target}\" to be focused.");
+
+        return $this;
+    }
+
+    public function assertNotFocused(string $target): self
+    {
+        $this->retry(fn (): bool => ! $this->isFocused($target));
+        Assert::assertFalse($this->isFocused($target), "Expected \"{$target}\" not to be focused.");
 
         return $this;
     }
