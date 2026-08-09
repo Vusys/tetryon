@@ -6,6 +6,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **`chooseFromDropdown()` for custom (non-native) comboboxes** (#81). `select()` only drives a native `<select>`; component libraries usually render the WAI-ARIA pattern instead (a trigger / `role="combobox"` input revealing a `role="listbox"` of `role="option"`s). `chooseFromDropdown($field, $option)` opens the control and clicks the option by visible text, matched globally so it works even when the list is portalled to `<body>`. `select()` continues to fail loudly (`UndrivableElementException`) when pointed at a non-`<select>`.
+
 ## [0.5.0] - 2026-08-09
 
 Shadow DOM, all the way. Following 0.4.0's CSS-based piercing, the behavioural text/label strategies pierce open shadow roots too — so a web-component app is drivable the way Tetryon is meant to be, by link text, button text, and label. Still beta and pre-1.0 — see [`docs/compatibility.md`](docs/compatibility.md).
