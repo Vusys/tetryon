@@ -36,7 +36,7 @@ Apps: **es6** javascript-es6 · **rea** react · **r-r** react-redux · **vue** 
 | clear-completed removes + hides | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⊘⁴ | ✅ | ✅ |
 | active filter (hash) survives reload | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⊘⁴ | ✅ | ✅ |
 
-**Skip key** — ¹ app commits via an internal blur on Enter/Escape, dropped in headless (#143) · ² React Escape deviation · ³ es6 toggle-all deviation · ⁴ shadow DOM: CSS-based resolution pierces it (#151), but this suite drives by text/label, which doesn't yet (#162) · ⁵ react-redux empty-destroy deviation.
+**Skip key** — ¹ app commits via an internal blur on Enter/Escape, dropped in headless (#143) · ² React Escape deviation · ³ es6 toggle-all deviation · ⁴ shadow DOM: resolution now pierces it (#151, #162), but these scenarios read state via non-piercing `evaluate()` (#165) · ⁵ react-redux empty-destroy deviation.
 
 ## Triage of every gap
 
@@ -45,7 +45,7 @@ The whole point of the epic was that the *selector strategy* — the thing Tetry
 ### Tetryon bugs (fix)
 
 - **Commit-on-blur under headless — [#143](https://github.com/Vusys/tetryon/issues/143), mitigated.** In headless Firefox `document.hasFocus()` is `false` and moving focus fires no `blur`/`focusout` event, so any commit-on-blur pattern no-ops. The [`blur()`](../blob/master/docs/interactions.md) verb now dispatches those events itself, so *blur saves* passes on all nine reachable apps. What remains is what Tetryon can't intercept: es6, svelte, and jquery commit by calling the field's *own* `blur()` internally on Enter/Escape, and that internal blur is still dropped headless — so *Enter saves* / *Escape discards* / *edit-to-empty* on those apps need a focused window (run headed, or under Xvfb in CI — see [Continuous integration](../blob/master/docs/ci.md)). Tetryon's keys are fine either way: `pressKey('Enter')` fires `keydown`+`keypress` correctly.
-- **Shadow DOM — [#151](https://github.com/Vusys/tetryon/issues/151), partially fixed.** Lit renders the whole app into nested shadow roots. Resolution now pierces them for CSS-based targets (test-id, placeholder, name, explicit CSS/id), and actionability and `assertSee()` are shadow-aware — so a web-component app is drivable by those. Against Lit that's 5 of the 16 scenarios (add, counter, empty-state, toggle-all, load). The rest fail because this suite drives behaviourally by **text/label**, which resolves via XPath and can't cross shadow boundaries; piercing those is tracked in [#162](https://github.com/Vusys/tetryon/issues/162). Lit stays skipped until then.
+- **Shadow DOM — [#151](https://github.com/Vusys/tetryon/issues/151) + [#162](https://github.com/Vusys/tetryon/issues/162), fixed.** Lit renders the whole app into nested shadow roots. Resolution now pierces them for **both** CSS-based targets (test-id, placeholder, name, explicit CSS/id) and text/label strategies (button/link text, label association) — via a JS matcher, since XPath can't cross shadow boundaries — and actionability and `assertSee()` are shadow-aware. So a web-component app is drivable behaviourally. Lit still can't run the *whole* suite green because these scenarios read state via `document.querySelectorAll` in `evaluate()`, which doesn't pierce (tracked in [#165](https://github.com/Vusys/tetryon/issues/165)); it stays skipped until that's shadow-aware. The only strategy that still doesn't pierce is the accessible-name locator.
 
 ### Upstream app deviations (record, don't fix)
 

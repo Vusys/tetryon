@@ -56,15 +56,15 @@ Prefix or shape the target to bypass the human-text resolution:
 
 ## Shadow DOM
 
-Web components render into shadow roots, which the browser's own `querySelector` (and WebDriver's node location) don't cross. Tetryon's **CSS-based** strategies pierce them anyway: when a CSS locator — an explicit `#id` / `.class` / `[attr]`, a configured test attribute, `[placeholder]`, or `[name]` — matches nothing in the light DOM, resolution retries with a walker that descends every open shadow root. Actionability and `assertSee()` are shadow-aware too, so an element nested several shadow roots deep is found, driven, and read.
+Web components render into shadow roots, which the browser's own `querySelector` (and WebDriver's node location) don't cross. Tetryon's resolution pierces them anyway: when a locator matches nothing in the light DOM, it retries with a matcher run inside every open shadow root. This covers the **CSS-based** strategies — explicit `#id` / `.class` / `[attr]`, a configured test attribute, `[placeholder]`, `[name]` ([#151](https://github.com/Vusys/tetryon/issues/151)) — and the **text-based** ones — label text, button text, link text, and bare visible text — via a JavaScript equivalent, since XPath can't cross shadow boundaries ([#162](https://github.com/Vusys/tetryon/issues/162)). Actionability and `assertSee()` are shadow-aware too, so an element nested several shadow roots deep is found, driven, and read.
 
 ```php
-->fill('@email', 'ada@example.com')   // data-testid inside a shadow root
-->fill('Email', 'ada@example.com')    // or by placeholder
-->click('#save');
+->fill('Email', 'ada@example.com')    // by placeholder, inside a shadow root
+->check('Accept terms')               // by its sibling label, across shadow
+->click('Go');                        // by link text
 ```
 
-The **text-based** strategies — label text, button text, link text, and bare visible text — resolve via XPath, which cannot cross shadow boundaries, so they do not pierce yet ([#162](https://github.com/Vusys/tetryon/issues/162)). For a component app, prefer a test attribute, placeholder, or explicit CSS. Closed shadow roots (`mode: 'closed'`) are unreachable by anything, by design.
+The one strategy that doesn't pierce is the **accessible-name** locator (it uses the platform accessibility tree). Closed shadow roots (`mode: 'closed'`) are unreachable by anything, by design.
 
 ## When nothing matches
 

@@ -24,10 +24,20 @@
                 root.innerHTML =
                     '<inner-field></inner-field>' +
                     '<button data-testid="save">Save</button>' +
+                    '<a href="#go">Go</a>' +
+                    '<input type="checkbox" class="accept"><label>Accept terms</label>' +
                     '<div data-testid="msg">idle</div>';
+                const msg = root.querySelector('[data-testid=msg]');
                 root.querySelector('[data-testid=save]').addEventListener('click', () => {
                     const value = root.querySelector('inner-field').shadowRoot.querySelector('input').value;
-                    root.querySelector('[data-testid=msg]').textContent = 'saved:' + value;
+                    msg.textContent = 'saved:' + value;
+                });
+                root.querySelector('a').addEventListener('click', (e) => {
+                    e.preventDefault();
+                    msg.textContent = 'linked';
+                });
+                root.querySelector('.accept').addEventListener('change', (e) => {
+                    msg.textContent = e.target.checked ? 'accepted' : 'unaccepted';
                 });
             }
         }

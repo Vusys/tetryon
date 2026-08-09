@@ -6,6 +6,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Shadow-DOM piercing for the text/label strategies** (#162). Following #151 (CSS-based piercing), the behavioural strategies now pierce open shadow roots too — button text, link text, and label association (wrapping, `for=`, adjacency). XPath can't cross shadow boundaries, so each carries a JavaScript matcher the driver runs inside every shadow root when the native locate finds nothing. Web-component apps are now drivable behaviourally (`click('Go')`, `press('Save')`, `check('Accept terms')`). The accessible-name locator still doesn't pierce.
+
 ## [0.4.0] - 2026-08-09
 
 Focus and shadow DOM — the two gaps the TodoMVC epic surfaced. Commit-on-blur flows work in headless, there's a first-class `blur()` and `assertFocused()`, and web-component apps that render into shadow roots are drivable by CSS/test-id/placeholder. Still beta and pre-1.0 — see [`docs/compatibility.md`](docs/compatibility.md).
