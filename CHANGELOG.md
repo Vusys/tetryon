@@ -6,6 +6,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-09
+
+Custom widgets, driven behaviourally. Two things the TodoMVC epic reached for and shadow-DOM work exposed: a first-class `chooseFromDropdown()` for the WAI-ARIA combobox pattern that component libraries ship instead of a native `<select>`, and shadow-aware focus assertions — enough for the behavioural suite to run against Lit, where every todo is its own shadow root. Still beta and pre-1.0 — see [`docs/compatibility.md`](docs/compatibility.md).
+
 ### Added
 
 - **`chooseFromDropdown()` for custom (non-native) comboboxes** (#81). `select()` only drives a native `<select>`; component libraries usually render the WAI-ARIA pattern instead (a trigger / `role="combobox"` input revealing a `role="listbox"` of `role="option"`s). `chooseFromDropdown($field, $option)` opens the control and clicks the option by visible text, matched globally so it works even when the list is portalled to `<body>`. `select()` continues to fail loudly (`UndrivableElementException`) when pointed at a non-`<select>`.
@@ -234,7 +238,8 @@ first-class Laravel integration.
   and a writable artifact directory — and prints a report with fix hints,
   exiting non-zero if anything is wrong.
 
-[Unreleased]: https://github.com/Vusys/tetryon/compare/v0.5.0...master
+[Unreleased]: https://github.com/Vusys/tetryon/compare/v0.6.0...master
+[0.6.0]: https://github.com/Vusys/tetryon/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Vusys/tetryon/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Vusys/tetryon/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Vusys/tetryon/compare/v0.2.0...v0.3.0
