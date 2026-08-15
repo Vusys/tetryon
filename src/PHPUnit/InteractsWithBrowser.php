@@ -13,6 +13,7 @@ use Vusys\Tetryon\Core\Support\StreamLogger;
 use Vusys\Tetryon\Firefox\Exception\FirefoxException;
 use Vusys\Tetryon\Firefox\FirefoxBiDiDriver;
 use Vusys\Tetryon\Firefox\LaunchOptions;
+use Vusys\Tetryon\PHPUnit\Recording\SuiteRecording;
 
 /**
  * Gives any PHPUnit test a fluent {@see Browser} via `$this->browser()`, and
@@ -33,6 +34,8 @@ trait InteractsWithBrowser
 
     private ?Configuration $tetryonConfiguration = null;
 
+    private ?SlideshowRecorder $tetryonRecorder = null;
+
     protected function browser(): Browser
     {
         if ($this->tetryonBrowser instanceof Browser) {
@@ -52,6 +55,22 @@ trait InteractsWithBrowser
     protected function scenario(): Scenario
     {
         return new Scenario($this->browser());
+    }
+
+    /**
+     * A {@see SlideshowRecorder} for this test, titled and scoped to
+     * $totalSteps note()/type()/step() calls. Its closing pass/fail frame is
+     * appended automatically after the test runs, and its slides are handed
+     * off to {@see SuiteRecording} — so every recorder-instrumented test
+     * contributes to one combined video of the whole run, gated behind
+     * `TETRYON_RECORD_SUITE` (issue #102).
+     */
+    protected function recorder(string $title, int $totalSteps): SlideshowRecorder
+    {
+        $driver = $this->driver();
+        $configuration = $this->tetryonConfiguration ?? $this->browserConfiguration();
+
+        return $this->tetryonRecorder = new SlideshowRecorder($driver, $configuration->artifactsPath, $title, $totalSteps);
     }
 
     /**
@@ -90,6 +109,12 @@ trait InteractsWithBrowser
     {
         $driver = $this->tetryonDriver;
         $configuration = $this->tetryonConfiguration;
+
+        if ($driver instanceof FirefoxBiDiDriver && $this->tetryonRecorder instanceof SlideshowRecorder) {
+            $recorder = $this->tetryonRecorder->result(! $this->browserTestFailed());
+            SuiteRecording::append($recorder->slides());
+            $this->tetryonRecorder = null;
+        }
 
         if ($driver instanceof FirefoxBiDiDriver && $configuration instanceof Configuration && $this->browserTestFailed()) {
             $report = new FailureArtifacts($configuration->artifactsPath)

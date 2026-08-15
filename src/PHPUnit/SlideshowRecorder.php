@@ -7,12 +7,10 @@ namespace Vusys\Tetryon\PHPUnit;
 use InvalidArgumentException;
 use Throwable;
 use Vusys\Tetryon\Firefox\FirefoxBiDiDriver;
-use Vusys\Tetryon\PHPUnit\Recording\ConcatScript;
-use Vusys\Tetryon\PHPUnit\Recording\Exception\RecordingException;
 use Vusys\Tetryon\PHPUnit\Recording\ExternalTool;
-use Vusys\Tetryon\PHPUnit\Recording\ProcessRunner;
 use Vusys\Tetryon\PHPUnit\Recording\Slide;
-use Vusys\Tetryon\PHPUnit\Recording\SlideCompositor;
+use Vusys\Tetryon\PHPUnit\Recording\SlideshowEncoder;
+use Vusys\Tetryon\PHPUnit\Recording\SuiteRecording;
 
 /**
  * Spike (issue #102): records a browser test as an annotated slideshow — a
@@ -27,20 +25,24 @@ use Vusys\Tetryon\PHPUnit\Recording\SlideCompositor;
  * Soft-optional by design: {@see render()} never throws. Missing `magick`/
  * `ffmpeg`, or any failure while compositing or encoding, is reported through
  * {@see skipReason()} instead — recording must never be why a test fails.
+ *
+ * A test can render its own `.mp4` via {@see render()}, or hand its slides
+ * off to {@see SuiteRecording} via {@see slides()} so many tests combine into
+ * one video of the whole run — see {@see InteractsWithBrowser::recorder()}.
  */
 final class SlideshowRecorder
 {
-    private const int STEP_START_HOLD_MS = 500;
+    private const int STEP_START_HOLD_MS = 1200;
 
-    private const int TYPING_FRAME_MS = 70;
+    private const int TYPING_FRAME_MS = 90;
 
-    private const int NOTE_HOLD_MS = 1200;
+    private const int NOTE_HOLD_MS = 1800;
 
-    private const int MIN_STEP_HOLD_MS = 600;
+    private const int MIN_STEP_HOLD_MS = 1800;
 
     private const int SWEEP_FRAMES = 6;
 
-    private const int MIN_FRAME_MS = 40;
+    private const int MIN_FRAME_MS = 50;
 
     private int $stepIndex = 0;
 
@@ -119,6 +121,40 @@ final class SlideshowRecorder
     }
 
     /**
+     * Append the test's closing frame: the timeline held complete, tinted and
+     * captioned with its outcome. Called automatically by
+     * {@see InteractsWithBrowser} for any test that used {@see recorder()};
+     * only call this directly when driving a recorder outside that trait.
+     */
+    public function result(bool $passed): self
+    {
+        $this->slides[] = new Slide(
+            screenshotPng: $this->driver->screenshot(),
+            title: $this->title,
+            totalSteps: $this->totalSteps,
+            stepLabel: $this->headerStepLabel(),
+            caption: $passed ? 'Passed' : 'Failed',
+            progress: $this->totalSteps,
+            durationMs: self::NOTE_HOLD_MS,
+            outcome: $passed ? 'passed' : 'failed',
+        );
+
+        return $this;
+    }
+
+    /**
+     * Every slide recorded so far — the escape hatch for handing this
+     * recorder's frames off to a combined recording instead of (or as well
+     * as) rendering its own `.mp4`.
+     *
+     * @return list<Slide>
+     */
+    public function slides(): array
+    {
+        return $this->slides;
+    }
+
+    /**
      * Composite every recorded slide into an `.mp4` at $outputPath. Returns
      * the path on success, or null if recording was skipped or failed — check
      * {@see skipReason()} for why. Never throws.
@@ -149,7 +185,9 @@ final class SlideshowRecorder
         }
 
         try {
-            return $this->composeAndEncode($magick, $ffmpeg, $outputPath);
+            $workingDirectory = rtrim($this->artifactDirectory, '/').'/slideshow-'.substr(sha1($outputPath), 0, 8);
+
+            return SlideshowEncoder::encode($magick, $ffmpeg, $this->slides, $workingDirectory, $outputPath);
         } catch (Throwable $e) {
             $this->skipReason = "Tetryon: slideshow rendering failed ({$e->getMessage()}); continuing without a recording.";
 
@@ -166,44 +204,12 @@ final class SlideshowRecorder
         return $this->skipReason;
     }
 
-    private function composeAndEncode(string $magick, string $ffmpeg, string $outputPath): string
-    {
-        $workingDirectory = rtrim($this->artifactDirectory, '/').'/slideshow-'.substr(sha1($outputPath), 0, 8);
-        if (! is_dir($workingDirectory) && ! @mkdir($workingDirectory, 0o777, true) && ! is_dir($workingDirectory)) {
-            throw new RecordingException("Could not create the working directory \"{$workingDirectory}\".");
-        }
-
-        // ffmpeg's concat demuxer resolves relative paths in the list file
-        // against the list file's own directory, not the process cwd — an
-        // absolute working directory sidesteps that ambiguity entirely.
-        $workingDirectory = realpath($workingDirectory) ?: $workingDirectory;
-
-        $compositor = new SlideCompositor($magick, $this->title, $this->totalSteps);
-
-        $framePaths = [];
-        $durationsMs = [];
-        foreach ($this->slides as $index => $slide) {
-            $framePath = "{$workingDirectory}/frame-{$index}.png";
-            $compositor->compose($slide, $workingDirectory, $framePath);
-            $framePaths[] = $framePath;
-            $durationsMs[] = $slide->durationMs;
-        }
-
-        $concatPath = "{$workingDirectory}/concat.txt";
-        file_put_contents($concatPath, ConcatScript::build($framePaths, $durationsMs));
-
-        ProcessRunner::run([
-            $ffmpeg, '-y', '-f', 'concat', '-safe', '0', '-i', $concatPath,
-            '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', '-pix_fmt', 'yuv420p', $outputPath,
-        ]);
-
-        return $outputPath;
-    }
-
     private function captureFrame(string $caption, int $durationMs): void
     {
         $this->slides[] = new Slide(
             screenshotPng: $this->driver->screenshot(),
+            title: $this->title,
+            totalSteps: $this->totalSteps,
             stepLabel: $this->headerStepLabel(),
             caption: $caption,
             progress: max(0, $this->stepIndex - 1),
@@ -221,6 +227,8 @@ final class SlideshowRecorder
         for ($frame = 1; $frame <= self::SWEEP_FRAMES; $frame++) {
             $this->slides[] = new Slide(
                 screenshotPng: $screenshot,
+                title: $this->title,
+                totalSteps: $this->totalSteps,
                 stepLabel: $this->headerStepLabel(),
                 caption: $caption,
                 progress: ($this->stepIndex - 1) + ($frame / self::SWEEP_FRAMES),
