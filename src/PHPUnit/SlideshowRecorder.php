@@ -38,6 +38,8 @@ final class SlideshowRecorder
 
     private const int NOTE_HOLD_MS = 1800;
 
+    private const int ASSERTION_HOLD_MS = 1400;
+
     private const int MIN_STEP_HOLD_MS = 1800;
 
     private const int SWEEP_FRAMES = 6;
@@ -116,6 +118,34 @@ final class SlideshowRecorder
         $durationMs = (int) round((microtime(true) - $start) * 1000);
 
         $this->appendSweep($label, $durationMs);
+
+        return $this;
+    }
+
+    /**
+     * Run an assertion and capture the proof: a frame checkmarked and tinted
+     * green, captioned with what was confirmed. Package positioning is that
+     * assertions auto-wait and retry — this is where the slideshow shows that
+     * off, rather than only ever showing the actions that lead up to it.
+     * Doesn't consume a step number; the timeline stays wherever the most
+     * recent step()/type() left it.
+     *
+     * @param  callable(): void  $assertion
+     */
+    public function assert(string $label, callable $assertion): self
+    {
+        $assertion();
+
+        $this->slides[] = new Slide(
+            screenshotPng: $this->driver->screenshot(),
+            title: $this->title,
+            totalSteps: $this->totalSteps,
+            stepLabel: $this->headerStepLabel(),
+            caption: $label,
+            progress: $this->stepIndex,
+            durationMs: self::ASSERTION_HOLD_MS,
+            verified: true,
+        );
 
         return $this;
     }

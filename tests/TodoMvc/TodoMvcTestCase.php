@@ -161,9 +161,10 @@ abstract class TodoMvcTestCase extends BrowserTestCase
 
         $this->recordNewTodo($recorder, $browser, 'Buy milk');
 
-        $browser->assertValue('.new-todo', '')
-            ->assertSee('Buy milk')
-            ->assertSee('1 item left');
+        $browser->assertValue('.new-todo', '')->assertSee('Buy milk');
+        $recorder->assert('Sees "1 item left"', function () use ($browser): void {
+            $browser->assertSee('1 item left');
+        });
     }
 
     public function test_the_counter_pluralises(): void
@@ -174,7 +175,9 @@ abstract class TodoMvcTestCase extends BrowserTestCase
         $this->recordNewTodo($recorder, $browser, 'Buy milk');
         $this->recordNewTodo($recorder, $browser, 'Walk the dog');
 
-        $browser->assertSee('2 items left');
+        $recorder->assert('Sees "2 items left"', function () use ($browser): void {
+            $browser->assertSee('2 items left');
+        });
     }
 
     public function test_input_is_trimmed_and_whitespace_only_is_rejected(): void
@@ -183,8 +186,10 @@ abstract class TodoMvcTestCase extends BrowserTestCase
         $recorder = $this->recorder('Trims input, rejects whitespace-only', totalSteps: 4);
 
         $this->recordNewTodo($recorder, $browser, '   Buy milk   ');
-        $browser->assertSee('1 item left')
-            ->assertExpression($this->pierce('label').".some(l => l.textContent.trim() === 'Buy milk')");
+        $browser->assertSee('1 item left');
+        $recorder->assert('Confirms "Buy milk" was trimmed', function () use ($browser): void {
+            $browser->assertExpression($this->pierce('label').".some(l => l.textContent.trim() === 'Buy milk')");
+        });
 
         $this->recordNewTodo($recorder, $browser, '     ');
         $browser->assertSee('1 item left');
@@ -201,8 +206,10 @@ abstract class TodoMvcTestCase extends BrowserTestCase
             $browser->check('Buy milk');
         });
 
-        $browser->assertSee('1 item left')
-            ->assertExpression($this->pierce('li').".some(li => li.classList.contains('completed') && li.textContent.includes('Buy milk'))");
+        $browser->assertSee('1 item left');
+        $recorder->assert('Confirms "Buy milk" is completed', function () use ($browser): void {
+            $browser->assertExpression($this->pierce('li').".some(li => li.classList.contains('completed') && li.textContent.includes('Buy milk'))");
+        });
     }
 
     public function test_toggle_all_completes_and_uncompletes_everything(): void
@@ -222,7 +229,9 @@ abstract class TodoMvcTestCase extends BrowserTestCase
         $recorder->step('Check "toggle all"', function () use ($browser, $toggleAll): void {
             $browser->check($toggleAll);
         });
-        $browser->assertSee('0 items left');
+        $recorder->assert('Sees "0 items left"', function () use ($browser): void {
+            $browser->assertSee('0 items left');
+        });
 
         $recorder->step('Uncheck "toggle all"', function () use ($browser, $toggleAll): void {
             $browser->uncheck($toggleAll);
@@ -238,8 +247,10 @@ abstract class TodoMvcTestCase extends BrowserTestCase
         $this->recordNewTodo($recorder, $browser, 'Buy milk');
         $this->recordDoubleClickToEdit($recorder, $browser, 'Buy milk');
 
-        $browser->assertExpression($this->pierce('li').".some(li => li.classList.contains('editing') && li.textContent.includes('Buy milk'))")
-            ->assertFocused('.editing .edit');
+        $browser->assertExpression($this->pierce('li').".some(li => li.classList.contains('editing') && li.textContent.includes('Buy milk'))");
+        $recorder->assert('Confirms the edit field is focused', function () use ($browser): void {
+            $browser->assertFocused('.editing .edit');
+        });
     }
 
     public function test_enter_saves_an_edit(): void
@@ -254,7 +265,10 @@ abstract class TodoMvcTestCase extends BrowserTestCase
             $browser->pressKey('Enter');
         });
 
-        $browser->assertSee('Buy oat milk')->assertDontSee('Buy milk');
+        $browser->assertDontSee('Buy milk');
+        $recorder->assert('Sees "Buy oat milk"', function () use ($browser): void {
+            $browser->assertSee('Buy oat milk');
+        });
     }
 
     public function test_escape_discards_an_edit(): void
@@ -269,7 +283,10 @@ abstract class TodoMvcTestCase extends BrowserTestCase
             $browser->pressKey('Escape');
         });
 
-        $browser->assertSee('Buy milk')->assertDontSee('Discarded change');
+        $browser->assertSee('Buy milk');
+        $recorder->assert('Confirms the edit was discarded', function () use ($browser): void {
+            $browser->assertDontSee('Discarded change');
+        });
     }
 
     public function test_blur_saves_an_edit(): void
@@ -284,7 +301,9 @@ abstract class TodoMvcTestCase extends BrowserTestCase
             $browser->blur('.editing .edit');
         });
 
-        $browser->assertSee('Buy oat milk');
+        $recorder->assert('Sees "Buy oat milk"', function () use ($browser): void {
+            $browser->assertSee('Buy oat milk');
+        });
     }
 
     public function test_editing_to_empty_destroys_the_item(): void
@@ -299,7 +318,10 @@ abstract class TodoMvcTestCase extends BrowserTestCase
             $browser->pressKey('Enter');
         });
 
-        $browser->assertDontSee('Buy milk')->assertMissing('.todo-list li');
+        $browser->assertDontSee('Buy milk');
+        $recorder->assert('Confirms the todo was destroyed', function () use ($browser): void {
+            $browser->assertMissing('.todo-list li');
+        });
     }
 
     public function test_hovering_reveals_destroy_and_clicking_removes_the_item(): void
@@ -319,7 +341,10 @@ abstract class TodoMvcTestCase extends BrowserTestCase
             $browser->click('.destroy');
         });
 
-        $browser->assertDontSee('Walk the dog')->assertSee('Buy milk');
+        $browser->assertSee('Buy milk');
+        $recorder->assert('Confirms "Walk the dog" was removed', function () use ($browser): void {
+            $browser->assertDontSee('Walk the dog');
+        });
     }
 
     public function test_filters_move_the_selection_and_filter_the_list(): void
@@ -336,8 +361,10 @@ abstract class TodoMvcTestCase extends BrowserTestCase
         $recorder->step('Click "Active"', function () use ($browser): void {
             $browser->click('Active');
         });
-        $browser->assertSee('Walk the dog')->assertDontSee('Buy milk')
-            ->assertExpression($this->pierce('.filters a.selected')."[0]?.textContent.trim() === 'Active'");
+        $browser->assertSee('Walk the dog')->assertDontSee('Buy milk');
+        $recorder->assert('Confirms "Active" is the selected filter', function () use ($browser): void {
+            $browser->assertExpression($this->pierce('.filters a.selected')."[0]?.textContent.trim() === 'Active'");
+        });
 
         $recorder->step('Click "Completed"', function () use ($browser): void {
             $browser->click('Completed');
@@ -365,9 +392,10 @@ abstract class TodoMvcTestCase extends BrowserTestCase
             $browser->press('Clear completed');
         });
 
-        $browser->assertDontSee('Buy milk')
-            ->assertSee('Walk the dog')
-            ->assertMissing('.clear-completed');
+        $browser->assertDontSee('Buy milk')->assertSee('Walk the dog');
+        $recorder->assert('Confirms "Clear completed" hides itself', function () use ($browser): void {
+            $browser->assertMissing('.clear-completed');
+        });
     }
 
     public function test_the_active_filter_survives_a_reload(): void
@@ -387,6 +415,8 @@ abstract class TodoMvcTestCase extends BrowserTestCase
         $recorder->step('Refresh the page', function () use ($browser): void {
             $browser->refresh();
         });
-        $browser->assertPathIs($this->app()->url().'#/completed');
+        $recorder->assert('Confirms the filter survived the reload', function () use ($browser): void {
+            $browser->assertPathIs($this->app()->url().'#/completed');
+        });
     }
 }

@@ -11,6 +11,12 @@ use Throwable;
  * process into one combined video — "run the suite, get one video of it
  * running and turning green" (issue #102).
  *
+ * Kept grouped by test (rather than flattened) until render time, so each
+ * slide can be stamped with its test's position in the whole run — "test 42
+ * of 160" plus an overall progress strip (see {@see Slide::withSuitePosition()}
+ * and {@see SlideCompositor}) — which isn't knowable until every test has
+ * finished and the total is known.
+ *
  * Gated behind `TETRYON_RECORD_SUITE` so an ordinary `composer test:todomvc`
  * run pays neither the memory cost of holding every screenshot nor the
  * compositing/encoding cost — {@see append()} is a no-op unless the flag is
@@ -19,8 +25,8 @@ use Throwable;
  */
 final class SuiteRecording
 {
-    /** @var list<Slide> */
-    private static array $slides = [];
+    /** @var list<list<Slide>> one entry per test that handed off slides */
+    private static array $testRecordings = [];
 
     private static bool $shutdownRegistered = false;
 
@@ -40,7 +46,7 @@ final class SuiteRecording
             return;
         }
 
-        self::$slides = [...self::$slides, ...$slides];
+        self::$testRecordings[] = $slides;
         self::registerShutdownRender();
     }
 
@@ -53,7 +59,7 @@ final class SuiteRecording
      */
     public static function render(string $outputPath): ?string
     {
-        if (self::$slides === []) {
+        if (self::$testRecordings === []) {
             return null;
         }
 
@@ -66,11 +72,13 @@ final class SuiteRecording
         }
 
         try {
+            $slides = self::positionedSlides();
             $workingDirectory = dirname($outputPath).'/suite-recording';
-            $result = SlideshowEncoder::encode($magick, $ffmpeg, self::$slides, $workingDirectory, $outputPath);
+            $result = SlideshowEncoder::encode($magick, $ffmpeg, $slides, $workingDirectory, $outputPath);
             fwrite(STDERR, sprintf(
-                "\nTetryon: suite recording (%d slides across the run) written to %s\n",
-                count(self::$slides),
+                "\nTetryon: suite recording (%d tests, %d slides) written to %s\n",
+                count(self::$testRecordings),
+                count($slides),
                 $result,
             ));
 
@@ -87,8 +95,25 @@ final class SuiteRecording
      */
     public static function reset(): void
     {
-        self::$slides = [];
+        self::$testRecordings = [];
         self::$shutdownRegistered = false;
+    }
+
+    /**
+     * @return list<Slide>
+     */
+    private static function positionedSlides(): array
+    {
+        $total = count(self::$testRecordings);
+
+        $slides = [];
+        foreach (self::$testRecordings as $testIndex => $testSlides) {
+            foreach ($testSlides as $slide) {
+                $slides[] = $slide->withSuitePosition($testIndex + 1, $total);
+            }
+        }
+
+        return $slides;
     }
 
     private static function registerShutdownRender(): void

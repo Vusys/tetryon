@@ -21,7 +21,10 @@ final readonly class Slide
      * @param  string  $stepLabel  e.g. "step 2/4", shown top-right
      * @param  float  $progress  timeline fill, in units of whole steps (2.6 means step 3 is 60% filled)
      * @param  int  $durationMs  how long this frame is held for during playback
-     * @param  'passed'|'failed'|null  $outcome  set only on the closing frame of a test
+     * @param  'passed'|'failed'|null  $outcome  set only on a test's closing frame — tints the caption and the whole timeline
+     * @param  bool  $verified  set on an assertion's proof frame — tints the caption green without touching the timeline
+     * @param  int|null  $suiteIndex  this slide's test's 1-based position in a combined suite recording
+     * @param  int|null  $suiteTotal  how many tests contribute to a combined suite recording
      */
     public function __construct(
         public string $screenshotPng,
@@ -32,5 +35,30 @@ final readonly class Slide
         public float $progress,
         public int $durationMs,
         public ?string $outcome = null,
+        public bool $verified = false,
+        public ?int $suiteIndex = null,
+        public ?int $suiteTotal = null,
     ) {}
+
+    /**
+     * A copy of this slide stamped with its position in the whole suite —
+     * only known once every test has finished, so {@see SuiteRecording}
+     * applies this at render time rather than at capture time.
+     */
+    public function withSuitePosition(int $suiteIndex, int $suiteTotal): self
+    {
+        return new self(
+            screenshotPng: $this->screenshotPng,
+            title: $this->title,
+            totalSteps: $this->totalSteps,
+            stepLabel: $this->stepLabel,
+            caption: $this->caption,
+            progress: $this->progress,
+            durationMs: $this->durationMs,
+            outcome: $this->outcome,
+            verified: $this->verified,
+            suiteIndex: $suiteIndex,
+            suiteTotal: $suiteTotal,
+        );
+    }
 }
