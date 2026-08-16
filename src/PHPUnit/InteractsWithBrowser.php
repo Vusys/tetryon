@@ -9,11 +9,12 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Vusys\Tetryon\Core\Config\Configuration;
+use Vusys\Tetryon\Core\Diagnostics\ArtifactBag;
 use Vusys\Tetryon\Core\Support\StreamLogger;
 use Vusys\Tetryon\Firefox\Exception\FirefoxException;
 use Vusys\Tetryon\Firefox\FirefoxBiDiDriver;
 use Vusys\Tetryon\Firefox\LaunchOptions;
-use Vusys\Tetryon\PHPUnit\Recording\SuiteRecording;
+use Vusys\Tetryon\PHPUnit\Report\SuiteReport;
 
 /**
  * Gives any PHPUnit test a fluent {@see Browser} via `$this->browser()`, and
@@ -34,7 +35,7 @@ trait InteractsWithBrowser
 
     private ?Configuration $tetryonConfiguration = null;
 
-    private ?SlideshowRecorder $tetryonRecorder = null;
+    private ?Recorder $tetryonRecorder = null;
 
     protected function browser(): Browser
     {
@@ -58,19 +59,19 @@ trait InteractsWithBrowser
     }
 
     /**
-     * A {@see SlideshowRecorder} for this test, titled and scoped to
-     * $totalSteps note()/type()/step() calls. Its closing pass/fail frame is
-     * appended automatically after the test runs, and its slides are handed
-     * off to {@see SuiteRecording} — so every recorder-instrumented test
-     * contributes to one combined video of the whole run, gated behind
-     * `TETRYON_RECORD_SUITE` (issue #102).
+     * A {@see Recorder} for this test, titled and scoped to $totalSteps
+     * note()/type()/step()/assert() calls. Its closing pass/fail moment is
+     * appended automatically after the test runs, and its recording is
+     * handed off to {@see SuiteReport} — so every recorder-instrumented test
+     * contributes to one combined report of the whole run, gated behind
+     * `TETRYON_SUITE_REPORT` (issue #102).
      */
-    protected function recorder(string $title, int $totalSteps): SlideshowRecorder
+    protected function recorder(string $title, int $totalSteps): Recorder
     {
         $driver = $this->driver();
         $configuration = $this->tetryonConfiguration ?? $this->browserConfiguration();
 
-        return $this->tetryonRecorder = new SlideshowRecorder($driver, $configuration->artifactsPath, $title, $totalSteps);
+        return $this->tetryonRecorder = new Recorder($driver, $configuration, static::class.'::'.$this->name(), $title, $totalSteps);
     }
 
     /**
@@ -109,16 +110,19 @@ trait InteractsWithBrowser
     {
         $driver = $this->tetryonDriver;
         $configuration = $this->tetryonConfiguration;
+        $failed = $this->browserTestFailed();
 
-        if ($driver instanceof FirefoxBiDiDriver && $this->tetryonRecorder instanceof SlideshowRecorder) {
-            $recorder = $this->tetryonRecorder->result(! $this->browserTestFailed());
-            SuiteRecording::append($recorder->slides());
+        $bag = ($driver instanceof FirefoxBiDiDriver && $failed) ? FailureArtifacts::captureBag($driver) : null;
+
+        if ($this->tetryonRecorder instanceof Recorder) {
+            $recorder = $this->tetryonRecorder->result(! $failed, $bag);
+            SuiteReport::append($recorder->recording());
             $this->tetryonRecorder = null;
         }
 
-        if ($driver instanceof FirefoxBiDiDriver && $configuration instanceof Configuration && $this->browserTestFailed()) {
-            $report = new FailureArtifacts($configuration->artifactsPath)
-                ->capture($driver, $configuration, static::class.'::'.$this->name());
+        if ($driver instanceof FirefoxBiDiDriver && $configuration instanceof Configuration && $bag instanceof ArtifactBag) {
+            $directory = FailureArtifacts::directoryFor($configuration->artifactsPath, static::class.'::'.$this->name());
+            $report = FailureArtifacts::write($bag, $directory, $configuration);
             fwrite(STDERR, $report."\n");
         }
 
