@@ -51,6 +51,11 @@ final class SuiteReport
      * matching how a single test's {@see Recorder}
      * degrades (#102, Decision 3), since there is no PHPUnit test left to
      * report through by the time this runs.
+     *
+     * Stays silent on STDOUT/STDERR — it's exercised directly by unit tests,
+     * and Infection's initial test run aborts the whole suite the moment it
+     * sees a byte on STDERR (`InitialTestsRunner::run()`). The one legitimate
+     * caller, the shutdown notice below, prints its own message.
      */
     public static function render(string $outputDirectory): ?string
     {
@@ -58,13 +63,7 @@ final class SuiteReport
             return null;
         }
 
-        $result = ReportRenderer::render(self::$recordings, $outputDirectory, Configuration::fromEnvironment());
-
-        fwrite(STDERR, $result === null
-            ? "\nTetryon: suite report failed to render.\n"
-            : sprintf("\nTetryon: suite report (%d tests) written to %s\n", count(self::$recordings), $result));
-
-        return $result;
+        return ReportRenderer::render(self::$recordings, $outputDirectory, Configuration::fromEnvironment());
     }
 
     /**
@@ -84,8 +83,21 @@ final class SuiteReport
 
         self::$shutdownRegistered = true;
         register_shutdown_function(static function (): void {
+            // register_shutdown_function() can't be unregistered, so this
+            // still fires even after a test resets state via reset() (PHP
+            // has no unregister). Bail quietly rather than print a bogus
+            // "failed to render" notice on every ordinary Unit-suite run.
+            if (self::$recordings === []) {
+                return;
+            }
+
             $path = getenv('TETRYON_SUITE_REPORT_PATH');
-            self::render(is_string($path) && $path !== '' ? $path : 'tests/Browser/Artifacts/suite-report');
+            $count = count(self::$recordings);
+            $result = self::render(is_string($path) && $path !== '' ? $path : 'tests/Browser/Artifacts/suite-report');
+
+            fwrite(STDERR, $result === null
+                ? "\nTetryon: suite report failed to render.\n"
+                : sprintf("\nTetryon: suite report (%d tests) written to %s\n", $count, $result));
         });
     }
 }
