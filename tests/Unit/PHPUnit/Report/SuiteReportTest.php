@@ -77,12 +77,11 @@ final class SuiteReportTest extends TestCase
             screenshotPng: $this->onePixelPng(),
             caption: 'A step',
             stepIndex: 1,
-            totalSteps: 1,
             progress: 1,
             durationMs: 0,
         );
 
-        return new TestRecording($testId, $title, 1, true, [$moment]);
+        return new TestRecording($testId, $title, true, [$moment]);
     }
 
     private function onePixelPng(): string

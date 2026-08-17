@@ -10,7 +10,6 @@ use Vusys\Tetryon\Firefox\Exception\FirefoxBinaryNotFoundException;
 use Vusys\Tetryon\Firefox\FirefoxBinary;
 use Vusys\Tetryon\PHPUnit\Browser;
 use Vusys\Tetryon\PHPUnit\BrowserTestCase;
-use Vusys\Tetryon\PHPUnit\Recorder;
 use Vusys\Tetryon\Tests\Support\StaticSiteServer;
 
 /**
@@ -24,10 +23,11 @@ use Vusys\Tetryon\Tests\Support\StaticSiteServer;
  * fetched, so the opt-in `TodoMvc` suite is green on a machine that has run
  * neither.
  *
- * Every scenario with an action to show is instrumented with
- * {@see Recorder} (issue #102): living here once, that instrumentation runs
- * for all ten apps, and — with `TETRYON_SUITE_REPORT=1` — combines into one
- * browsable report of the whole compatibility suite passing.
+ * Every scenario with an action to show turns recording on
+ * ({@see Browser::recording()}, issue #102): living here once, that
+ * instrumentation runs for all ten apps, and — with `TETRYON_SUITE_REPORT=1`
+ * — combines into one browsable report of the whole compatibility suite
+ * passing.
  */
 abstract class TodoMvcTestCase extends BrowserTestCase
 {
@@ -105,31 +105,24 @@ abstract class TodoMvcTestCase extends BrowserTestCase
     }
 
     /**
-     * The recorded equivalent of {@see newTodo()} — types the field via the
-     * recorder (one step) and presses Enter as a second, separately timed
-     * step, so the report shows the text being typed before it commits.
+     * The recorded equivalent of {@see newTodo()} — one beat covering the
+     * type-and-commit gesture, so the report shows the text being typed
+     * before it lands, without a step per keystroke-adjacent call.
      */
-    private function recordNewTodo(Recorder $recorder, Browser $browser, string $text): Browser
+    protected function recordNewTodo(Browser $browser, string $text): Browser
     {
-        $recorder->type($browser, 'What needs to be done?', $text, "Type \"{$text}\"");
-        $recorder->step('Press Enter', function () use ($browser): void {
-            $browser->pressKey('Enter');
-        });
-
-        return $browser;
+        return $browser->beat("Add \"{$text}\"")
+            ->fill('What needs to be done?', $text)
+            ->pressKey('Enter');
     }
 
     /**
-     * The recorded equivalent of a bare `doubleClick($text)` — a single timed
-     * step, factored out because five scenarios open the same edit box.
+     * The recorded equivalent of a bare `doubleClick($text)` — one beat,
+     * factored out because five scenarios open the same edit box.
      */
-    private function recordDoubleClickToEdit(Recorder $recorder, Browser $browser, string $text): Browser
+    private function recordDoubleClickToEdit(Browser $browser, string $text): Browser
     {
-        $recorder->step("Double-click \"{$text}\"", function () use ($browser, $text): void {
-            $browser->doubleClick($text);
-        });
-
-        return $browser;
+        return $browser->beat("Double-click \"{$text}\"")->doubleClick($text);
     }
 
     /**
@@ -156,60 +149,43 @@ abstract class TodoMvcTestCase extends BrowserTestCase
 
     public function test_adding_a_todo_clears_the_input_and_counts_it(): void
     {
-        $browser = $this->visitApp();
-        $recorder = $this->recorder('Adding a todo', totalSteps: 2);
-
-        $this->recordNewTodo($recorder, $browser, 'Buy milk');
-
-        $browser->assertValue('.new-todo', '')->assertSee('Buy milk');
-        $recorder->assert($browser, 'Sees "1 item left"', function () use ($browser): void {
-            $browser->assertSee('1 item left');
-        });
+        $this->recordNewTodo($this->visitApp()->recording('Adding a todo'), 'Buy milk')
+            ->assertValue('.new-todo', '')
+            ->assertSee('Buy milk')
+            ->assertSee('1 item left');
     }
 
     public function test_the_counter_pluralises(): void
     {
-        $browser = $this->visitApp();
-        $recorder = $this->recorder('Counter pluralises', totalSteps: 4);
+        $browser = $this->visitApp()->recording('Counter pluralises');
 
-        $this->recordNewTodo($recorder, $browser, 'Buy milk');
-        $this->recordNewTodo($recorder, $browser, 'Walk the dog');
-
-        $recorder->assert($browser, 'Sees "2 items left"', function () use ($browser): void {
-            $browser->assertSee('2 items left');
-        });
+        $this->recordNewTodo($browser, 'Buy milk');
+        $this->recordNewTodo($browser, 'Walk the dog')
+            ->assertSee('2 items left');
     }
 
     public function test_input_is_trimmed_and_whitespace_only_is_rejected(): void
     {
-        $browser = $this->visitApp();
-        $recorder = $this->recorder('Trims input, rejects whitespace-only', totalSteps: 4);
+        $browser = $this->visitApp()->recording('Trims input, rejects whitespace-only');
 
-        $this->recordNewTodo($recorder, $browser, '   Buy milk   ');
-        $browser->assertSee('1 item left');
-        $recorder->assert($browser, 'Confirms "Buy milk" was trimmed', function () use ($browser): void {
-            $browser->assertExpression($this->pierce('label').".some(l => l.textContent.trim() === 'Buy milk')");
-        });
+        $this->recordNewTodo($browser, '   Buy milk   ')
+            ->assertSee('1 item left')
+            ->assertExpression($this->pierce('label').".some(l => l.textContent.trim() === 'Buy milk')");
 
-        $this->recordNewTodo($recorder, $browser, '     ');
-        $browser->assertSee('1 item left');
+        $this->recordNewTodo($browser, '     ')
+            ->assertSee('1 item left');
     }
 
     public function test_toggling_a_todo_completes_it_and_updates_the_count(): void
     {
-        $browser = $this->visitApp();
-        $recorder = $this->recorder('Toggling completes a todo', totalSteps: 5);
+        $browser = $this->visitApp()->recording('Toggling completes a todo');
 
-        $this->recordNewTodo($recorder, $browser, 'Buy milk');
-        $this->recordNewTodo($recorder, $browser, 'Walk the dog');
-        $recorder->step('Check "Buy milk"', function () use ($browser): void {
-            $browser->check('Buy milk');
-        });
+        $this->recordNewTodo($browser, 'Buy milk');
+        $this->recordNewTodo($browser, 'Walk the dog');
 
-        $browser->assertSee('1 item left');
-        $recorder->assert($browser, 'Confirms "Buy milk" is completed', function () use ($browser): void {
-            $browser->assertExpression($this->pierce('li').".some(li => li.classList.contains('completed') && li.textContent.includes('Buy milk'))");
-        });
+        $browser->beat('Check "Buy milk"')->check('Buy milk')
+            ->assertSee('1 item left')
+            ->assertExpression($this->pierce('li').".some(li => li.classList.contains('completed') && li.textContent.includes('Buy milk'))");
     }
 
     public function test_toggle_all_completes_and_uncompletes_everything(): void
@@ -220,182 +196,125 @@ abstract class TodoMvcTestCase extends BrowserTestCase
         // sidesteps both. The real input is visually hidden, so check()/uncheck()
         // (synthetic click) is what reaches it (#139).
         $toggleAll = $this->app()->toggleAllSelector();
-        $browser = $this->visitApp();
-        $recorder = $this->recorder('Toggle all completes and uncompletes', totalSteps: 6);
+        $browser = $this->visitApp()->recording('Toggle all completes and uncompletes');
 
-        $this->recordNewTodo($recorder, $browser, 'Buy milk');
-        $this->recordNewTodo($recorder, $browser, 'Walk the dog');
+        $this->recordNewTodo($browser, 'Buy milk');
+        $this->recordNewTodo($browser, 'Walk the dog');
 
-        $recorder->step('Check "toggle all"', function () use ($browser, $toggleAll): void {
-            $browser->check($toggleAll);
-        });
-        $recorder->assert($browser, 'Sees "0 items left"', function () use ($browser): void {
-            $browser->assertSee('0 items left');
-        });
+        $browser->beat('Check "toggle all"')->check($toggleAll)
+            ->assertSee('0 items left');
 
-        $recorder->step('Uncheck "toggle all"', function () use ($browser, $toggleAll): void {
-            $browser->uncheck($toggleAll);
-        });
-        $browser->assertSee('2 items left');
+        $browser->beat('Uncheck "toggle all"')->uncheck($toggleAll)
+            ->assertSee('2 items left');
     }
 
     public function test_double_click_enters_edit_mode_and_focuses_the_input(): void
     {
-        $browser = $this->visitApp();
-        $recorder = $this->recorder('Double-click enters edit mode', totalSteps: 3);
+        $browser = $this->visitApp()->recording('Double-click enters edit mode');
 
-        $this->recordNewTodo($recorder, $browser, 'Buy milk');
-        $this->recordDoubleClickToEdit($recorder, $browser, 'Buy milk');
-
-        $browser->assertExpression($this->pierce('li').".some(li => li.classList.contains('editing') && li.textContent.includes('Buy milk'))");
-        $recorder->assert($browser, 'Confirms the edit field is focused', function () use ($browser): void {
-            $browser->assertFocused('.editing .edit');
-        });
+        $this->recordNewTodo($browser, 'Buy milk');
+        $this->recordDoubleClickToEdit($browser, 'Buy milk')
+            ->assertExpression($this->pierce('li').".some(li => li.classList.contains('editing') && li.textContent.includes('Buy milk'))")
+            ->assertFocused('.editing .edit');
     }
 
     public function test_enter_saves_an_edit(): void
     {
-        $browser = $this->visitApp();
-        $recorder = $this->recorder('Enter saves an edit', totalSteps: 5);
+        $browser = $this->visitApp()->recording('Enter saves an edit');
 
-        $this->recordNewTodo($recorder, $browser, 'Buy milk');
-        $this->recordDoubleClickToEdit($recorder, $browser, 'Buy milk');
-        $recorder->type($browser, '.editing .edit', 'Buy oat milk', 'Edit to "Buy oat milk"');
-        $recorder->step('Press Enter', function () use ($browser): void {
-            $browser->pressKey('Enter');
-        });
+        $this->recordNewTodo($browser, 'Buy milk');
+        $this->recordDoubleClickToEdit($browser, 'Buy milk');
 
-        $browser->assertDontSee('Buy milk');
-        $recorder->assert($browser, 'Sees "Buy oat milk"', function () use ($browser): void {
-            $browser->assertSee('Buy oat milk');
-        });
+        $browser->beat('Edit to "Buy oat milk"')
+            ->fill('.editing .edit', 'Buy oat milk')->pressKey('Enter')
+            ->assertDontSee('Buy milk')
+            ->assertSee('Buy oat milk');
     }
 
     public function test_escape_discards_an_edit(): void
     {
-        $browser = $this->visitApp();
-        $recorder = $this->recorder('Escape discards an edit', totalSteps: 5);
+        $browser = $this->visitApp()->recording('Escape discards an edit');
 
-        $this->recordNewTodo($recorder, $browser, 'Buy milk');
-        $this->recordDoubleClickToEdit($recorder, $browser, 'Buy milk');
-        $recorder->type($browser, '.editing .edit', 'Discarded change', 'Edit to "Discarded change"');
-        $recorder->step('Press Escape', function () use ($browser): void {
-            $browser->pressKey('Escape');
-        });
+        $this->recordNewTodo($browser, 'Buy milk');
+        $this->recordDoubleClickToEdit($browser, 'Buy milk');
 
-        $browser->assertSee('Buy milk');
-        $recorder->assert($browser, 'Confirms the edit was discarded', function () use ($browser): void {
-            $browser->assertDontSee('Discarded change');
-        });
+        $browser->beat('Edit to "Discarded change"')
+            ->fill('.editing .edit', 'Discarded change')
+            ->beat('Press Escape')->pressKey('Escape')
+            ->assertSee('Buy milk')
+            ->assertDontSee('Discarded change');
     }
 
     public function test_blur_saves_an_edit(): void
     {
-        $browser = $this->visitApp();
-        $recorder = $this->recorder('Blur saves an edit', totalSteps: 5);
+        $browser = $this->visitApp()->recording('Blur saves an edit');
 
-        $this->recordNewTodo($recorder, $browser, 'Buy milk');
-        $this->recordDoubleClickToEdit($recorder, $browser, 'Buy milk');
-        $recorder->type($browser, '.editing .edit', 'Buy oat milk', 'Edit to "Buy oat milk"');
-        $recorder->step('Blur the field', function () use ($browser): void {
-            $browser->blur('.editing .edit');
-        });
+        $this->recordNewTodo($browser, 'Buy milk');
+        $this->recordDoubleClickToEdit($browser, 'Buy milk');
 
-        $recorder->assert($browser, 'Sees "Buy oat milk"', function () use ($browser): void {
-            $browser->assertSee('Buy oat milk');
-        });
+        $browser->beat('Edit to "Buy oat milk"')->fill('.editing .edit', 'Buy oat milk')
+            ->beat('Blur the field')->blur('.editing .edit')
+            ->assertSee('Buy oat milk');
     }
 
     public function test_editing_to_empty_destroys_the_item(): void
     {
-        $browser = $this->visitApp();
-        $recorder = $this->recorder('Editing to empty destroys the item', totalSteps: 5);
+        $browser = $this->visitApp()->recording('Editing to empty destroys the item');
 
-        $this->recordNewTodo($recorder, $browser, 'Buy milk');
-        $this->recordDoubleClickToEdit($recorder, $browser, 'Buy milk');
-        $recorder->type($browser, '.editing .edit', '', 'Clear the field');
-        $recorder->step('Press Enter', function () use ($browser): void {
-            $browser->pressKey('Enter');
-        });
+        $this->recordNewTodo($browser, 'Buy milk');
+        $this->recordDoubleClickToEdit($browser, 'Buy milk');
 
-        $browser->assertDontSee('Buy milk');
-        $recorder->assert($browser, 'Confirms the todo was destroyed', function () use ($browser): void {
-            $browser->assertMissing('.todo-list li');
-        });
+        $browser->beat('Clear the field')->fill('.editing .edit', '')
+            ->beat('Press Enter')->pressKey('Enter')
+            ->assertDontSee('Buy milk')
+            ->assertMissing('.todo-list li');
     }
 
     public function test_hovering_reveals_destroy_and_clicking_removes_the_item(): void
     {
-        $browser = $this->visitApp();
-        $recorder = $this->recorder('Hover reveals destroy', totalSteps: 6);
+        $browser = $this->visitApp()->recording('Hover reveals destroy');
 
-        $this->recordNewTodo($recorder, $browser, 'Buy milk');
-        $this->recordNewTodo($recorder, $browser, 'Walk the dog');
+        $this->recordNewTodo($browser, 'Buy milk');
+        $this->recordNewTodo($browser, 'Walk the dog');
 
-        $recorder->step('Hover "Walk the dog"', function () use ($browser): void {
-            $browser->hover('Walk the dog');
-        });
-        // .destroy carries no accessible text, so the CSS contract is the only
-        // handle; only the hovered row's button is clickable, so it wins.
-        $recorder->step('Click the destroy button', function () use ($browser): void {
-            $browser->click('.destroy');
-        });
-
-        $browser->assertSee('Buy milk');
-        $recorder->assert($browser, 'Confirms "Walk the dog" was removed', function () use ($browser): void {
-            $browser->assertDontSee('Walk the dog');
-        });
+        $browser->beat('Hover "Walk the dog"')->hover('Walk the dog')
+            // .destroy carries no accessible text, so the CSS contract is the only
+            // handle; only the hovered row's button is clickable, so it wins.
+            ->beat('Click the destroy button')->click('.destroy')
+            ->assertSee('Buy milk')
+            ->assertDontSee('Walk the dog');
     }
 
     public function test_filters_move_the_selection_and_filter_the_list(): void
     {
-        $browser = $this->visitApp();
-        $recorder = $this->recorder('Filters move the selection', totalSteps: 8);
+        $browser = $this->visitApp()->recording('Filters move the selection');
 
-        $this->recordNewTodo($recorder, $browser, 'Buy milk');
-        $this->recordNewTodo($recorder, $browser, 'Walk the dog');
+        $this->recordNewTodo($browser, 'Buy milk');
+        $this->recordNewTodo($browser, 'Walk the dog');
 
-        $recorder->step('Check "Buy milk"', function () use ($browser): void {
-            $browser->check('Buy milk');
-        });
-        $recorder->step('Click "Active"', function () use ($browser): void {
-            $browser->click('Active');
-        });
-        $browser->assertSee('Walk the dog')->assertDontSee('Buy milk');
-        $recorder->assert($browser, 'Confirms "Active" is the selected filter', function () use ($browser): void {
-            $browser->assertExpression($this->pierce('.filters a.selected')."[0]?.textContent.trim() === 'Active'");
-        });
+        $browser->beat('Check "Buy milk"')->check('Buy milk')
+            ->beat('Click "Active"')->click('Active')
+            ->assertSee('Walk the dog')->assertDontSee('Buy milk')
+            ->assertExpression($this->pierce('.filters a.selected')."[0]?.textContent.trim() === 'Active'");
 
-        $recorder->step('Click "Completed"', function () use ($browser): void {
-            $browser->click('Completed');
-        });
-        $browser->assertSee('Buy milk')->assertDontSee('Walk the dog');
+        $browser->beat('Click "Completed"')->click('Completed')
+            ->assertSee('Buy milk')->assertDontSee('Walk the dog');
 
-        $recorder->step('Click "All"', function () use ($browser): void {
-            $browser->click('All');
-        });
-        $browser->assertSee('Buy milk')->assertSee('Walk the dog');
+        $browser->beat('Click "All"')->click('All')
+            ->assertSee('Buy milk')->assertSee('Walk the dog');
     }
 
     public function test_clear_completed_removes_completed_then_hides_itself(): void
     {
-        $browser = $this->visitApp();
-        $recorder = $this->recorder('Clear completed', totalSteps: 6);
+        $browser = $this->visitApp()->recording('Clear completed');
 
-        $this->recordNewTodo($recorder, $browser, 'Buy milk');
-        $this->recordNewTodo($recorder, $browser, 'Walk the dog');
+        $this->recordNewTodo($browser, 'Buy milk');
+        $this->recordNewTodo($browser, 'Walk the dog');
 
-        $recorder->step('Check "Buy milk"', function () use ($browser): void {
-            $browser->check('Buy milk');
-        });
-        $recorder->step('Press "Clear completed"', function () use ($browser): void {
-            $browser->press('Clear completed');
-        });
-
-        $browser->assertDontSee('Buy milk')->assertSee('Walk the dog');
-        $recorder->assert($browser, 'Confirms "Clear completed" hides itself', function () use ($browser): void {
-            $browser->assertMissing('.clear-completed');
-        });
+        $browser->beat('Check "Buy milk"')->check('Buy milk')
+            ->beat('Press "Clear completed"')->press('Clear completed')
+            ->assertDontSee('Buy milk')->assertSee('Walk the dog')
+            ->assertMissing('.clear-completed');
     }
 
     public function test_the_active_filter_survives_a_reload(): void
@@ -403,20 +322,13 @@ abstract class TodoMvcTestCase extends BrowserTestCase
         // The apps we ship don't persist todos (see the epic), so this asserts
         // the hash route itself survives a reload — assertable now that
         // currentPath() keeps the fragment (#140) — not the filtered list.
-        $browser = $this->visitApp();
-        $recorder = $this->recorder('Active filter survives a reload', totalSteps: 4);
+        $browser = $this->visitApp()->recording('Active filter survives a reload');
 
-        $this->recordNewTodo($recorder, $browser, 'Buy milk');
-        $recorder->step('Click "Completed"', function () use ($browser): void {
-            $browser->click('Completed');
-        });
-        $browser->assertPathIs($this->app()->url().'#/completed');
+        $this->recordNewTodo($browser, 'Buy milk');
+        $browser->beat('Click "Completed"')->click('Completed')
+            ->assertPathIs($this->app()->url().'#/completed');
 
-        $recorder->step('Refresh the page', function () use ($browser): void {
-            $browser->refresh();
-        });
-        $recorder->assert($browser, 'Confirms the filter survived the reload', function () use ($browser): void {
-            $browser->assertPathIs($this->app()->url().'#/completed');
-        });
+        $browser->beat('Refresh the page')->refresh()
+            ->assertPathIs($this->app()->url().'#/completed');
     }
 }

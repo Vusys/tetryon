@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Vusys\Tetryon\PHPUnit;
 
 use PHPUnit\Framework\Assert;
+use Throwable;
 use Vusys\Tetryon\Core\Config\Configuration;
+use Vusys\Tetryon\Core\Diagnostics\ArtifactBag;
 use Vusys\Tetryon\Core\Dialog\DialogExpectation;
 use Vusys\Tetryon\Core\Dialog\UnhandledDialogException;
 use Vusys\Tetryon\Core\NaturalLanguage\StepParser;
@@ -23,6 +25,9 @@ use Vusys\Tetryon\Core\Support\Waiter;
 use Vusys\Tetryon\Firefox\Bidi\BiDiTrace;
 use Vusys\Tetryon\Firefox\FirefoxBiDiDriver;
 use Vusys\Tetryon\Firefox\NetworkRecord;
+use Vusys\Tetryon\PHPUnit\Report\RecordingSession;
+use Vusys\Tetryon\PHPUnit\Report\SuiteReport;
+use Vusys\Tetryon\PHPUnit\Report\TestRecording;
 
 /**
  * The fluent, user-facing browser API. Wraps the Firefox driver and turns its
@@ -175,11 +180,14 @@ final readonly class Browser
 
     private AssertionLog $assertionLog;
 
+    private RecordingSession $recording;
+
     public function __construct(
         private FirefoxBiDiDriver $driver,
         private Configuration $configuration,
         ?SelectorResolver $resolver = null,
         private ?ElementReference $scope = null,
+        ?RecordingSession $recording = null,
     ) {
         $this->resolver = $resolver ?? new SelectorResolver(
             $driver,
@@ -187,24 +195,80 @@ final readonly class Browser
             $configuration->selectorTestAttributes,
         );
         $this->assertionLog = new AssertionLog;
-    }
-
-    /**
-     * Every assertion this browser has performed since the last drain, in
-     * call order — e.g. `assertSee("1 item left")`. Used by
-     * {@see Recorder::assert()} to show exactly which
-     * assertions ran, not just the caller's label.
-     *
-     * @return list<string>
-     */
-    public function drainAssertionLog(): array
-    {
-        return $this->assertionLog->drain();
+        $this->recording = $recording ?? new RecordingSession($driver);
     }
 
     private function describeValue(mixed $value): string
     {
         return is_string($value) ? "\"{$value}\"" : (string) json_encode($value);
+    }
+
+    // ── Recording ────────────────────────────────────────────────────────
+
+    /**
+     * Turn on the browsable-report recording for this test (issue #102).
+     * Every {@see beat()} and passing assertion captures a screenshot from
+     * here on; a test that never calls this pays no screenshot cost and
+     * behaves exactly as before.
+     *
+     * $title is what the report shows for this test — usually worth writing
+     * by hand, since a good title is a sentence a teammate can skim. Left
+     * unset, it falls back to PHPUnit's own derived test name.
+     */
+    public function recording(?string $title = null): self
+    {
+        $this->recording->activate($title);
+
+        return $this;
+    }
+
+    /**
+     * Mark the start of a new labelled beat of the recording — the one verb
+     * that replaces the old note()/step()/type()/assert() split. Everything
+     * chained after a beat (gestures, assertions) belongs to it until the
+     * next beat() call or the test ends; grouping several gestures under one
+     * beat is an editorial choice, not something this counts for you.
+     *
+     * $between is the escape hatch for a non-browser wait that has to sit
+     * between two beats — a database poll after an optimistic UI save —
+     * without breaking the chain:
+     *
+     *     $this->browser()->recording()
+     *         ->beat('Answer the question')->click('Yes')
+     *         ->beat('Persist', fn () => $this->waitForAnswersPersisted($record, 1))
+     *         ->beat('Submit')->click('Submit');
+     *
+     * A no-op when {@see recording()} was never called.
+     *
+     * @param  (callable(): void)|null  $between
+     */
+    public function beat(string $label, ?callable $between = null): self
+    {
+        $this->recording->advanceBeat($label, $between);
+
+        return $this;
+    }
+
+    private function logAssertion(string $description): void
+    {
+        $this->assertionLog->record($description);
+        $this->recording->captureAssertion($description);
+    }
+
+    /**
+     * This test's finished recording — the closing pass/fail moment
+     * appended, ready to hand off to
+     * {@see SuiteReport}. Null when
+     * {@see recording()} was never called. $fallbackTitle is used only when
+     * {@see recording()} was called without an explicit title.
+     */
+    public function finishedRecording(string $testId, bool $passed, ?ArtifactBag $diagnostics, string $fallbackTitle): ?TestRecording
+    {
+        if (! $this->recording->isActive()) {
+            return null;
+        }
+
+        return $this->recording->finish($testId, $passed, $diagnostics, $fallbackTitle);
     }
 
     // ── Navigation ──────────────────────────────────────────────────────────
@@ -274,7 +338,7 @@ final readonly class Browser
     public function within(string $target, callable $callback): self
     {
         $container = $this->resolveWaiting($target);
-        $callback(new self($this->driver, $this->configuration, $this->resolver->within($container), $container));
+        $callback(new self($this->driver, $this->configuration, $this->resolver->within($container), $container, $this->recording));
 
         return $this;
     }
@@ -638,7 +702,7 @@ final readonly class Browser
             $this->dialogMessage() ?? '',
             'The last dialog did not say what was expected.',
         );
-        $this->assertionLog->record("assertDialogMessage(\"{$expected}\")");
+        $this->logAssertion("assertDialogMessage(\"{$expected}\")");
 
         return $this;
     }
@@ -829,7 +893,7 @@ final readonly class Browser
     {
         $this->retry(fn (): bool => str_contains($this->visibleText(), $text));
         Assert::assertStringContainsString($text, $this->visibleText(), "Expected to see \"{$text}\" on the page.");
-        $this->assertionLog->record("assertSee(\"{$text}\")");
+        $this->logAssertion("assertSee(\"{$text}\")");
 
         return $this;
     }
@@ -838,7 +902,7 @@ final readonly class Browser
     {
         $this->retry(fn (): bool => ! str_contains($this->visibleText(), $text));
         Assert::assertStringNotContainsString($text, $this->visibleText(), "Did not expect to see \"{$text}\" on the page.");
-        $this->assertionLog->record("assertDontSee(\"{$text}\")");
+        $this->logAssertion("assertDontSee(\"{$text}\")");
 
         return $this;
     }
@@ -848,7 +912,7 @@ final readonly class Browser
         $expected = $this->configuration->resolveUrl($url);
         $this->retry(fn (): bool => $this->currentUrl() === $expected);
         Assert::assertSame($expected, $this->currentUrl());
-        $this->assertionLog->record("assertUrlIs(\"{$url}\")");
+        $this->logAssertion("assertUrlIs(\"{$url}\")");
 
         return $this;
     }
@@ -857,7 +921,7 @@ final readonly class Browser
     {
         $this->retry(fn (): bool => $this->currentPath() === $path);
         Assert::assertSame($path, $this->currentPath());
-        $this->assertionLog->record("assertPathIs(\"{$path}\")");
+        $this->logAssertion("assertPathIs(\"{$path}\")");
 
         return $this;
     }
@@ -866,7 +930,7 @@ final readonly class Browser
     {
         $this->retry(fn (): bool => $this->title() === $title);
         Assert::assertSame($title, $this->title());
-        $this->assertionLog->record("assertTitleIs(\"{$title}\")");
+        $this->logAssertion("assertTitleIs(\"{$title}\")");
 
         return $this;
     }
@@ -875,7 +939,7 @@ final readonly class Browser
     {
         $this->retry(fn (): bool => $this->value($field) === $expected);
         Assert::assertSame($expected, $this->value($field), "Field \"{$field}\" had an unexpected value.");
-        $this->assertionLog->record("assertValue(\"{$field}\", \"{$expected}\")");
+        $this->logAssertion("assertValue(\"{$field}\", \"{$expected}\")");
 
         return $this;
     }
@@ -884,7 +948,7 @@ final readonly class Browser
     {
         $this->retry(fn (): bool => $this->isVisibleNow($target));
         Assert::assertTrue($this->isVisibleNow($target), "Expected \"{$target}\" to be visible.");
-        $this->assertionLog->record("assertVisible(\"{$target}\")");
+        $this->logAssertion("assertVisible(\"{$target}\")");
 
         return $this;
     }
@@ -893,7 +957,7 @@ final readonly class Browser
     {
         $this->retry(fn (): bool => ! $this->isVisibleNow($target));
         Assert::assertFalse($this->isVisibleNow($target), "Expected \"{$target}\" to be missing or hidden.");
-        $this->assertionLog->record("assertMissing(\"{$target}\")");
+        $this->logAssertion("assertMissing(\"{$target}\")");
 
         return $this;
     }
@@ -906,7 +970,7 @@ final readonly class Browser
             $this->driver->evaluateScript($script) === true,
             "Expected to see \"{$text}\" near \"{$near}\".",
         );
-        $this->assertionLog->record("assertTextNear(\"{$near}\", \"{$text}\")");
+        $this->logAssertion("assertTextNear(\"{$near}\", \"{$text}\")");
 
         return $this;
     }
@@ -917,7 +981,7 @@ final readonly class Browser
     {
         $this->retry(fn (): bool => $this->isChecked($target));
         Assert::assertTrue($this->isChecked($target), "Expected \"{$target}\" to be checked.");
-        $this->assertionLog->record("assertChecked(\"{$target}\")");
+        $this->logAssertion("assertChecked(\"{$target}\")");
 
         return $this;
     }
@@ -926,7 +990,7 @@ final readonly class Browser
     {
         $this->retry(fn (): bool => ! $this->isChecked($target));
         Assert::assertFalse($this->isChecked($target), "Expected \"{$target}\" not to be checked.");
-        $this->assertionLog->record("assertNotChecked(\"{$target}\")");
+        $this->logAssertion("assertNotChecked(\"{$target}\")");
 
         return $this;
     }
@@ -935,7 +999,7 @@ final readonly class Browser
     {
         $this->retry(fn (): bool => $this->isFocused($target));
         Assert::assertTrue($this->isFocused($target), "Expected \"{$target}\" to be focused.");
-        $this->assertionLog->record("assertFocused(\"{$target}\")");
+        $this->logAssertion("assertFocused(\"{$target}\")");
 
         return $this;
     }
@@ -944,7 +1008,7 @@ final readonly class Browser
     {
         $this->retry(fn (): bool => ! $this->isFocused($target));
         Assert::assertFalse($this->isFocused($target), "Expected \"{$target}\" not to be focused.");
-        $this->assertionLog->record("assertNotFocused(\"{$target}\")");
+        $this->logAssertion("assertNotFocused(\"{$target}\")");
 
         return $this;
     }
@@ -963,7 +1027,7 @@ final readonly class Browser
     {
         $this->retry(fn (): bool => $this->selected($field) === $value);
         Assert::assertSame($value, $this->selected($field), "Expected \"{$field}\" to have \"{$value}\" selected.");
-        $this->assertionLog->record("assertSelected(\"{$field}\", \"{$value}\")");
+        $this->logAssertion("assertSelected(\"{$field}\", \"{$value}\")");
 
         return $this;
     }
@@ -972,7 +1036,7 @@ final readonly class Browser
     {
         $this->retry(fn (): bool => $this->selected($field) !== $value);
         Assert::assertNotSame($value, $this->selected($field), "Expected \"{$field}\" not to have \"{$value}\" selected.");
-        $this->assertionLog->record("assertNotSelected(\"{$field}\", \"{$value}\")");
+        $this->logAssertion("assertNotSelected(\"{$field}\", \"{$value}\")");
 
         return $this;
     }
@@ -981,7 +1045,7 @@ final readonly class Browser
     {
         $this->retry(fn (): bool => ! $this->isDisabled($target));
         Assert::assertFalse($this->isDisabled($target), "Expected \"{$target}\" to be enabled.");
-        $this->assertionLog->record("assertEnabled(\"{$target}\")");
+        $this->logAssertion("assertEnabled(\"{$target}\")");
 
         return $this;
     }
@@ -990,7 +1054,7 @@ final readonly class Browser
     {
         $this->retry(fn (): bool => $this->isDisabled($target));
         Assert::assertTrue($this->isDisabled($target), "Expected \"{$target}\" to be disabled.");
-        $this->assertionLog->record("assertDisabled(\"{$target}\")");
+        $this->logAssertion("assertDisabled(\"{$target}\")");
 
         return $this;
     }
@@ -999,7 +1063,7 @@ final readonly class Browser
     {
         $this->retry(fn (): bool => $this->attribute($target, $name) === $expected);
         Assert::assertSame($expected, $this->attribute($target, $name), "Attribute \"{$name}\" of \"{$target}\" had an unexpected value.");
-        $this->assertionLog->record("assertAttribute(\"{$target}\", \"{$name}\", \"{$expected}\")");
+        $this->logAssertion("assertAttribute(\"{$target}\", \"{$name}\", \"{$expected}\")");
 
         return $this;
     }
@@ -1012,7 +1076,7 @@ final readonly class Browser
             $this->attribute($target, $name) ?? '',
             "Attribute \"{$name}\" of \"{$target}\" did not contain \"{$needle}\".",
         );
-        $this->assertionLog->record("assertAttributeContains(\"{$target}\", \"{$name}\", \"{$needle}\")");
+        $this->logAssertion("assertAttributeContains(\"{$target}\", \"{$name}\", \"{$needle}\")");
 
         return $this;
     }
@@ -1031,7 +1095,7 @@ final readonly class Browser
             (bool) $this->evaluate($expression),
             $message !== '' ? $message : "Expected this expression to be truthy: {$expression}",
         );
-        $this->assertionLog->record("assertExpression(\"{$expression}\")");
+        $this->logAssertion("assertExpression(\"{$expression}\")");
 
         return $this;
     }
@@ -1048,7 +1112,7 @@ final readonly class Browser
             $this->evaluate($expression),
             $message !== '' ? $message : "Expression did not equal the expected value: {$expression}",
         );
-        $this->assertionLog->record("assertExpressionEquals(\"{$expression}\", ".$this->describeValue($expected).')');
+        $this->logAssertion("assertExpressionEquals(\"{$expression}\", ".$this->describeValue($expected).')');
 
         return $this;
     }
@@ -1085,7 +1149,7 @@ final readonly class Browser
     {
         $this->retry(fn (): bool => $this->matchingRequests($pattern) !== []);
         Assert::assertNotEmpty($this->matchingRequests($pattern), "Expected a request matching \"{$pattern}\".");
-        $this->assertionLog->record("assertRequested(\"{$pattern}\")");
+        $this->logAssertion("assertRequested(\"{$pattern}\")");
 
         return $this;
     }
@@ -1096,7 +1160,7 @@ final readonly class Browser
             $this->matchingRequests($pattern),
             "Did not expect a request matching \"{$pattern}\".",
         );
-        $this->assertionLog->record("assertNotRequested(\"{$pattern}\")");
+        $this->logAssertion("assertNotRequested(\"{$pattern}\")");
 
         return $this;
     }
@@ -1136,7 +1200,10 @@ final readonly class Browser
         );
 
         if (! $ok) {
-            throw new TimeoutException("Timed out waiting for \"{$target}\" to become actionable ({$reason}).");
+            $exception = new TimeoutException("Timed out waiting for \"{$target}\" to become actionable ({$reason}).");
+            $this->recording->captureFailure($exception);
+
+            throw $exception;
         }
 
         return $element;
@@ -1278,9 +1345,19 @@ final readonly class Browser
             return $element instanceof ElementReference;
         });
 
+        if ($element instanceof ElementReference) {
+            return $element;
+        }
+
         // On timeout, resolve once more so the rich ElementNotFoundException (with
         // its attempt list) surfaces instead of a bare null.
-        return $element ?? $this->resolveElement($target, $preferInteractive);
+        try {
+            return $this->resolveElement($target, $preferInteractive);
+        } catch (Throwable $e) {
+            $this->recording->captureFailure($e);
+
+            throw $e;
+        }
     }
 
     private function resolveNow(string $target, bool $preferInteractive = false): ?ElementReference

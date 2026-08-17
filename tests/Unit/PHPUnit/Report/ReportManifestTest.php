@@ -59,13 +59,12 @@ final class ReportManifestTest extends TestCase
             screenshotPng: 'bytes',
             caption: 'Click "Save changes"',
             stepIndex: 2,
-            totalSteps: 3,
             progress: 1,
             durationMs: 0,
             outcome: 'failed',
             selectorFailure: $failure,
         );
-        $recording = new TestRecording('A::test_one', 'Test one', 3, false, [$moment]);
+        $recording = new TestRecording('A::test_one', 'Test one', false, [$moment]);
 
         $manifest = ReportManifest::build([$recording], [['a.webp']], [null]);
 
@@ -91,13 +90,12 @@ final class ReportManifestTest extends TestCase
             screenshotPng: 'bytes',
             caption: 'Sees "1 item left"',
             stepIndex: 2,
-            totalSteps: 2,
             progress: 2,
             durationMs: 0,
             verified: true,
             assertions: ['assertSee("1 item left")', 'assertValue(".new-todo", "")'],
         );
-        $recording = new TestRecording('A::test_one', 'Test one', 2, true, [$moment]);
+        $recording = new TestRecording('A::test_one', 'Test one', true, [$moment]);
 
         $manifest = ReportManifest::build([$recording], [['a.webp']], [null]);
 
@@ -114,18 +112,42 @@ final class ReportManifestTest extends TestCase
         self::assertSame([], $this->moment($manifest, 0, 0)['assertions']);
     }
 
+    public function test_it_derives_total_steps_from_the_moments_captured(): void
+    {
+        $moments = [
+            new Moment(screenshotPng: 'bytes', caption: 'Beat 1', stepIndex: 1, progress: 0, durationMs: 0),
+            new Moment(screenshotPng: 'bytes', caption: 'Beat 1 · 5ms', stepIndex: 1, progress: 1, durationMs: 5),
+            new Moment(screenshotPng: 'bytes', caption: 'Beat 2', stepIndex: 2, progress: 1, durationMs: 0),
+            new Moment(screenshotPng: 'bytes', caption: 'Beat 2 · 5ms', stepIndex: 2, progress: 2, durationMs: 5),
+        ];
+        $recording = new TestRecording('A::test_one', 'Test one', true, $moments);
+
+        $manifest = ReportManifest::build([$recording], [['a.webp', 'b.webp', 'c.webp', 'd.webp']], [null]);
+
+        self::assertSame(2, $this->test($manifest, 0)['totalSteps']);
+        self::assertSame(2, $this->moment($manifest, 0, 3)['totalSteps']);
+    }
+
+    public function test_it_derives_zero_total_steps_when_nothing_was_captured(): void
+    {
+        $recording = new TestRecording('A::test_one', 'Test one', true, []);
+
+        $manifest = ReportManifest::build([$recording], [[]], [null]);
+
+        self::assertSame(0, $this->test($manifest, 0)['totalSteps']);
+    }
+
     private function recording(string $testId, bool $passed = true): TestRecording
     {
         $moment = new Moment(
             screenshotPng: 'bytes',
             caption: 'A step',
             stepIndex: 1,
-            totalSteps: 1,
             progress: 1,
             durationMs: 10,
         );
 
-        return new TestRecording($testId, $testId, 1, $passed, [$moment]);
+        return new TestRecording($testId, $testId, $passed, [$moment]);
     }
 
     /**

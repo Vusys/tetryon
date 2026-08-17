@@ -29,16 +29,17 @@ final class ReportManifest
 
         $tests = [];
         foreach ($recordings as $index => $recording) {
+            $totalSteps = self::totalSteps($recording->moments);
             $tests[] = [
                 'id' => $recording->testId,
                 'title' => $recording->title,
-                'totalSteps' => $recording->totalSteps,
+                'totalSteps' => $totalSteps,
                 'passed' => $recording->passed,
                 'index' => $index + 1,
                 'total' => $total,
                 'diagnosticsDir' => $diagnosticsDirs[$index] ?? null,
                 'diagnosticsReport' => $diagnosticsReports[$index] ?? null,
-                'moments' => self::moments($recording, $screenshotPaths[$index] ?? []),
+                'moments' => self::moments($recording, $totalSteps, $screenshotPaths[$index] ?? []),
             ];
         }
 
@@ -49,10 +50,27 @@ final class ReportManifest
     }
 
     /**
+     * The declared step count is derived from the moments actually captured
+     * — the beat index of the last one — rather than trusted from the
+     * developer, so the report can never claim a count the recording didn't
+     * produce.
+     *
+     * @param  list<Moment>  $moments
+     */
+    private static function totalSteps(array $moments): int
+    {
+        if ($moments === []) {
+            return 0;
+        }
+
+        return max(array_map(static fn (Moment $moment): int => $moment->stepIndex, $moments));
+    }
+
+    /**
      * @param  list<string>  $paths
      * @return list<array<string, mixed>>
      */
-    private static function moments(TestRecording $recording, array $paths): array
+    private static function moments(TestRecording $recording, int $totalSteps, array $paths): array
     {
         $moments = [];
         foreach ($recording->moments as $index => $moment) {
@@ -60,7 +78,7 @@ final class ReportManifest
                 'src' => $paths[$index] ?? null,
                 'caption' => $moment->caption,
                 'stepIndex' => $moment->stepIndex,
-                'totalSteps' => $moment->totalSteps,
+                'totalSteps' => $totalSteps,
                 'progress' => $moment->progress,
                 'durationMs' => $moment->durationMs,
                 'outcome' => $moment->outcome,

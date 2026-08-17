@@ -29,8 +29,8 @@ final class ReportRendererTest extends TestCase
 
     public function test_it_writes_screenshots_and_an_index_html(): void
     {
-        $recording = new TestRecording('A::test_one', 'Test one', 1, true, [
-            new Moment(screenshotPng: $this->onePixelPng(), caption: 'Passed', stepIndex: 1, totalSteps: 1, progress: 1, durationMs: 0, outcome: 'passed'),
+        $recording = new TestRecording('A::test_one', 'Test one', true, [
+            new Moment(screenshotPng: $this->onePixelPng(), caption: 'Passed', stepIndex: 1, progress: 1, durationMs: 0, outcome: 'passed'),
         ]);
 
         $indexPath = ReportRenderer::render([$recording], $this->outputDirectory, new Configuration);
@@ -55,8 +55,8 @@ final class ReportRendererTest extends TestCase
             trace: '',
             browserStderr: '',
         );
-        $recording = new TestRecording('A::test_two', 'Test two', 1, false, [
-            new Moment(screenshotPng: $this->onePixelPng(), caption: 'Failed', stepIndex: 1, totalSteps: 1, progress: 1, durationMs: 0, outcome: 'failed'),
+        $recording = new TestRecording('A::test_two', 'Test two', false, [
+            new Moment(screenshotPng: $this->onePixelPng(), caption: 'Failed', stepIndex: 1, progress: 1, durationMs: 0, outcome: 'failed'),
         ], $bag);
 
         ReportRenderer::render([$recording], $this->outputDirectory, new Configuration);
@@ -75,8 +75,8 @@ final class ReportRendererTest extends TestCase
         $blocker = sys_get_temp_dir().'/tetryon-report-blocker-'.bin2hex(random_bytes(4));
         file_put_contents($blocker, 'not a directory');
 
-        $recording = new TestRecording('A::test_one', 'Test one', 1, true, [
-            new Moment(screenshotPng: $this->onePixelPng(), caption: 'Passed', stepIndex: 1, totalSteps: 1, progress: 1, durationMs: 0),
+        $recording = new TestRecording('A::test_one', 'Test one', true, [
+            new Moment(screenshotPng: $this->onePixelPng(), caption: 'Passed', stepIndex: 1, progress: 1, durationMs: 0),
         ]);
 
         try {

@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace Vusys\Tetryon\PHPUnit\Report;
 
 use Vusys\Tetryon\Core\Config\Configuration;
-use Vusys\Tetryon\PHPUnit\Recorder;
 
 /**
- * Accumulates recordings handed off by every recorder-instrumented test in
+ * Accumulates recordings handed off by every recording-instrumented test in
  * the process into one combined report — "run the suite, get one browsable
  * report of it running and turning green" (issue #102).
  *
@@ -47,10 +46,9 @@ final class SuiteReport
 
     /**
      * Render every accumulated recording into one report. Never throws —
-     * {@see ReportRenderer::render()} already degrades to null on failure,
-     * matching how a single test's {@see Recorder}
-     * degrades (#102, Decision 3), since there is no PHPUnit test left to
-     * report through by the time this runs.
+     * {@see ReportRenderer::render()} already degrades to null on failure
+     * (#102, Decision 3), since there is no PHPUnit test left to report
+     * through by the time this runs.
      *
      * Stays silent on STDOUT/STDERR — it's exercised directly by unit tests,
      * and Infection's initial test run aborts the whole suite the moment it

@@ -11,17 +11,15 @@ use Vusys\Tetryon\Core\Diagnostics\FailureReport;
 use Vusys\Tetryon\Core\Support\ImageEncoder;
 use Vusys\Tetryon\Core\Support\Slug;
 use Vusys\Tetryon\PHPUnit\FailureArtifacts;
-use Vusys\Tetryon\PHPUnit\Recorder;
 use Vusys\Tetryon\PHPUnit\Report\Exception\ReportException;
 
 /**
  * Renders a list of {@see TestRecording}s into a browsable HTML report: one
  * `index.html`, a `screenshots/` directory of WebP/PNG frames, and — for
  * failing tests — a `diagnostics/` directory of the same files
- * {@see FailureArtifacts} writes on failure. Used for both a single test's
- * own report ({@see Recorder::render()}, one
- * recording) and the combined whole-suite report ({@see SuiteReport::render()},
- * many).
+ * {@see FailureArtifacts} writes on failure. Used for the combined
+ * whole-suite report ({@see SuiteReport::render()}, many recordings), though
+ * nothing stops a caller from rendering a single recording on its own.
  *
  * Never throws — a bad output path or an unreadable screenshot is reported
  * through a null return, matching the rest of this feature's "recording must

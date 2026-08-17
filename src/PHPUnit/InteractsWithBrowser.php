@@ -6,6 +6,7 @@ namespace Vusys\Tetryon\PHPUnit;
 
 use PHPUnit\Framework\Attributes\After;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Logging\TestDox\NamePrettifier;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Vusys\Tetryon\Core\Config\Configuration;
@@ -15,6 +16,7 @@ use Vusys\Tetryon\Firefox\Exception\FirefoxException;
 use Vusys\Tetryon\Firefox\FirefoxBiDiDriver;
 use Vusys\Tetryon\Firefox\LaunchOptions;
 use Vusys\Tetryon\PHPUnit\Report\SuiteReport;
+use Vusys\Tetryon\PHPUnit\Report\TestRecording;
 
 /**
  * Gives any PHPUnit test a fluent {@see Browser} via `$this->browser()`, and
@@ -35,8 +37,6 @@ trait InteractsWithBrowser
 
     private ?Configuration $tetryonConfiguration = null;
 
-    private ?Recorder $tetryonRecorder = null;
-
     protected function browser(): Browser
     {
         if ($this->tetryonBrowser instanceof Browser) {
@@ -56,22 +56,6 @@ trait InteractsWithBrowser
     protected function scenario(): Scenario
     {
         return new Scenario($this->browser());
-    }
-
-    /**
-     * A {@see Recorder} for this test, titled and scoped to $totalSteps
-     * note()/type()/step()/assert() calls. Its closing pass/fail moment is
-     * appended automatically after the test runs, and its recording is
-     * handed off to {@see SuiteReport} — so every recorder-instrumented test
-     * contributes to one combined report of the whole run, gated behind
-     * `TETRYON_SUITE_REPORT` (issue #102).
-     */
-    protected function recorder(string $title, int $totalSteps): Recorder
-    {
-        $driver = $this->driver();
-        $configuration = $this->tetryonConfiguration ?? $this->browserConfiguration();
-
-        return $this->tetryonRecorder = new Recorder($driver, $configuration, static::class.'::'.$this->name(), $title, $totalSteps);
     }
 
     /**
@@ -114,10 +98,13 @@ trait InteractsWithBrowser
 
         $bag = ($driver instanceof FirefoxBiDiDriver && $failed) ? FailureArtifacts::captureBag($driver) : null;
 
-        if ($this->tetryonRecorder instanceof Recorder) {
-            $recorder = $this->tetryonRecorder->result(! $failed, $bag);
-            SuiteReport::append($recorder->recording());
-            $this->tetryonRecorder = null;
+        $browser = $this->tetryonBrowser;
+        if ($browser instanceof Browser) {
+            $fallbackTitle = new NamePrettifier()->prettifyTestCase($this, false);
+            $recording = $browser->finishedRecording(static::class.'::'.$this->name(), ! $failed, $bag, $fallbackTitle);
+            if ($recording instanceof TestRecording) {
+                SuiteReport::append($recording);
+            }
         }
 
         if ($driver instanceof FirefoxBiDiDriver && $configuration instanceof Configuration && $bag instanceof ArtifactBag) {
