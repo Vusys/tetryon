@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Vusys\Tetryon\Tests\Browser;
 
 use Override;
+use PHPUnit\Framework\ExpectationFailedException;
 use PHPUnit\Framework\TestCase;
 use Vusys\Tetryon\Core\Config\Configuration;
 use Vusys\Tetryon\Core\Config\Timeouts;
@@ -14,13 +15,15 @@ use Vusys\Tetryon\Firefox\FirefoxBiDiDriver;
 use Vusys\Tetryon\Firefox\FirefoxBinary;
 use Vusys\Tetryon\Firefox\LaunchOptions;
 use Vusys\Tetryon\PHPUnit\Browser;
+use Vusys\Tetryon\PHPUnit\Report\Moment;
 use Vusys\Tetryon\PHPUnit\Report\ReportRenderer;
 use Vusys\Tetryon\Tests\Support\StaticSiteServer;
 
 /**
- * Verifies a failing gesture's selector trace makes it into the recording's
- * report — driven against a real Firefox, since {@see FirefoxBiDiDriver} is
- * final and cannot be doubled.
+ * Verifies a failing gesture or assertion captures a diagnostic moment (with
+ * the selector trace, when available) in the recording's report — driven
+ * against a real Firefox, since {@see FirefoxBiDiDriver} is final and cannot
+ * be doubled.
  */
 final class BrowserRecordingTest extends TestCase
 {
@@ -86,6 +89,48 @@ final class BrowserRecordingTest extends TestCase
             ?? self::fail('Expected the report to render.');
         $html = (string) file_get_contents($indexPath);
         self::assertStringContainsString('"target":"Does not exist"', $html);
+    }
+
+    public function test_a_failing_assertion_captures_its_own_moment_and_rethrows(): void
+    {
+        $server = $this->server ?? self::fail('Static-site server did not start.');
+
+        $this->driver = new FirefoxBiDiDriver(new LaunchOptions(headless: true));
+        $this->driver->start();
+        $this->driver->navigate($server->baseUrl.'/index.html');
+
+        $configuration = new Configuration(
+            baseUrl: $server->baseUrl,
+            timeouts: new Timeouts(default: 200, navigation: 5000, assertion: 200),
+        );
+        $browser = new Browser($this->driver, $configuration)->recording('A failing assertion');
+
+        try {
+            $browser->beat('Look for text that is not on the page')
+                ->assertSee('This text does not appear anywhere on the page');
+            self::fail('Expected an ExpectationFailedException.');
+        } catch (ExpectationFailedException) {
+            // expected — the recording must still see this and rethrow it.
+        }
+
+        $recording = $browser->finishedRecording('BrowserRecordingTest::test_a_failing_assertion', false, null, 'A failing assertion')
+            ?? self::fail('Expected a recording.');
+
+        self::assertFalse($recording->passed);
+
+        $failureMoment = null;
+        foreach ($recording->moments as $moment) {
+            if ($moment->outcome === 'failed' && str_starts_with($moment->caption, 'assertSee(')) {
+                $failureMoment = $moment;
+            }
+        }
+
+        self::assertInstanceOf(Moment::class, $failureMoment, 'Expected a failure moment captioned with the assertion itself.');
+        self::assertSame(
+            'assertSee("This text does not appear anywhere on the page")',
+            $failureMoment->caption,
+        );
+        self::assertNull($failureMoment->selectorFailure);
     }
 
     private static function deleteTree(string $path): void

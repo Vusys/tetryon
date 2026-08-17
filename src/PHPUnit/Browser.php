@@ -256,6 +256,28 @@ final readonly class Browser
     }
 
     /**
+     * Run a PHPUnit assertion, capturing its outcome into the recording
+     * either way: a failure moment captioned with $description if it throws
+     * (rethrown afterwards), or a self-captioned proof moment if it passes.
+     * Every assertX() method funnels through this so a failure is never the
+     * one moment the report has nothing to show for.
+     *
+     * @param  callable(): mixed  $assert
+     */
+    private function verifyAssertion(callable $assert, string $description): void
+    {
+        try {
+            $assert();
+        } catch (Throwable $e) {
+            $this->recording->captureFailure($e, $description);
+
+            throw $e;
+        }
+
+        $this->logAssertion($description);
+    }
+
+    /**
      * This test's finished recording — the closing pass/fail moment
      * appended, ready to hand off to
      * {@see SuiteReport}. Null when
@@ -697,12 +719,14 @@ final readonly class Browser
     public function assertDialogMessage(string $expected): self
     {
         $this->retry(fn (): bool => str_contains($this->dialogMessage() ?? '', $expected));
-        Assert::assertStringContainsString(
-            $expected,
-            $this->dialogMessage() ?? '',
-            'The last dialog did not say what was expected.',
+        $this->verifyAssertion(
+            fn () => Assert::assertStringContainsString(
+                $expected,
+                $this->dialogMessage() ?? '',
+                'The last dialog did not say what was expected.',
+            ),
+            "assertDialogMessage(\"{$expected}\")",
         );
-        $this->logAssertion("assertDialogMessage(\"{$expected}\")");
 
         return $this;
     }
@@ -892,8 +916,10 @@ final readonly class Browser
     public function assertSee(string $text): self
     {
         $this->retry(fn (): bool => str_contains($this->visibleText(), $text));
-        Assert::assertStringContainsString($text, $this->visibleText(), "Expected to see \"{$text}\" on the page.");
-        $this->logAssertion("assertSee(\"{$text}\")");
+        $this->verifyAssertion(
+            fn () => Assert::assertStringContainsString($text, $this->visibleText(), "Expected to see \"{$text}\" on the page."),
+            "assertSee(\"{$text}\")",
+        );
 
         return $this;
     }
@@ -901,8 +927,10 @@ final readonly class Browser
     public function assertDontSee(string $text): self
     {
         $this->retry(fn (): bool => ! str_contains($this->visibleText(), $text));
-        Assert::assertStringNotContainsString($text, $this->visibleText(), "Did not expect to see \"{$text}\" on the page.");
-        $this->logAssertion("assertDontSee(\"{$text}\")");
+        $this->verifyAssertion(
+            fn () => Assert::assertStringNotContainsString($text, $this->visibleText(), "Did not expect to see \"{$text}\" on the page."),
+            "assertDontSee(\"{$text}\")",
+        );
 
         return $this;
     }
@@ -911,8 +939,10 @@ final readonly class Browser
     {
         $expected = $this->configuration->resolveUrl($url);
         $this->retry(fn (): bool => $this->currentUrl() === $expected);
-        Assert::assertSame($expected, $this->currentUrl());
-        $this->logAssertion("assertUrlIs(\"{$url}\")");
+        $this->verifyAssertion(
+            fn () => Assert::assertSame($expected, $this->currentUrl()),
+            "assertUrlIs(\"{$url}\")",
+        );
 
         return $this;
     }
@@ -920,8 +950,10 @@ final readonly class Browser
     public function assertPathIs(string $path): self
     {
         $this->retry(fn (): bool => $this->currentPath() === $path);
-        Assert::assertSame($path, $this->currentPath());
-        $this->logAssertion("assertPathIs(\"{$path}\")");
+        $this->verifyAssertion(
+            fn () => Assert::assertSame($path, $this->currentPath()),
+            "assertPathIs(\"{$path}\")",
+        );
 
         return $this;
     }
@@ -929,8 +961,10 @@ final readonly class Browser
     public function assertTitleIs(string $title): self
     {
         $this->retry(fn (): bool => $this->title() === $title);
-        Assert::assertSame($title, $this->title());
-        $this->logAssertion("assertTitleIs(\"{$title}\")");
+        $this->verifyAssertion(
+            fn () => Assert::assertSame($title, $this->title()),
+            "assertTitleIs(\"{$title}\")",
+        );
 
         return $this;
     }
@@ -938,8 +972,10 @@ final readonly class Browser
     public function assertValue(string $field, string $expected): self
     {
         $this->retry(fn (): bool => $this->value($field) === $expected);
-        Assert::assertSame($expected, $this->value($field), "Field \"{$field}\" had an unexpected value.");
-        $this->logAssertion("assertValue(\"{$field}\", \"{$expected}\")");
+        $this->verifyAssertion(
+            fn () => Assert::assertSame($expected, $this->value($field), "Field \"{$field}\" had an unexpected value."),
+            "assertValue(\"{$field}\", \"{$expected}\")",
+        );
 
         return $this;
     }
@@ -947,8 +983,10 @@ final readonly class Browser
     public function assertVisible(string $target): self
     {
         $this->retry(fn (): bool => $this->isVisibleNow($target));
-        Assert::assertTrue($this->isVisibleNow($target), "Expected \"{$target}\" to be visible.");
-        $this->logAssertion("assertVisible(\"{$target}\")");
+        $this->verifyAssertion(
+            fn () => Assert::assertTrue($this->isVisibleNow($target), "Expected \"{$target}\" to be visible."),
+            "assertVisible(\"{$target}\")",
+        );
 
         return $this;
     }
@@ -956,8 +994,10 @@ final readonly class Browser
     public function assertMissing(string $target): self
     {
         $this->retry(fn (): bool => ! $this->isVisibleNow($target));
-        Assert::assertFalse($this->isVisibleNow($target), "Expected \"{$target}\" to be missing or hidden.");
-        $this->logAssertion("assertMissing(\"{$target}\")");
+        $this->verifyAssertion(
+            fn () => Assert::assertFalse($this->isVisibleNow($target), "Expected \"{$target}\" to be missing or hidden."),
+            "assertMissing(\"{$target}\")",
+        );
 
         return $this;
     }
@@ -966,11 +1006,13 @@ final readonly class Browser
     {
         $script = $this->textNearScript($near, $text);
         $this->retry(fn (): bool => $this->driver->evaluateScript($script) === true);
-        Assert::assertTrue(
-            $this->driver->evaluateScript($script) === true,
-            "Expected to see \"{$text}\" near \"{$near}\".",
+        $this->verifyAssertion(
+            fn () => Assert::assertTrue(
+                $this->driver->evaluateScript($script) === true,
+                "Expected to see \"{$text}\" near \"{$near}\".",
+            ),
+            "assertTextNear(\"{$near}\", \"{$text}\")",
         );
-        $this->logAssertion("assertTextNear(\"{$near}\", \"{$text}\")");
 
         return $this;
     }
@@ -980,8 +1022,10 @@ final readonly class Browser
     public function assertChecked(string $target): self
     {
         $this->retry(fn (): bool => $this->isChecked($target));
-        Assert::assertTrue($this->isChecked($target), "Expected \"{$target}\" to be checked.");
-        $this->logAssertion("assertChecked(\"{$target}\")");
+        $this->verifyAssertion(
+            fn () => Assert::assertTrue($this->isChecked($target), "Expected \"{$target}\" to be checked."),
+            "assertChecked(\"{$target}\")",
+        );
 
         return $this;
     }
@@ -989,8 +1033,10 @@ final readonly class Browser
     public function assertNotChecked(string $target): self
     {
         $this->retry(fn (): bool => ! $this->isChecked($target));
-        Assert::assertFalse($this->isChecked($target), "Expected \"{$target}\" not to be checked.");
-        $this->logAssertion("assertNotChecked(\"{$target}\")");
+        $this->verifyAssertion(
+            fn () => Assert::assertFalse($this->isChecked($target), "Expected \"{$target}\" not to be checked."),
+            "assertNotChecked(\"{$target}\")",
+        );
 
         return $this;
     }
@@ -998,8 +1044,10 @@ final readonly class Browser
     public function assertFocused(string $target): self
     {
         $this->retry(fn (): bool => $this->isFocused($target));
-        Assert::assertTrue($this->isFocused($target), "Expected \"{$target}\" to be focused.");
-        $this->logAssertion("assertFocused(\"{$target}\")");
+        $this->verifyAssertion(
+            fn () => Assert::assertTrue($this->isFocused($target), "Expected \"{$target}\" to be focused."),
+            "assertFocused(\"{$target}\")",
+        );
 
         return $this;
     }
@@ -1007,8 +1055,10 @@ final readonly class Browser
     public function assertNotFocused(string $target): self
     {
         $this->retry(fn (): bool => ! $this->isFocused($target));
-        Assert::assertFalse($this->isFocused($target), "Expected \"{$target}\" not to be focused.");
-        $this->logAssertion("assertNotFocused(\"{$target}\")");
+        $this->verifyAssertion(
+            fn () => Assert::assertFalse($this->isFocused($target), "Expected \"{$target}\" not to be focused."),
+            "assertNotFocused(\"{$target}\")",
+        );
 
         return $this;
     }
@@ -1026,8 +1076,10 @@ final readonly class Browser
     public function assertSelected(string $field, string $value): self
     {
         $this->retry(fn (): bool => $this->selected($field) === $value);
-        Assert::assertSame($value, $this->selected($field), "Expected \"{$field}\" to have \"{$value}\" selected.");
-        $this->logAssertion("assertSelected(\"{$field}\", \"{$value}\")");
+        $this->verifyAssertion(
+            fn () => Assert::assertSame($value, $this->selected($field), "Expected \"{$field}\" to have \"{$value}\" selected."),
+            "assertSelected(\"{$field}\", \"{$value}\")",
+        );
 
         return $this;
     }
@@ -1035,8 +1087,10 @@ final readonly class Browser
     public function assertNotSelected(string $field, string $value): self
     {
         $this->retry(fn (): bool => $this->selected($field) !== $value);
-        Assert::assertNotSame($value, $this->selected($field), "Expected \"{$field}\" not to have \"{$value}\" selected.");
-        $this->logAssertion("assertNotSelected(\"{$field}\", \"{$value}\")");
+        $this->verifyAssertion(
+            fn () => Assert::assertNotSame($value, $this->selected($field), "Expected \"{$field}\" not to have \"{$value}\" selected."),
+            "assertNotSelected(\"{$field}\", \"{$value}\")",
+        );
 
         return $this;
     }
@@ -1044,8 +1098,10 @@ final readonly class Browser
     public function assertEnabled(string $target): self
     {
         $this->retry(fn (): bool => ! $this->isDisabled($target));
-        Assert::assertFalse($this->isDisabled($target), "Expected \"{$target}\" to be enabled.");
-        $this->logAssertion("assertEnabled(\"{$target}\")");
+        $this->verifyAssertion(
+            fn () => Assert::assertFalse($this->isDisabled($target), "Expected \"{$target}\" to be enabled."),
+            "assertEnabled(\"{$target}\")",
+        );
 
         return $this;
     }
@@ -1053,8 +1109,10 @@ final readonly class Browser
     public function assertDisabled(string $target): self
     {
         $this->retry(fn (): bool => $this->isDisabled($target));
-        Assert::assertTrue($this->isDisabled($target), "Expected \"{$target}\" to be disabled.");
-        $this->logAssertion("assertDisabled(\"{$target}\")");
+        $this->verifyAssertion(
+            fn () => Assert::assertTrue($this->isDisabled($target), "Expected \"{$target}\" to be disabled."),
+            "assertDisabled(\"{$target}\")",
+        );
 
         return $this;
     }
@@ -1062,8 +1120,10 @@ final readonly class Browser
     public function assertAttribute(string $target, string $name, string $expected): self
     {
         $this->retry(fn (): bool => $this->attribute($target, $name) === $expected);
-        Assert::assertSame($expected, $this->attribute($target, $name), "Attribute \"{$name}\" of \"{$target}\" had an unexpected value.");
-        $this->logAssertion("assertAttribute(\"{$target}\", \"{$name}\", \"{$expected}\")");
+        $this->verifyAssertion(
+            fn () => Assert::assertSame($expected, $this->attribute($target, $name), "Attribute \"{$name}\" of \"{$target}\" had an unexpected value."),
+            "assertAttribute(\"{$target}\", \"{$name}\", \"{$expected}\")",
+        );
 
         return $this;
     }
@@ -1071,12 +1131,14 @@ final readonly class Browser
     public function assertAttributeContains(string $target, string $name, string $needle): self
     {
         $this->retry(fn (): bool => str_contains($this->attribute($target, $name) ?? '', $needle));
-        Assert::assertStringContainsString(
-            $needle,
-            $this->attribute($target, $name) ?? '',
-            "Attribute \"{$name}\" of \"{$target}\" did not contain \"{$needle}\".",
+        $this->verifyAssertion(
+            fn () => Assert::assertStringContainsString(
+                $needle,
+                $this->attribute($target, $name) ?? '',
+                "Attribute \"{$name}\" of \"{$target}\" did not contain \"{$needle}\".",
+            ),
+            "assertAttributeContains(\"{$target}\", \"{$name}\", \"{$needle}\")",
         );
-        $this->logAssertion("assertAttributeContains(\"{$target}\", \"{$name}\", \"{$needle}\")");
 
         return $this;
     }
@@ -1091,11 +1153,13 @@ final readonly class Browser
     public function assertExpression(string $expression, string $message = ''): self
     {
         $this->retry(fn (): bool => (bool) $this->evaluate($expression));
-        Assert::assertTrue(
-            (bool) $this->evaluate($expression),
-            $message !== '' ? $message : "Expected this expression to be truthy: {$expression}",
+        $this->verifyAssertion(
+            fn () => Assert::assertTrue(
+                (bool) $this->evaluate($expression),
+                $message !== '' ? $message : "Expected this expression to be truthy: {$expression}",
+            ),
+            "assertExpression(\"{$expression}\")",
         );
-        $this->logAssertion("assertExpression(\"{$expression}\")");
 
         return $this;
     }
@@ -1107,12 +1171,14 @@ final readonly class Browser
     public function assertExpressionEquals(string $expression, mixed $expected, string $message = ''): self
     {
         $this->retry(fn (): bool => $this->evaluate($expression) == $expected);
-        Assert::assertEquals(
-            $expected,
-            $this->evaluate($expression),
-            $message !== '' ? $message : "Expression did not equal the expected value: {$expression}",
+        $this->verifyAssertion(
+            fn () => Assert::assertEquals(
+                $expected,
+                $this->evaluate($expression),
+                $message !== '' ? $message : "Expression did not equal the expected value: {$expression}",
+            ),
+            "assertExpressionEquals(\"{$expression}\", ".$this->describeValue($expected).')',
         );
-        $this->logAssertion("assertExpressionEquals(\"{$expression}\", ".$this->describeValue($expected).')');
 
         return $this;
     }
@@ -1148,19 +1214,23 @@ final readonly class Browser
     public function assertRequested(string $pattern): self
     {
         $this->retry(fn (): bool => $this->matchingRequests($pattern) !== []);
-        Assert::assertNotEmpty($this->matchingRequests($pattern), "Expected a request matching \"{$pattern}\".");
-        $this->logAssertion("assertRequested(\"{$pattern}\")");
+        $this->verifyAssertion(
+            fn () => Assert::assertNotEmpty($this->matchingRequests($pattern), "Expected a request matching \"{$pattern}\"."),
+            "assertRequested(\"{$pattern}\")",
+        );
 
         return $this;
     }
 
     public function assertNotRequested(string $pattern): self
     {
-        Assert::assertEmpty(
-            $this->matchingRequests($pattern),
-            "Did not expect a request matching \"{$pattern}\".",
+        $this->verifyAssertion(
+            fn () => Assert::assertEmpty(
+                $this->matchingRequests($pattern),
+                "Did not expect a request matching \"{$pattern}\".",
+            ),
+            "assertNotRequested(\"{$pattern}\")",
         );
-        $this->logAssertion("assertNotRequested(\"{$pattern}\")");
 
         return $this;
     }

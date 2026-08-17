@@ -93,13 +93,16 @@ final class RecordingSession
     }
 
     /**
-     * Captures the moment a gesture failed to resolve or reach its target —
-     * guarded, since a driver that just threw may be in a bad state. Carries
-     * the selector-resolution trace when the failure was an
+     * Captures the moment a gesture or assertion failed — guarded, since a
+     * driver that just threw may be in a bad state. Carries the
+     * selector-resolution trace when the failure was an
      * {@see ElementNotFoundException}, since that's only available here, not
-     * at teardown time.
+     * at teardown time. $caption defaults to the current beat's label
+     * (a gesture failure); pass the assertion's own description (e.g.
+     * `assertSee("...")`) for an assertion failure, so the report names what
+     * actually failed instead of falling back to the beat's label.
      */
-    public function captureFailure(Throwable $exception): void
+    public function captureFailure(Throwable $exception, ?string $caption = null): void
     {
         if (! $this->active) {
             return;
@@ -113,7 +116,7 @@ final class RecordingSession
 
         $this->moments[] = new Moment(
             screenshotPng: $screenshot,
-            caption: $this->currentLabel ?? 'Failed',
+            caption: $caption ?? $this->currentLabel ?? 'Failed',
             stepIndex: $this->beatIndex,
             progress: max(0, $this->beatIndex - 1),
             durationMs: 0,
