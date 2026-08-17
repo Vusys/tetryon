@@ -45,6 +45,19 @@ Assertions don't have this problem, because they retry: an `assertVisible(...)` 
 
 Without it, the beat photography itself contributes nothing beyond luck — whether an "after" moment happens to land on a settled frame depends entirely on what the test does next, not on anything the recording feature guarantees.
 
+**The retried condition has to be visual, not just a passing wait.** `waitForExpression()` (or an assertion built on the same DOM value) genuinely resolving does not mean the frame is settled — plenty of real UI code sets its state *before* it animates into view, not after. A Bootstrap modal is a common case: its JS often populates the modal's fields on `show.bs.modal`, which fires synchronously the instant `.show()` is called, before the `.modal.fade` CSS transition has even started. A wait built on that field's value passes at essentially t=0 of a transition that takes another 150–300ms to become visible, so the beat's "after" moment still photographs nothing:
+
+```php
+// Passes, but doesn't settle the frame — the field is populated
+// before the modal has visibly appeared, not after:
+->beat('Open the edit-row modal')
+    ->click('@edit-row')
+    ->waitForExpression('document.querySelector(\'[data-edit-row-field="name"]\')?.value === "Ada"')
+->beat('Overwrite the name and submit')
+```
+
+Use a condition that samples what the page actually looks like — `assertVisible()`, a geometry or visibility check — not one that only samples application state a script may set ahead of the animation.
+
 ### A non-browser wait between two beats
 
 `beat()` takes an optional second argument for a wait that isn't a gesture on this browser — a database poll after an optimistic UI save, say — so it can sit between two beats without breaking the chain:
