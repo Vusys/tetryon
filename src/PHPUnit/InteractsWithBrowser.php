@@ -6,13 +6,17 @@ namespace Vusys\Tetryon\PHPUnit;
 
 use PHPUnit\Framework\Attributes\After;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Logging\TestDox\NamePrettifier;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Vusys\Tetryon\Core\Config\Configuration;
+use Vusys\Tetryon\Core\Diagnostics\ArtifactBag;
 use Vusys\Tetryon\Core\Support\StreamLogger;
 use Vusys\Tetryon\Firefox\Exception\FirefoxException;
 use Vusys\Tetryon\Firefox\FirefoxBiDiDriver;
 use Vusys\Tetryon\Firefox\LaunchOptions;
+use Vusys\Tetryon\PHPUnit\Report\SuiteReport;
+use Vusys\Tetryon\PHPUnit\Report\TestRecording;
 
 /**
  * Gives any PHPUnit test a fluent {@see Browser} via `$this->browser()`, and
@@ -90,10 +94,22 @@ trait InteractsWithBrowser
     {
         $driver = $this->tetryonDriver;
         $configuration = $this->tetryonConfiguration;
+        $failed = $this->browserTestFailed();
 
-        if ($driver instanceof FirefoxBiDiDriver && $configuration instanceof Configuration && $this->browserTestFailed()) {
-            $report = new FailureArtifacts($configuration->artifactsPath)
-                ->capture($driver, $configuration, static::class.'::'.$this->name());
+        $bag = ($driver instanceof FirefoxBiDiDriver && $failed) ? FailureArtifacts::captureBag($driver) : null;
+
+        $browser = $this->tetryonBrowser;
+        if ($browser instanceof Browser) {
+            $fallbackTitle = new NamePrettifier()->prettifyTestCase($this, false);
+            $recording = $browser->finishedRecording(static::class.'::'.$this->name(), ! $failed, $bag, $fallbackTitle);
+            if ($recording instanceof TestRecording) {
+                SuiteReport::append($recording);
+            }
+        }
+
+        if ($driver instanceof FirefoxBiDiDriver && $configuration instanceof Configuration && $bag instanceof ArtifactBag) {
+            $directory = FailureArtifacts::directoryFor($configuration->artifactsPath, static::class.'::'.$this->name());
+            $report = FailureArtifacts::write($bag, $directory, $configuration);
             fwrite(STDERR, $report."\n");
         }
 
