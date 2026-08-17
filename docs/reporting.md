@@ -29,6 +29,22 @@ The closing moment — passed or failed — is appended automatically once the t
 
 If a gesture fails to resolve or reach its target (most commonly an unresolved selector), the recording captures that failure as its own moment — carrying the selector-resolution trace when available — and rethrows. The test still fails normally; the report just shows exactly where and why.
 
+### Beat-boundary screenshots are not synchronized
+
+A beat's "before"/"after" moments are raw screenshots taken the instant `beat()` runs — unlike a gesture (`click()`, `fill()`, …), which auto-waits for its target to be actionable first, a beat boundary waits for nothing. If the gesture that just ran triggered something asynchronous — a Bootstrap modal fading in, a CSS-transitioned panel sliding into place, anything a JS handler kicks off after the click already returned — the "after" moment can land mid-transition, or even before the transition has started at all. Two beats back to back with nothing but a `click()` between them can end up with pixel-identical "before"/"after" frames that show none of the UI the beat is named after.
+
+Assertions don't have this problem, because they retry: an `assertVisible(...)` or `assertSee(...)` placed after the gesture and before the next `beat()` call only captures its proof moment once its own condition holds, so it's always a settled frame. That's the workaround today — if a beat's "after" shot needs to be trustworthy (the modal genuinely visible, the panel genuinely in place), follow the gesture with a retrying assertion before calling `beat()` again:
+
+```php
+->beat('Open the delete confirmation')
+    ->click('[data-delete-url]')
+    ->assertVisible('.modal.show')     // settles the frame before the next beat closes it
+->beat('Confirm deletion')
+    ->click('@confirm-delete')
+```
+
+Without it, the beat photography itself contributes nothing beyond luck — whether an "after" moment happens to land on a settled frame depends entirely on what the test does next, not on anything the recording feature guarantees.
+
 ### A non-browser wait between two beats
 
 `beat()` takes an optional second argument for a wait that isn't a gesture on this browser — a database poll after an optimistic UI save, say — so it can sit between two beats without breaking the chain:
