@@ -35,6 +35,8 @@ final class RecordingSession
 
     private ?float $beatStartedAt = null;
 
+    private bool $currentBeatFailed = false;
+
     /** @var list<Moment> */
     private array $moments = [];
 
@@ -67,6 +69,7 @@ final class RecordingSession
         }
 
         $this->closeCurrentBeat();
+        $this->currentBeatFailed = false;
 
         if ($between !== null) {
             $between();
@@ -101,6 +104,10 @@ final class RecordingSession
      * (a gesture failure); pass the assertion's own description (e.g.
      * `assertSee("...")`) for an assertion failure, so the report names what
      * actually failed instead of falling back to the beat's label.
+     *
+     * Marks the current beat as already-failed, so {@see closeCurrentBeat()}
+     * doesn't also append a neutral "after" moment for it — this failure
+     * moment is that beat's closing evidence.
      */
     public function captureFailure(Throwable $exception, ?string $caption = null): void
     {
@@ -113,6 +120,8 @@ final class RecordingSession
         } catch (Throwable) {
             return;
         }
+
+        $this->currentBeatFailed = true;
 
         $this->moments[] = new Moment(
             screenshotPng: $screenshot,
@@ -157,8 +166,11 @@ final class RecordingSession
             return;
         }
 
-        $durationMs = (int) round((microtime(true) - ($this->beatStartedAt ?? microtime(true))) * 1000);
-        $this->capture(sprintf('%s · %dms', $this->currentLabel, $durationMs), $this->beatIndex, $this->beatIndex, $durationMs);
+        if (! $this->currentBeatFailed) {
+            $durationMs = (int) round((microtime(true) - ($this->beatStartedAt ?? microtime(true))) * 1000);
+            $this->capture(sprintf('%s · %dms', $this->currentLabel, $durationMs), $this->beatIndex, $this->beatIndex, $durationMs);
+        }
+
         $this->currentLabel = null;
     }
 
