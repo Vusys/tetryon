@@ -61,7 +61,7 @@ final class BrowserRecordingTest extends TestCase
             ->recording('A failing step');
 
         try {
-            $browser->beat('Click "Does not exist"')->click('Does not exist');
+            $browser->beat('Click "Does not exist"', fn (Browser $b): Browser => $b->click('Does not exist'));
             self::fail('Expected an ElementNotFoundException.');
         } catch (ElementNotFoundException) {
             // expected — the recording must still see this and rethrow it.
@@ -98,8 +98,10 @@ final class BrowserRecordingTest extends TestCase
             ->recording('A failing assertion');
 
         try {
-            $browser->beat('Look for text that is not on the page')
-                ->assertSee('This text does not appear anywhere on the page');
+            $browser->beat(
+                'Look for text that is not on the page',
+                fn (Browser $b): Browser => $b->assertSee('This text does not appear anywhere on the page'),
+            );
             self::fail('Expected an ExpectationFailedException.');
         } catch (ExpectationFailedException) {
             // expected — the recording must still see this and rethrow it.
@@ -124,6 +126,22 @@ final class BrowserRecordingTest extends TestCase
         $closingMoment = $recording->moments[2];
         self::assertSame('Failed', $closingMoment->caption);
         self::assertSame('failed', $closingMoment->outcome);
+    }
+
+    public function test_a_beat_runs_its_gesture_even_when_recording_was_never_turned_on(): void
+    {
+        $configuration = $this->startBrowser();
+        $browser = new Browser($this->driver ?? self::fail('Driver did not start.'), $configuration);
+
+        // No ->recording() call at all — beat() must still run its body;
+        // recording only ever changes whether the gesture is photographed,
+        // never whether it happens.
+        $browser->beat('Follow the link', fn (Browser $b): Browser => $b->click('Next page'))
+            ->assertSee('The second page');
+
+        self::assertNull(
+            $browser->finishedRecording('BrowserRecordingTest::test_a_beat_runs_without_recording', true, null, 'unused'),
+        );
     }
 
     private function startBrowser(): Configuration

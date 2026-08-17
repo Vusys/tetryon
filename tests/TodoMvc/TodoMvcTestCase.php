@@ -111,9 +111,9 @@ abstract class TodoMvcTestCase extends BrowserTestCase
      */
     protected function recordNewTodo(Browser $browser, string $text): Browser
     {
-        return $browser->beat("Add \"{$text}\"")
+        return $browser->beat("Add \"{$text}\"", fn (Browser $b): Browser => $b
             ->fill('What needs to be done?', $text)
-            ->pressKey('Enter');
+            ->pressKey('Enter'));
     }
 
     /**
@@ -122,7 +122,7 @@ abstract class TodoMvcTestCase extends BrowserTestCase
      */
     private function recordDoubleClickToEdit(Browser $browser, string $text): Browser
     {
-        return $browser->beat("Double-click \"{$text}\"")->doubleClick($text);
+        return $browser->beat("Double-click \"{$text}\"", fn (Browser $b): Browser => $b->doubleClick($text));
     }
 
     /**
@@ -183,7 +183,7 @@ abstract class TodoMvcTestCase extends BrowserTestCase
         $this->recordNewTodo($browser, 'Buy milk');
         $this->recordNewTodo($browser, 'Walk the dog');
 
-        $browser->beat('Check "Buy milk"')->check('Buy milk')
+        $browser->beat('Check "Buy milk"', fn (Browser $b): Browser => $b->check('Buy milk'))
             ->assertSee('1 item left')
             ->assertExpression($this->pierce('li').".some(li => li.classList.contains('completed') && li.textContent.includes('Buy milk'))");
     }
@@ -201,10 +201,10 @@ abstract class TodoMvcTestCase extends BrowserTestCase
         $this->recordNewTodo($browser, 'Buy milk');
         $this->recordNewTodo($browser, 'Walk the dog');
 
-        $browser->beat('Check "toggle all"')->check($toggleAll)
+        $browser->beat('Check "toggle all"', fn (Browser $b): Browser => $b->check($toggleAll))
             ->assertSee('0 items left');
 
-        $browser->beat('Uncheck "toggle all"')->uncheck($toggleAll)
+        $browser->beat('Uncheck "toggle all"', fn (Browser $b): Browser => $b->uncheck($toggleAll))
             ->assertSee('2 items left');
     }
 
@@ -225,8 +225,9 @@ abstract class TodoMvcTestCase extends BrowserTestCase
         $this->recordNewTodo($browser, 'Buy milk');
         $this->recordDoubleClickToEdit($browser, 'Buy milk');
 
-        $browser->beat('Edit to "Buy oat milk"')
-            ->fill('.editing .edit', 'Buy oat milk')->pressKey('Enter')
+        $browser->beat('Edit to "Buy oat milk"', fn (Browser $b): Browser => $b
+            ->fill('.editing .edit', 'Buy oat milk')
+            ->pressKey('Enter'))
             ->assertDontSee('Buy milk')
             ->assertSee('Buy oat milk');
     }
@@ -238,9 +239,8 @@ abstract class TodoMvcTestCase extends BrowserTestCase
         $this->recordNewTodo($browser, 'Buy milk');
         $this->recordDoubleClickToEdit($browser, 'Buy milk');
 
-        $browser->beat('Edit to "Discarded change"')
-            ->fill('.editing .edit', 'Discarded change')
-            ->beat('Press Escape')->pressKey('Escape')
+        $browser->beat('Edit to "Discarded change"', fn (Browser $b): Browser => $b->fill('.editing .edit', 'Discarded change'))
+            ->beat('Press Escape', fn (Browser $b): Browser => $b->pressKey('Escape'))
             ->assertSee('Buy milk')
             ->assertDontSee('Discarded change');
     }
@@ -252,8 +252,8 @@ abstract class TodoMvcTestCase extends BrowserTestCase
         $this->recordNewTodo($browser, 'Buy milk');
         $this->recordDoubleClickToEdit($browser, 'Buy milk');
 
-        $browser->beat('Edit to "Buy oat milk"')->fill('.editing .edit', 'Buy oat milk')
-            ->beat('Blur the field')->blur('.editing .edit')
+        $browser->beat('Edit to "Buy oat milk"', fn (Browser $b): Browser => $b->fill('.editing .edit', 'Buy oat milk'))
+            ->beat('Blur the field', fn (Browser $b): Browser => $b->blur('.editing .edit'))
             ->assertSee('Buy oat milk');
     }
 
@@ -264,8 +264,8 @@ abstract class TodoMvcTestCase extends BrowserTestCase
         $this->recordNewTodo($browser, 'Buy milk');
         $this->recordDoubleClickToEdit($browser, 'Buy milk');
 
-        $browser->beat('Clear the field')->fill('.editing .edit', '')
-            ->beat('Press Enter')->pressKey('Enter')
+        $browser->beat('Clear the field', fn (Browser $b): Browser => $b->fill('.editing .edit', ''))
+            ->beat('Press Enter', fn (Browser $b): Browser => $b->pressKey('Enter'))
             ->assertDontSee('Buy milk')
             ->assertMissing('.todo-list li');
     }
@@ -277,10 +277,10 @@ abstract class TodoMvcTestCase extends BrowserTestCase
         $this->recordNewTodo($browser, 'Buy milk');
         $this->recordNewTodo($browser, 'Walk the dog');
 
-        $browser->beat('Hover "Walk the dog"')->hover('Walk the dog')
+        $browser->beat('Hover "Walk the dog"', fn (Browser $b): Browser => $b->hover('Walk the dog'))
             // .destroy carries no accessible text, so the CSS contract is the only
             // handle; only the hovered row's button is clickable, so it wins.
-            ->beat('Click the destroy button')->click('.destroy')
+            ->beat('Click the destroy button', fn (Browser $b): Browser => $b->click('.destroy'))
             ->assertSee('Buy milk')
             ->assertDontSee('Walk the dog');
     }
@@ -292,15 +292,15 @@ abstract class TodoMvcTestCase extends BrowserTestCase
         $this->recordNewTodo($browser, 'Buy milk');
         $this->recordNewTodo($browser, 'Walk the dog');
 
-        $browser->beat('Check "Buy milk"')->check('Buy milk')
-            ->beat('Click "Active"')->click('Active')
+        $browser->beat('Check "Buy milk"', fn (Browser $b): Browser => $b->check('Buy milk'))
+            ->beat('Click "Active"', fn (Browser $b): Browser => $b->click('Active'))
             ->assertSee('Walk the dog')->assertDontSee('Buy milk')
             ->assertExpression($this->pierce('.filters a.selected')."[0]?.textContent.trim() === 'Active'");
 
-        $browser->beat('Click "Completed"')->click('Completed')
+        $browser->beat('Click "Completed"', fn (Browser $b): Browser => $b->click('Completed'))
             ->assertSee('Buy milk')->assertDontSee('Walk the dog');
 
-        $browser->beat('Click "All"')->click('All')
+        $browser->beat('Click "All"', fn (Browser $b): Browser => $b->click('All'))
             ->assertSee('Buy milk')->assertSee('Walk the dog');
     }
 
@@ -311,8 +311,8 @@ abstract class TodoMvcTestCase extends BrowserTestCase
         $this->recordNewTodo($browser, 'Buy milk');
         $this->recordNewTodo($browser, 'Walk the dog');
 
-        $browser->beat('Check "Buy milk"')->check('Buy milk')
-            ->beat('Press "Clear completed"')->press('Clear completed')
+        $browser->beat('Check "Buy milk"', fn (Browser $b): Browser => $b->check('Buy milk'))
+            ->beat('Press "Clear completed"', fn (Browser $b): Browser => $b->press('Clear completed'))
             ->assertDontSee('Buy milk')->assertSee('Walk the dog')
             ->assertMissing('.clear-completed');
     }
@@ -325,10 +325,10 @@ abstract class TodoMvcTestCase extends BrowserTestCase
         $browser = $this->visitApp()->recording('Active filter survives a reload');
 
         $this->recordNewTodo($browser, 'Buy milk');
-        $browser->beat('Click "Completed"')->click('Completed')
+        $browser->beat('Click "Completed"', fn (Browser $b): Browser => $b->click('Completed'))
             ->assertPathIs($this->app()->url().'#/completed');
 
-        $browser->beat('Refresh the page')->refresh()
+        $browser->beat('Refresh the page', fn (Browser $b): Browser => $b->refresh())
             ->assertPathIs($this->app()->url().'#/completed');
     }
 }

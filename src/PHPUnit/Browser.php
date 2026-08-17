@@ -223,28 +223,30 @@ final readonly class Browser
     }
 
     /**
-     * Mark the start of a new labelled beat of the recording — the one verb
-     * that replaces the old note()/step()/type()/assert() split. Everything
-     * chained after a beat (gestures, assertions) belongs to it until the
-     * next beat() call or the test ends; grouping several gestures under one
-     * beat is an editorial choice, not something this counts for you.
+     * Run $body as a labelled beat of the recording — the one verb that
+     * replaces the old note()/step()/type()/assert() split. Captures a
+     * "before" moment, invokes $body with this browser, then captures a
+     * timed "after" moment; grouping several gestures under one beat is an
+     * editorial choice, not something this counts for you. $body always
+     * runs — recording only ever changes whether it's photographed, never
+     * whether it happens.
      *
-     * $between is the escape hatch for a non-browser wait that has to sit
-     * between two beats — a database poll after an optimistic UI save —
-     * without breaking the chain:
+     * The closure is the point: a gesture has to be inside some beat's body
+     * to be captured at all, rather than "belongs to whatever beat is
+     * chained before it" being a rule you hold in your head. It also folds
+     * away the old separate escape hatch for a non-browser wait — that's
+     * just a beat whose body doesn't happen to call a `Browser` method:
      *
      *     $this->browser()->recording()
-     *         ->beat('Answer the question')->click('Yes')
+     *         ->beat('Answer the question', fn ($b) => $b->click('Yes'))
      *         ->beat('Persist', fn () => $this->waitForAnswersPersisted($record, 1))
-     *         ->beat('Submit')->click('Submit');
+     *         ->beat('Submit', fn ($b) => $b->click('Submit'));
      *
-     * A no-op when {@see recording()} was never called.
-     *
-     * @param  (callable(): void)|null  $between
+     * @param  callable(self): mixed  $body
      */
-    public function beat(string $label, ?callable $between = null): self
+    public function beat(string $label, callable $body): self
     {
-        $this->recording->advanceBeat($label, $between);
+        $this->recording->runBeat($label, fn (): mixed => $body($this));
 
         return $this;
     }

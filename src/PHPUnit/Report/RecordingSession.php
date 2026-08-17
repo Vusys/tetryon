@@ -11,17 +11,15 @@ use Vusys\Tetryon\Firefox\FirefoxBiDiDriver;
 use Vusys\Tetryon\PHPUnit\Browser;
 
 /**
- * The recording collaborator every {@see Browser}
- * holds — inert until {@see Browser::recording()}
- * activates it, so a test that never opts in pays no screenshot cost and
- * sees no behaviour change (issue #102).
+ * The recording collaborator every {@see Browser} holds — inert until
+ * {@see Browser::recording()} activates it, so a test that never opts in
+ * pays no screenshot cost and sees no behaviour change (issue #102).
  *
- * Once active, {@see Browser::beat()} is the single
- * marker verb: it closes the previous beat (capturing an "after" moment,
- * timed) and opens the next one (capturing a "before" moment) — replacing
- * the old `note()`/`step()`/`type()` split with chain position alone.
- * Assertions caption themselves via {@see captureAssertion()}, called from
- * every `Browser::assertX()` method — no verb, no label.
+ * Once active, {@see Browser::beat()} is the single marker verb: it
+ * captures a "before" moment, runs its body, then captures a timed "after"
+ * moment — replacing the old `note()`/`step()`/`type()` split with one
+ * container. Assertions caption themselves via {@see captureAssertion()},
+ * called from every `Browser::assertX()` method — no verb, no label.
  */
 final class RecordingSession
 {
@@ -32,10 +30,6 @@ final class RecordingSession
     private int $beatIndex = 0;
 
     private ?string $currentLabel = null;
-
-    private ?float $beatStartedAt = null;
-
-    private bool $currentBeatFailed = false;
 
     /** @var list<Moment> */
     private array $moments = [];
@@ -54,31 +48,34 @@ final class RecordingSession
     }
 
     /**
-     * Close the current beat (if one is open) and open the next, labelled
-     * $label. $between runs after the close and before the open — the
-     * escape hatch for a non-browser wait (a database poll after an
-     * optimistic UI save) that belongs between two beats but isn't a
-     * gesture on this browser.
+     * Run $body as a labelled beat: capture a "before" moment, invoke
+     * $body, then capture a timed "after" moment — unless $body's own
+     * failure already captured one (see {@see captureFailure()}), in which
+     * case the exception it threw is still propagating and this method
+     * never reaches its closing capture at all. $body always runs, active
+     * or not — recording only ever changes whether the beat is
+     * photographed, never whether it happens.
      *
-     * @param  (callable(): void)|null  $between
+     * @param  callable(): mixed  $body
      */
-    public function advanceBeat(string $label, ?callable $between = null): void
+    public function runBeat(string $label, callable $body): void
     {
         if (! $this->active) {
+            $body();
+
             return;
-        }
-
-        $this->closeCurrentBeat();
-        $this->currentBeatFailed = false;
-
-        if ($between !== null) {
-            $between();
         }
 
         $this->beatIndex++;
         $this->currentLabel = $label;
-        $this->beatStartedAt = microtime(true);
+        $startedAt = microtime(true);
         $this->capture($label, $this->beatIndex, $this->beatIndex - 1, 0);
+
+        $body();
+
+        $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
+        $this->capture(sprintf('%s · %dms', $label, $durationMs), $this->beatIndex, $this->beatIndex, $durationMs);
+        $this->currentLabel = null;
     }
 
     /**
@@ -105,9 +102,10 @@ final class RecordingSession
      * `assertSee("...")`) for an assertion failure, so the report names what
      * actually failed instead of falling back to the beat's label.
      *
-     * Marks the current beat as already-failed, so {@see closeCurrentBeat()}
-     * doesn't also append a neutral "after" moment for it — this failure
-     * moment is that beat's closing evidence.
+     * The exception this is called for is always rethrown by the caller
+     * afterwards, which is what stops {@see runBeat()} from also appending
+     * a neutral "after" moment for the same beat — this failure moment is
+     * that beat's closing evidence.
      */
     public function captureFailure(Throwable $exception, ?string $caption = null): void
     {
@@ -121,8 +119,6 @@ final class RecordingSession
             return;
         }
 
-        $this->currentBeatFailed = true;
-
         $this->moments[] = new Moment(
             screenshotPng: $screenshot,
             caption: $caption ?? $this->currentLabel ?? 'Failed',
@@ -135,14 +131,12 @@ final class RecordingSession
     }
 
     /**
-     * Close any open beat, append the closing pass/fail moment, and return
-     * this test's recording. $fallbackTitle is used only when
-     * {@see Browser::recording()} was called without
-     * an explicit title.
+     * Append the closing pass/fail moment and return this test's recording.
+     * $fallbackTitle is used only when {@see Browser::recording()} was
+     * called without an explicit title.
      */
     public function finish(string $testId, bool $passed, ?ArtifactBag $diagnostics, string $fallbackTitle): TestRecording
     {
-        $this->closeCurrentBeat();
         $this->capture(
             $passed ? 'Passed' : 'Failed',
             $this->beatIndex,
@@ -158,20 +152,6 @@ final class RecordingSession
             moments: $this->moments,
             diagnostics: $diagnostics,
         );
-    }
-
-    private function closeCurrentBeat(): void
-    {
-        if ($this->currentLabel === null) {
-            return;
-        }
-
-        if (! $this->currentBeatFailed) {
-            $durationMs = (int) round((microtime(true) - ($this->beatStartedAt ?? microtime(true))) * 1000);
-            $this->capture(sprintf('%s · %dms', $this->currentLabel, $durationMs), $this->beatIndex, $this->beatIndex, $durationMs);
-        }
-
-        $this->currentLabel = null;
     }
 
     /**
