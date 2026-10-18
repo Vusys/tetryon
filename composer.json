@@ -61,7 +61,8 @@
         }
     },
     "suggest": {
-        "laravel/framework": "For the Laravel integration: service provider, config publishing, tetryon:* artisan commands, and Laravel\\BrowserTestCase."
+        "laravel/framework": "For the Laravel integration: service provider, config publishing, tetryon:* artisan commands, and Laravel\\BrowserTestCase.",
+        "ext-gd": "For WebP-encoded report screenshots; falls back to PNG when absent."
     },
     "minimum-stability": "stable",
     "prefer-stable": true,
