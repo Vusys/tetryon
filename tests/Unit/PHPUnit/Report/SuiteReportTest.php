@@ -74,7 +74,7 @@ final class SuiteReportTest extends TestCase
     private function recording(string $testId, string $title = 'A test'): TestRecording
     {
         $moment = new Moment(
-            screenshotPng: $this->onePixelPng(),
+            screenshot: $this->onePixelPng(),
             caption: 'A step',
             stepIndex: 1,
             progress: 1,

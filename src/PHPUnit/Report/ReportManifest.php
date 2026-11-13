@@ -84,6 +84,8 @@ final class ReportManifest
                 'outcome' => $moment->outcome,
                 'verified' => $moment->verified,
                 'assertions' => $moment->assertions,
+                'atMs' => $moment->atMs,
+                'overlay' => $moment->overlay,
                 'selectorTrace' => $moment->selectorFailure === null ? null : [
                     'target' => $moment->selectorFailure->target,
                     'attempts' => array_map(

@@ -1278,13 +1278,48 @@ final readonly class Browser
             throw $exception;
         }
 
+        $this->recordGesture($element);
+
         return $element;
+    }
+
+    /**
+     * While a beat is being recorded, photograph the page with the element a
+     * gesture is about to act on marked out — where it is, and for a
+     * `<select>` what it offers — so the report can show the gesture itself
+     * and not only its result. Measured, never drawn into the page under
+     * test; a failure to measure is swallowed rather than failing the test.
+     */
+    private function recordGesture(ElementReference $element): void
+    {
+        if (! $this->recording->isInBeat()) {
+            return;
+        }
+
+        try {
+            $json = $this->driver->callFunctionOn(
+                $element,
+                'function(){ const r = this.getBoundingClientRect(); const select = this.tagName === "SELECT";'
+                .' return JSON.stringify({ x: r.x, y: r.y, w: r.width, h: r.height, vw: innerWidth, vh: innerHeight,'
+                .' options: select ? Array.from(this.options, o => o.text.trim()) : null,'
+                .' selected: select && this.selectedIndex >= 0 ? this.options[this.selectedIndex].text.trim() : null }); }',
+            );
+            $overlay = is_string($json) ? json_decode($json, true) : null;
+        } catch (Throwable) {
+            return;
+        }
+
+        if (is_array($overlay)) {
+            /** @var array<string, mixed> $overlay */
+            $this->recording->sample($overlay);
+        }
     }
 
     private function selectOption(string $field, string $value, bool $byValueOnly): self
     {
+        $select = $this->drivable('select', $field);
         $matched = $this->driver->callFunctionOn(
-            $this->drivable('select', $field),
+            $select,
             'function(v, byValue){'
             .' for (const o of this.options) {'
             .'  if (o.value === v || (byValue !== "1" && o.text.trim() === v)) {'
@@ -1297,6 +1332,11 @@ final readonly class Browser
         if ($matched !== true) {
             throw OptionNotFoundException::for($field, $value, $byValueOnly);
         }
+
+        // A second frame, now with the chosen option selected — the option
+        // list is set by script and never opens, so this pair is the only
+        // way a recording can show a choice being made.
+        $this->recordGesture($select);
 
         return $this;
     }
@@ -1487,7 +1527,16 @@ final readonly class Browser
      */
     private function wait(int $timeoutMs, callable $condition): bool
     {
-        return new Waiter($timeoutMs)->until($condition);
+        return new Waiter($timeoutMs)->until(function () use ($condition): bool {
+            if ($condition()) {
+                return true;
+            }
+
+            // Still waiting — photograph what the page is doing meanwhile.
+            $this->recording->sample();
+
+            return false;
+        });
     }
 
     private function textNearScript(string $near, string $text): string

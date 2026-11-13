@@ -18,6 +18,12 @@ final class ImageEncoder
 {
     public static function encode(string $pngBytes): EncodedImage
     {
+        // Already WebP (a recording encodes at capture time) — pass through
+        // rather than lossily re-encode.
+        if (str_starts_with($pngBytes, 'RIFF') && substr($pngBytes, 8, 4) === 'WEBP') {
+            return new EncodedImage($pngBytes, 'webp');
+        }
+
         if (! extension_loaded('gd') || ! function_exists('imagewebp')) {
             return new EncodedImage($pngBytes, 'png');
         }

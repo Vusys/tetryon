@@ -30,7 +30,7 @@ final class ReportRendererTest extends TestCase
     public function test_it_writes_screenshots_and_an_index_html(): void
     {
         $recording = new TestRecording('A::test_one', 'Test one', true, [
-            new Moment(screenshotPng: $this->onePixelPng(), caption: 'Passed', stepIndex: 1, progress: 1, durationMs: 0, outcome: 'passed'),
+            new Moment(screenshot: $this->onePixelPng(), caption: 'Passed', stepIndex: 1, progress: 1, durationMs: 0, outcome: 'passed'),
         ]);
 
         $indexPath = ReportRenderer::render([$recording], $this->outputDirectory, new Configuration);
@@ -39,9 +39,40 @@ final class ReportRendererTest extends TestCase
         self::assertFileExists($indexPath);
         self::assertStringContainsString('"title":"Test one"', (string) file_get_contents($indexPath));
 
-        $screenshots = glob("{$this->outputDirectory}/screenshots/*/*");
+        $screenshots = glob("{$this->outputDirectory}/screenshots/*");
         self::assertNotFalse($screenshots);
         self::assertCount(1, $screenshots);
+    }
+
+    public function test_it_writes_an_image_shared_by_several_moments_once(): void
+    {
+        $still = $this->onePixelPng();
+        $moment = static fn (string $caption): Moment => new Moment(screenshot: $still, caption: $caption, stepIndex: 1, progress: 1, durationMs: 0);
+
+        $indexPath = ReportRenderer::render([
+            new TestRecording('A::test_one', 'Test one', true, [$moment('Before'), $moment('After')]),
+            new TestRecording('A::test_two', 'Test two', true, [$moment('Passed')]),
+        ], $this->outputDirectory, new Configuration);
+
+        self::assertNotNull($indexPath);
+        $screenshots = glob("{$this->outputDirectory}/screenshots/*");
+        self::assertNotFalse($screenshots);
+        self::assertCount(1, $screenshots);
+        self::assertSame(3, substr_count((string) file_get_contents($indexPath), '"src":"screenshots/'));
+    }
+
+    public function test_it_clears_images_left_by_an_earlier_render(): void
+    {
+        $recording = new TestRecording('A::test_one', 'Test one', true, [
+            new Moment(screenshot: $this->onePixelPng(), caption: 'Passed', stepIndex: 1, progress: 1, durationMs: 0),
+        ]);
+        mkdir("{$this->outputDirectory}/screenshots", recursive: true);
+        file_put_contents("{$this->outputDirectory}/screenshots/stale.webp", 'left over');
+
+        ReportRenderer::render([$recording], $this->outputDirectory, new Configuration);
+
+        self::assertFileDoesNotExist("{$this->outputDirectory}/screenshots/stale.webp");
+        self::assertCount(1, (array) glob("{$this->outputDirectory}/screenshots/*"));
     }
 
     public function test_it_writes_diagnostics_for_a_failing_test(): void
@@ -56,7 +87,7 @@ final class ReportRendererTest extends TestCase
             browserStderr: '',
         );
         $recording = new TestRecording('A::test_two', 'Test two', false, [
-            new Moment(screenshotPng: $this->onePixelPng(), caption: 'Failed', stepIndex: 1, progress: 1, durationMs: 0, outcome: 'failed'),
+            new Moment(screenshot: $this->onePixelPng(), caption: 'Failed', stepIndex: 1, progress: 1, durationMs: 0, outcome: 'failed'),
         ], $bag);
 
         ReportRenderer::render([$recording], $this->outputDirectory, new Configuration);
@@ -76,7 +107,7 @@ final class ReportRendererTest extends TestCase
         file_put_contents($blocker, 'not a directory');
 
         $recording = new TestRecording('A::test_one', 'Test one', true, [
-            new Moment(screenshotPng: $this->onePixelPng(), caption: 'Passed', stepIndex: 1, progress: 1, durationMs: 0),
+            new Moment(screenshot: $this->onePixelPng(), caption: 'Passed', stepIndex: 1, progress: 1, durationMs: 0),
         ]);
 
         try {

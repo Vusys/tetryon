@@ -56,7 +56,7 @@ final class ReportManifestTest extends TestCase
             new ResolutionAttempt('ARIA name', 0),
         ]);
         $moment = new Moment(
-            screenshotPng: 'bytes',
+            screenshot: 'bytes',
             caption: 'Click "Save changes"',
             stepIndex: 2,
             progress: 1,
@@ -87,7 +87,7 @@ final class ReportManifestTest extends TestCase
     public function test_it_carries_the_assertion_calls_a_moment_proved(): void
     {
         $moment = new Moment(
-            screenshotPng: 'bytes',
+            screenshot: 'bytes',
             caption: 'Sees "1 item left"',
             stepIndex: 2,
             progress: 2,
@@ -105,6 +105,17 @@ final class ReportManifestTest extends TestCase
         );
     }
 
+    public function test_it_carries_capture_time_and_gesture_overlay(): void
+    {
+        $overlay = ['x' => 10, 'y' => 20, 'w' => 100, 'h' => 30, 'vw' => 800, 'vh' => 600, 'options' => ['Red', 'Green'], 'selected' => 'Green'];
+        $moment = new Moment(screenshot: 'bytes', caption: 'Pick a colour', stepIndex: 1, progress: 0, durationMs: 0, atMs: 1234, overlay: $overlay);
+
+        $manifest = ReportManifest::build([new TestRecording('A::test_one', 'Test one', true, [$moment])], [['a.webp']], [null]);
+
+        self::assertSame(1234, $this->moment($manifest, 0, 0)['atMs']);
+        self::assertSame($overlay, $this->moment($manifest, 0, 0)['overlay']);
+    }
+
     public function test_it_carries_an_empty_assertion_list_by_default(): void
     {
         $manifest = ReportManifest::build([$this->recording('A::test_one')], [['a.webp']], [null]);
@@ -115,10 +126,10 @@ final class ReportManifestTest extends TestCase
     public function test_it_derives_total_steps_from_the_moments_captured(): void
     {
         $moments = [
-            new Moment(screenshotPng: 'bytes', caption: 'Beat 1', stepIndex: 1, progress: 0, durationMs: 0),
-            new Moment(screenshotPng: 'bytes', caption: 'Beat 1 · 5ms', stepIndex: 1, progress: 1, durationMs: 5),
-            new Moment(screenshotPng: 'bytes', caption: 'Beat 2', stepIndex: 2, progress: 1, durationMs: 0),
-            new Moment(screenshotPng: 'bytes', caption: 'Beat 2 · 5ms', stepIndex: 2, progress: 2, durationMs: 5),
+            new Moment(screenshot: 'bytes', caption: 'Beat 1', stepIndex: 1, progress: 0, durationMs: 0),
+            new Moment(screenshot: 'bytes', caption: 'Beat 1 · 5ms', stepIndex: 1, progress: 1, durationMs: 5),
+            new Moment(screenshot: 'bytes', caption: 'Beat 2', stepIndex: 2, progress: 1, durationMs: 0),
+            new Moment(screenshot: 'bytes', caption: 'Beat 2 · 5ms', stepIndex: 2, progress: 2, durationMs: 5),
         ];
         $recording = new TestRecording('A::test_one', 'Test one', true, $moments);
 
@@ -140,7 +151,7 @@ final class ReportManifestTest extends TestCase
     private function recording(string $testId, bool $passed = true): TestRecording
     {
         $moment = new Moment(
-            screenshotPng: 'bytes',
+            screenshot: 'bytes',
             caption: 'A step',
             stepIndex: 1,
             progress: 1,

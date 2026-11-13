@@ -15,7 +15,8 @@ use Vusys\Tetryon\PHPUnit\Report\Exception\ReportException;
 
 /**
  * Renders a list of {@see TestRecording}s into a browsable HTML report: one
- * `index.html`, a `screenshots/` directory of WebP/PNG frames, and — for
+ * `index.html`, a `screenshots/` directory of WebP/PNG frames (one file per
+ * distinct image, however many moments show it), and — for
  * failing tests — a `diagnostics/` directory of the same files
  * {@see FailureArtifacts} writes on failure. Used for the combined
  * whole-suite report ({@see SuiteReport::render()}, many recordings), though
@@ -55,11 +56,11 @@ final class ReportRenderer
     private static function renderOrThrow(array $recordings, string $outputDirectory, Configuration $configuration): string
     {
         if ($recordings === []) {
-            throw new ReportException('Nothing was recorded — no note()/type()/step()/assert() calls were made.');
+            throw new ReportException('Nothing was recorded — no test called recording().');
         }
 
         $outputDirectory = rtrim($outputDirectory, '/');
-        self::ensureDirectory($outputDirectory);
+        self::ensureDirectory("{$outputDirectory}/screenshots");
 
         $screenshotPaths = [];
         $diagnosticsDirs = [];
@@ -69,11 +70,14 @@ final class ReportRenderer
             $slug = Slug::forTestId($recording->testId);
 
             $paths = [];
-            foreach ($recording->moments as $index => $moment) {
-                $encoded = ImageEncoder::encode($moment->screenshotPng);
-                $relative = sprintf('screenshots/%s/%03d.%s', $slug, $index, $encoded->extension);
-                self::ensureDirectory(dirname("{$outputDirectory}/{$relative}"));
-                file_put_contents("{$outputDirectory}/{$relative}", $encoded->bytes);
+            foreach ($recording->moments as $moment) {
+                // Named by content: a frame the page sat on for five moments
+                // — or that five tests all opened on — is written once.
+                $encoded = ImageEncoder::encode($moment->screenshot);
+                $relative = sprintf('screenshots/%s.%s', md5($encoded->bytes), $encoded->extension);
+                if (! is_file("{$outputDirectory}/{$relative}")) {
+                    file_put_contents("{$outputDirectory}/{$relative}", $encoded->bytes);
+                }
                 $paths[] = $relative;
             }
             $screenshotPaths[] = $paths;
@@ -88,6 +92,15 @@ final class ReportRenderer
             } else {
                 $diagnosticsDirs[] = null;
                 $diagnosticsReports[] = null;
+            }
+        }
+
+        // Images are named by content, so a re-render into the same
+        // directory would otherwise keep every frame of every earlier run.
+        $current = array_flip(array_merge(...$screenshotPaths));
+        foreach (glob("{$outputDirectory}/screenshots/*") ?: [] as $file) {
+            if (! isset($current['screenshots/'.basename($file)])) {
+                @unlink($file);
             }
         }
 
@@ -221,7 +234,16 @@ final class ReportRenderer
         #caption .verified-badge { color: var(--passed); margin-right: 6px; }
         #step-meta { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
         #stage { display: flex; justify-content: center; padding: 16px; background: var(--paper); }
-        #stage img { max-width: 100%; max-height: 70vh; border: 1px solid var(--border); border-radius: 4px; }
+        #stage-frame { position: relative; display: inline-block; line-height: 0; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; background-size: 100% 100%; }
+        #stage img { max-width: 100%; max-height: 70vh; display: block; }
+        #stage img.is-fading { animation: frame-in 180ms ease-out; }
+        @keyframes frame-in { from { opacity: 0; } to { opacity: 1; } }
+        #overlay { position: absolute; inset: 0; pointer-events: none; line-height: 1.3; }
+        .gesture-ring { position: absolute; border: 2px solid var(--accent); border-radius: 6px; box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 30%, transparent); animation: ring-in 320ms ease-out; }
+        @keyframes ring-in { from { transform: scale(1.35); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .gesture-options { position: absolute; margin: 4px 0 0; padding: 4px 0; list-style: none; min-width: 140px; max-height: 60%; overflow: hidden; background: #fff; color: #0f172a; border: 1px solid #94a3b8; border-radius: 6px; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.25); font-size: 13px; }
+        .gesture-options li { padding: 3px 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .gesture-options li.is-selected { background: #3b82f6; color: #fff; }
         #nav { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--border); flex-wrap: wrap; }
         #nav button, #nav select {
             padding: 6px 14px;
@@ -239,6 +261,7 @@ final class ReportRenderer
         #rail { display: flex; gap: 6px; overflow-x: auto; flex: 1; padding: 2px; }
         #rail img { height: 44px; border: 2px solid transparent; border-radius: 4px; cursor: pointer; opacity: 0.6; }
         #rail img.is-selected { border-color: var(--accent); opacity: 1; }
+        @media (prefers-reduced-motion: reduce) { #stage img.is-fading, .gesture-ring { animation: none; } }
         #assertions, #trace, #diagnostics { margin-top: 16px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
         #assertions h2, #trace h2, #diagnostics h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 0 0 10px; }
         #assertions ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
@@ -271,7 +294,7 @@ final class ReportRenderer
                         <span id="caption"></span>
                         <span id="step-meta"></span>
                     </div>
-                    <div id="stage"><img id="stage-img" alt=""></div>
+                    <div id="stage"><div id="stage-frame"><img id="stage-img" alt=""><div id="overlay"></div></div></div>
                     <div id="nav">
                         <div id="nav-controls">
                             <button id="play" type="button" aria-pressed="false">&#9654; Play</button>
@@ -296,10 +319,16 @@ final class ReportRenderer
         <script>
         (function () {
             'use strict';
-        
+
             var data = JSON.parse(document.getElementById('tetryon-report-data').textContent);
             var state = { testIndex: 0, momentIndex: 0 };
-            var MIN_HOLD_MS = 1000;
+            // Playback paces itself on the real gap between moments, clamped:
+            // long enough to read a new caption, never so long that a slow
+            // step turns into dead air.
+            var MIN_FRAME_MS = 250;
+            var MIN_CAPTION_MS = 900;
+            var MIN_GESTURE_MS = 600;
+            var MAX_HOLD_MS = 1500;
             var playTimer = null;
             var playSpeed = 1;
 
@@ -313,6 +342,8 @@ final class ReportRenderer
                 caption: document.getElementById('caption'),
                 stepMeta: document.getElementById('step-meta'),
                 stageImg: document.getElementById('stage-img'),
+                stageFrame: document.getElementById('stage-frame'),
+                overlay: document.getElementById('overlay'),
                 rail: document.getElementById('rail'),
                 play: document.getElementById('play'),
                 speed: document.getElementById('speed'),
@@ -322,22 +353,22 @@ final class ReportRenderer
                 trace: document.getElementById('trace'),
                 diagnostics: document.getElementById('diagnostics'),
             };
-        
+
             function escapeHtml(text) {
                 var div = document.createElement('div');
                 div.textContent = text == null ? '' : String(text);
                 return div.innerHTML;
             }
-        
+
             function currentTest() {
                 return data.tests[state.testIndex];
             }
-        
+
             function initialTestIndex() {
                 var firstFailed = data.tests.findIndex(function (t) { return !t.passed; });
                 return firstFailed === -1 ? 0 : firstFailed;
             }
-        
+
             function renderSummary() {
                 if (data.tests.length <= 1) {
                     return;
@@ -350,7 +381,7 @@ final class ReportRenderer
                 els.summary.innerHTML = '<span class="summary-count">' + s.passed + '/' + s.total + ' passed</span>'
                     + '<div class="summary-bar">' + bar + '</div>';
             }
-        
+
             function renderSidebar() {
                 if (data.tests.length <= 1) {
                     return;
@@ -371,7 +402,7 @@ final class ReportRenderer
                 });
                 els.sidebarList.innerHTML = html;
             }
-        
+
             function selectTest(index, keepPlaying) {
                 if (!keepPlaying) {
                     stopPlaying();
@@ -381,42 +412,100 @@ final class ReportRenderer
                 renderSidebar();
                 renderTest();
             }
-        
+
             function renderTest() {
                 var test = currentTest();
                 els.testTitle.textContent = test.title;
                 els.testMeta.textContent = (test.passed ? 'Passed' : 'Failed')
                     + (data.tests.length > 1 ? ' · test ' + test.index + ' of ' + test.total : '')
                     + ' · ' + test.totalSteps + ' steps';
-        
+
+                // One thumbnail per change of picture, not per moment.
                 els.rail.innerHTML = test.moments.map(function (m, i) {
-                    var cls = 'is-' + (m.outcome || (m.verified ? 'passed' : 'default')) + (i === state.momentIndex ? ' is-selected' : '');
-                    return '<img src="' + m.src + '" class="' + cls + '" data-moment-index="' + i + '" alt="">';
+                    if (i > 0 && test.moments[i - 1].src === m.src) {
+                        return '';
+                    }
+                    return '<img src="' + m.src + '" data-moment-index="' + i + '" alt="">';
                 }).join('');
-        
+
                 renderMoment();
             }
-        
+
             function renderMoment() {
                 var test = currentTest();
                 var moment = test.moments[state.momentIndex];
-        
-                els.stageImg.src = moment.src;
+
+                if (els.stageImg.getAttribute('src') !== moment.src) {
+                    // Crossfade: the outgoing frame stays behind as the
+                    // background while the incoming one fades in over it.
+                    var outgoing = els.stageImg.getAttribute('src');
+                    els.stageFrame.style.backgroundImage = outgoing ? 'url("' + outgoing + '")' : '';
+                    els.stageImg.src = moment.src;
+                    els.stageImg.classList.remove('is-fading');
+                    void els.stageImg.offsetWidth;
+                    els.stageImg.classList.add('is-fading');
+                }
+                renderOverlay(moment.overlay);
+                var upcoming = test.moments[state.momentIndex + 1];
+                if (upcoming) {
+                    new Image().src = upcoming.src;
+                }
                 els.caption.className = moment.outcome ? 'is-' + moment.outcome : '';
                 els.caption.innerHTML = (moment.verified ? '<span class="verified-badge">✓</span>' : '') + escapeHtml(moment.caption);
+                var skipped = realGapMs(test, state.momentIndex) - MAX_HOLD_MS;
                 els.stepMeta.textContent = 'step ' + moment.stepIndex + '/' + moment.totalSteps
-                    + (moment.durationMs ? ' · ' + moment.durationMs + 'ms' : '');
-        
-                Array.prototype.forEach.call(els.rail.querySelectorAll('img'), function (img, i) {
-                    img.classList.toggle('is-selected', i === state.momentIndex);
+                    + (moment.durationMs ? ' · ' + moment.durationMs + 'ms' : '')
+                    + (skipped > 0 ? ' · nothing changed for ' + (skipped / 1000).toFixed(1) + 's' : '');
+
+                var current = null;
+                Array.prototype.forEach.call(els.rail.querySelectorAll('img'), function (img) {
+                    img.classList.remove('is-selected');
+                    if (Number(img.dataset.momentIndex) <= state.momentIndex) {
+                        current = img;
+                    }
                 });
-        
+                if (current) {
+                    current.classList.add('is-selected');
+                    els.rail.scrollLeft = current.offsetLeft - els.rail.offsetLeft - els.rail.clientWidth / 2;
+                }
+
                 els.prev.disabled = state.momentIndex === 0 && state.testIndex === 0;
                 els.next.disabled = state.momentIndex === test.moments.length - 1 && state.testIndex === data.tests.length - 1;
 
                 renderAssertions(moment);
                 renderTrace(moment);
                 renderDiagnostics(test);
+            }
+
+            function renderOverlay(o) {
+                if (!o || !o.vw || !o.vh) {
+                    els.overlay.innerHTML = '';
+                    return;
+                }
+                var pct = function (value, of) { return (value / of * 100) + '%'; };
+                var html = '<div class="gesture-ring" style="left:' + pct(o.x, o.vw) + ';top:' + pct(o.y, o.vh)
+                    + ';width:' + pct(o.w, o.vw) + ';height:' + pct(o.h, o.vh) + '"></div>';
+                if (o.options) {
+                    html += '<ul class="gesture-options" style="left:' + pct(o.x, o.vw) + ';top:' + pct(o.y + o.h, o.vh)
+                        + ';min-width:' + pct(o.w, o.vw) + '">'
+                        + o.options.map(function (label) {
+                            return '<li' + (label === o.selected ? ' class="is-selected"' : '') + '>' + escapeHtml(label) + '</li>';
+                        }).join('') + '</ul>';
+                }
+                els.overlay.innerHTML = html;
+            }
+
+            function realGapMs(test, index) {
+                var next = test.moments[index + 1];
+                return next ? Math.max(0, (next.atMs || 0) - (test.moments[index].atMs || 0)) : 0;
+            }
+
+            function holdMs(test, index) {
+                var moment = test.moments[index];
+                var previous = test.moments[index - 1];
+                var sameCaption = previous && previous.caption === moment.caption;
+                var floor = !sameCaption ? MIN_CAPTION_MS : (moment.overlay ? MIN_GESTURE_MS : MIN_FRAME_MS);
+                return Math.min(Math.max(realGapMs(test, index), floor), MAX_HOLD_MS) / playSpeed;
             }
 
             function renderAssertions(moment) {
@@ -443,7 +532,7 @@ final class ReportRenderer
                 }).join('');
                 els.trace.innerHTML = '<h2>Selector attempts for "' + escapeHtml(moment.selectorTrace.target) + '"</h2><table>' + rows + '</table>';
             }
-        
+
             function renderDiagnostics(test) {
                 if (!test.diagnosticsDir) {
                     els.diagnostics.hidden = true;
@@ -503,15 +592,13 @@ final class ReportRenderer
                     stopPlaying();
                     return;
                 }
-                var moment = currentTest().moments[state.momentIndex];
-                playTimer = setTimeout(playTick, Math.max(moment.durationMs, MIN_HOLD_MS) / playSpeed);
+                playTimer = setTimeout(playTick, holdMs(currentTest(), state.momentIndex));
             }
 
             function startPlaying() {
                 els.play.innerHTML = '&#10074;&#10074; Pause';
                 els.play.setAttribute('aria-pressed', 'true');
-                var moment = currentTest().moments[state.momentIndex];
-                playTimer = setTimeout(playTick, Math.max(moment.durationMs, MIN_HOLD_MS) / playSpeed);
+                playTimer = setTimeout(playTick, holdMs(currentTest(), state.momentIndex));
             }
 
             els.sidebarList.addEventListener('click', function (event) {

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Recording</title>
+    <style>
+        #panel { opacity: 0; transition: opacity 250ms linear; background: #1d4ed8; color: #fff; padding: 40px; }
+        #panel.shown { opacity: 1; }
+    </style>
+</head>
+<body>
+    <!--
+        Two shapes a recording has to cope with: a slow step whose page moves
+        through a visible in-between state, and a change that only finishes
+        animating after the gesture that started it has already returned.
+    -->
+    <button onclick="
+        document.getElementById('status').textContent = 'Saving…';
+        setTimeout(function () { document.getElementById('status').textContent = 'Saved'; }, 400);
+    ">Save</button>
+    <p id="status">Idle</p>
+
+    <button onclick="document.getElementById('panel').classList.add('shown')">Reveal</button>
+    <div id="panel">Revealed panel</div>
+
+    <label for="colour">Colour</label>
+    <select id="colour">
+        <option>Red</option>
+        <option>Green</option>
+        <option>Blue</option>
+    </select>
+</body>
+</html>
