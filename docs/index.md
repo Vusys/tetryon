@@ -46,6 +46,7 @@ Tests are ordinary PHPUnit tests. Tetryon owns browser automation; PHPUnit owns 
 - [Assertions](assertions.md) — the `assert*` methods.
 - [Configuration](configuration.md) — base URL, timeouts, viewport, artifacts.
 - [Diagnostics](diagnostics.md) — failure artifacts, `tetryon doctor`, logging.
+- [Reporting](reporting.md) — record a test (or a whole suite run) as a browsable HTML report.
 - [Laravel](laravel.md) — service provider, `tetryon:install`, `loginAs()`.
 - [Continuous integration](ci.md) — running the Browser suite in CI.
 - [TodoMVC compatibility](todomvc.md) — the shared behavioural suite run against ten real frameworks, with a matrix and gap triage.

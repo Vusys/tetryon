@@ -55,10 +55,9 @@ final class DiagnosticsTest extends TestCase
         $this->driver->start();
         $this->driver->navigate($server->baseUrl.'/index.html');
 
-        $report = new FailureArtifacts($this->artifactsPath)
-            ->capture($this->driver, new Configuration(baseUrl: $server->baseUrl), 'SettingsTest::test_save');
-
-        $directory = $this->artifactsPath.'/SettingsTest_test_save';
+        $directory = FailureArtifacts::directoryFor($this->artifactsPath, 'SettingsTest::test_save');
+        $bag = FailureArtifacts::captureBag($this->driver);
+        $report = FailureArtifacts::write($bag, $directory, new Configuration(baseUrl: $server->baseUrl));
         self::assertFileExists($directory.'/screenshot.png');
         self::assertFileExists($directory.'/page.html');
         self::assertFileExists($directory.'/console.log');
