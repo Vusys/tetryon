@@ -6,7 +6,6 @@ namespace Vusys\Tetryon\PHPUnit;
 
 use PHPUnit\Framework\Attributes\After;
 use PHPUnit\Framework\TestCase;
-use PHPUnit\Logging\TestDox\NamePrettifier;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Vusys\Tetryon\Core\Config\Configuration;
@@ -100,7 +99,11 @@ trait InteractsWithBrowser
 
         $browser = $this->tetryonBrowser;
         if ($browser instanceof Browser) {
-            $fallbackTitle = new NamePrettifier()->prettifyTestCase($this, false);
+            // "test_guest_can_log_in" / "testGuestCanLogIn" → "Guest can log in".
+            // Done by hand: PHPUnit's own NamePrettifier is internal, and its
+            // constructor changed within the 13.x line.
+            $words = preg_replace(['/^test_?/i', '/_+|(?<=.)(?=[A-Z])/'], ['', ' '], $this->name());
+            $fallbackTitle = ucfirst(strtolower(trim((string) $words)));
             $recording = $browser->finishedRecording(static::class.'::'.$this->name(), ! $failed, $bag, $fallbackTitle);
             if ($recording instanceof TestRecording) {
                 SuiteReport::append($recording);
