@@ -46,6 +46,17 @@ final class RecordingSession
 
     private const int SETTLE_CAP_MS = 500;
 
+    private const int LOAD_CAP_MS = 2000;
+
+    /** Resolves with location.href once loaded, fonts ready and two frames painted — or after %d ms regardless. */
+    private const string LOADED_SCRIPT = <<<'JS'
+        new Promise((done) => {
+            setTimeout(() => done(location.href), %d);
+            const painted = () => document.fonts.ready.then(() => requestAnimationFrame(() => requestAnimationFrame(() => done(location.href))));
+            if (document.readyState === 'complete') { painted(); } else { addEventListener('load', painted, { once: true }); }
+        })
+        JS;
+
     public function __construct(private readonly FirefoxBiDiDriver $driver) {}
 
     public function activate(?string $title = null): void
@@ -89,8 +100,7 @@ final class RecordingSession
         $body();
 
         $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
-        $this->settle();
-        $this->capture(sprintf('%s · %dms', $label, $durationMs), $this->beatIndex, $this->beatIndex, $durationMs);
+        $this->capture(sprintf('%s · %dms', $label, $durationMs), $this->beatIndex, $this->beatIndex, $durationMs, settle: true);
         $this->currentLabel = null;
     }
 
@@ -110,6 +120,17 @@ final class RecordingSession
             return;
         }
 
+        $this->frame($this->currentLabel, $overlay);
+    }
+
+    /**
+     * Shoot and append a frame unless it repeats the last one. A gesture
+     * frame is a key moment; anything else is an in-between frame.
+     *
+     * @param  array<string, mixed>|null  $overlay
+     */
+    private function frame(string $caption, ?array $overlay = null): void
+    {
         $previous = $this->lastHash;
         try {
             $image = $this->shoot();
@@ -129,12 +150,13 @@ final class RecordingSession
 
         $this->moments[] = new Moment(
             screenshot: $image,
-            caption: $this->currentLabel,
+            caption: $caption,
             stepIndex: $this->beatIndex,
             progress: max(0, $this->beatIndex - 1),
             durationMs: 0,
             atMs: $this->elapsedMs(),
             overlay: $overlay,
+            key: $overlay !== null,
         );
     }
 
@@ -156,16 +178,33 @@ final class RecordingSession
      * ponytail: a change that starts more than one interval after the body
      * returns is still missed; end the body with a visual assertion for those.
      */
-    private function settle(): void
+    private function settle(string $caption): void
     {
         $deadline = microtime(true) + self::SETTLE_CAP_MS / 1000;
-        $this->sample();
+        $this->frame($caption);
 
         do {
             usleep(self::SETTLE_INTERVAL_MS * 1000);
             $count = count($this->moments);
-            $this->sample();
+            $this->frame($caption);
         } while (count($this->moments) > $count && microtime(true) < $deadline);
+    }
+
+    /**
+     * Wait (bounded) for the page to finish loading — images, stylesheets,
+     * web fonts — and paint, then return its URL. A proof taken the instant
+     * a URL changes otherwise shows a page with its background still missing.
+     * Null when the page can't be asked, e.g. mid-navigation.
+     */
+    private function loadedUrl(): ?string
+    {
+        try {
+            $url = $this->driver->evaluateScript(sprintf(self::LOADED_SCRIPT, self::LOAD_CAP_MS));
+        } catch (Throwable) {
+            return null;
+        }
+
+        return is_string($url) ? $url : null;
     }
 
     /**
@@ -179,7 +218,7 @@ final class RecordingSession
             return;
         }
 
-        $this->capture($description, $this->beatIndex, $this->beatIndex, 0, verified: true, assertions: [$description]);
+        $this->capture($description, $this->beatIndex, $this->beatIndex, 0, verified: true, assertions: [$description], settle: true);
     }
 
     /**
@@ -234,6 +273,7 @@ final class RecordingSession
             $this->beatIndex,
             0,
             outcome: $passed ? 'passed' : 'failed',
+            settle: true,
         );
 
         return new TestRecording(
@@ -257,12 +297,28 @@ final class RecordingSession
         bool $verified = false,
         ?string $outcome = null,
         array $assertions = [],
+        bool $settle = false,
     ): void {
+        // A test's first beat opens before anything has been visited.
+        if ($this->loadedUrl() === 'about:blank') {
+            return;
+        }
+
+        if ($settle) {
+            $this->settle($this->currentLabel ?? $caption);
+        }
+
         // Firefox refuses a screenshot mid-navigation; recording must never fail the test.
         try {
             $screenshot = $this->shoot();
         } catch (Throwable) {
             return;
+        }
+
+        // The key moment supersedes an in-between frame of the same picture just before it.
+        $last = $this->moments === [] ? null : $this->moments[count($this->moments) - 1];
+        if ($last instanceof Moment && ! $last->key && $last->screenshot === $screenshot) {
+            array_pop($this->moments);
         }
 
         $this->moments[] = new Moment(

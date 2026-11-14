@@ -116,6 +116,17 @@ final class ReportManifestTest extends TestCase
         self::assertSame($overlay, $this->moment($manifest, 0, 0)['overlay']);
     }
 
+    public function test_it_marks_key_and_in_between_moments(): void
+    {
+        $key = new Moment(screenshot: 'bytes', caption: 'Beat 1', stepIndex: 1, progress: 0, durationMs: 0);
+        $between = new Moment(screenshot: 'bytes', caption: 'Beat 1', stepIndex: 1, progress: 0, durationMs: 0, key: false);
+
+        $manifest = ReportManifest::build([new TestRecording('A::test_one', 'Test one', true, [$key, $between])], [['a.webp', 'b.webp']], [null]);
+
+        self::assertTrue($this->moment($manifest, 0, 0)['key']);
+        self::assertFalse($this->moment($manifest, 0, 1)['key']);
+    }
+
     public function test_it_carries_an_empty_assertion_list_by_default(): void
     {
         $manifest = ReportManifest::build([$this->recording('A::test_one')], [['a.webp']], [null]);

@@ -45,9 +45,18 @@ A beat is more than a "before" and an "after". While recording, three things add
 
 - **Waiting.** Every `Browser` wait — `waitForText()`, `waitForPath()`, the auto-wait before a gesture, a retrying assertion — photographs the page each time it polls and comes up empty. A slow step (a form submitting, a page navigating) is recorded as the states it actually passed through, not as one still held for its whole duration.
 - **Gestures.** As a gesture's target becomes actionable, the frame records where that element is, and the report draws a ring around it. For a native `<select>` it also records the options and which is selected, once as the gesture lands and once more after the choice — `select()` sets the value by script and the browser's own option list never opens, so the report draws the list itself. Nothing is drawn into the page under test.
-- **Settling.** Once the body returns, the beat keeps photographing until two frames 100ms apart match, for at most half a second. A modal still fading in or a panel still sliding is followed to its resting state before the closing "after" moment is taken. A page that never stops moving (a spinner, a carousel) costs that half second, not a wait timeout.
+- **Settling.** Once the body returns, the beat waits for the page to finish loading (images, stylesheets and web fonts, for at most two seconds), then keeps photographing until two frames 100ms apart match, for at most half a second. A modal still fading in or a panel still sliding is followed to its resting state before the closing "after" moment is taken. A page that never stops moving (a spinner, a carousel) costs that half second, not a wait timeout. An assertion's proof moment and the closing pass/fail moment settle the same way, so `assertPathIs()` passing the instant the URL changes doesn't leave a half-painted page as its proof.
 
-Recording still never changes what a test does, only how long it takes: a screenshot per poll, and up to half a second per beat.
+The report tells the story in **key moments** — a beat's edges, each gesture, each proof, a failure — all of a page at rest. The frames sampled while waiting and settling are **in-between frames**: the rail and Prev/Next skip them, and Play shows them, so an animation can still be watched without cluttering the steps. A frame of the blank page a test starts on, before its first `visit()`, is never kept.
+
+Recording never changes what a test does, but it does change how long it takes: a screenshot per poll, and up to half a second of settling at every beat boundary and every assertion. That pause is the one way recording can mask a defect. A test that deliberately races an animation — confirming a modal while it is still fading in, say — must keep both gestures inside one beat, with no assertion between them, or the settle will wait the animation out:
+
+```php
+// One beat: a boundary between the two clicks would let the modal finish fading in.
+->beat('Delete the field and confirm', fn (Browser $b) => $b
+    ->click('[data-action="delete-field"]')
+    ->click('@confirm-delete'))
+```
 
 Settling follows a change that is already under way. It cannot know about one that hasn't started — a panel that only appears after a request comes back, say. If a beat has to close on that, end its body with an assertion that waits for it to be *visible*:
 
@@ -75,8 +84,8 @@ An ordinary test run pays nothing for this — accumulation and rendering are bo
 
 - A header summary — pass/fail counts and a segmented progress bar.
 - A sidebar of every test, filterable by title.
-- A thumbnail rail (one thumbnail per change of picture) and a large current-moment view: screenshot, caption, step count, duration, a ring around the element a gesture is acting on, and a green checkmark on a verified assertion moment.
-- Player controls — Play/Pause, a 0.5×/1×/2×/4× speed selector, and Prev/Next (arrow keys, or Space to toggle play). Playback follows the real gaps between frames, clamped at both ends — long enough to read a new caption, never more than a second and a half on a page where nothing was changing (the report says how much it skipped) — and flows from one test straight into the next, so pressing Play turns the whole suite into a watchable run instead of a screenshot wall. Pause and scrub anywhere at any point.
+- A thumbnail rail (one thumbnail per change of picture among key moments) and a large current-moment view: screenshot, caption, step count, duration, a ring around the element a gesture is acting on, and a green checkmark on a verified assertion moment.
+- Player controls — Play/Pause, a 0.5×/1×/2×/4× speed selector, and Prev/Next between key moments (arrow keys, or Space to toggle play). Playback includes the in-between frames, follows the real gaps between frames, clamped at both ends — long enough to read a new caption, never more than a second and a half on a page where nothing was changing (the report says how much it skipped) — and flows from one test straight into the next, so pressing Play turns the whole suite into a watchable run instead of a screenshot wall. Pause and scrub anywhere at any point.
 - An assertions panel on any verified moment, listing the exact `Browser` calls that moment proved — e.g. `assertSee("1 item left")`.
 - A selector-attempts table on any moment where a gesture failed to resolve its target.
 - For a failing test: links to its console log, network log, page HTML, and BiDi trace, plus the same plain-text failure report `tetryon doctor` and stderr print on failure — captured once and shared, not re-queried from the driver.

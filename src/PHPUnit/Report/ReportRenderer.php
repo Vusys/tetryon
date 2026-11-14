@@ -420,11 +420,14 @@ final class ReportRenderer
                     + (data.tests.length > 1 ? ' · test ' + test.index + ' of ' + test.total : '')
                     + ' · ' + test.totalSteps + ' steps';
 
-                // One thumbnail per change of picture, not per moment.
+                // One thumbnail per change of picture among key moments;
+                // in-between frames are left to Play.
+                var lastSrc = null;
                 els.rail.innerHTML = test.moments.map(function (m, i) {
-                    if (i > 0 && test.moments[i - 1].src === m.src) {
+                    if (m.key === false || m.src === lastSrc) {
                         return '';
                     }
+                    lastSrc = m.src;
                     return '<img src="' + m.src + '" data-moment-index="' + i + '" alt="">';
                 }).join('');
 
@@ -547,10 +550,21 @@ final class ReportRenderer
                     + '<pre>' + escapeHtml(test.diagnosticsReport || '') + '</pre>';
             }
 
-            function advanceMoment() {
-                var test = currentTest();
-                if (state.momentIndex < test.moments.length - 1) {
-                    state.momentIndex += 1;
+            // The nearest moment from `from` in `step` direction, skipping
+            // in-between frames when keyOnly; -1 when there is none.
+            function nearestMoment(moments, from, step, keyOnly) {
+                for (var i = from; i >= 0 && i < moments.length; i += step) {
+                    if (!keyOnly || moments[i].key !== false) {
+                        return i;
+                    }
+                }
+                return -1;
+            }
+
+            function advanceMoment(keyOnly) {
+                var next = nearestMoment(currentTest().moments, state.momentIndex + 1, 1, keyOnly);
+                if (next !== -1) {
+                    state.momentIndex = next;
                     renderMoment();
                     return true;
                 }
@@ -561,17 +575,18 @@ final class ReportRenderer
                 return false;
             }
 
-            function retreatMoment() {
-                if (state.momentIndex > 0) {
-                    state.momentIndex -= 1;
+            function retreatMoment(keyOnly) {
+                var previous = nearestMoment(currentTest().moments, state.momentIndex - 1, -1, keyOnly);
+                if (previous !== -1) {
+                    state.momentIndex = previous;
                     renderMoment();
                     return true;
                 }
                 if (state.testIndex > 0) {
                     var targetIndex = state.testIndex - 1;
-                    var lastMomentIndex = data.tests[targetIndex].moments.length - 1;
+                    var moments = data.tests[targetIndex].moments;
                     selectTest(targetIndex, true);
-                    state.momentIndex = lastMomentIndex;
+                    state.momentIndex = Math.max(0, nearestMoment(moments, moments.length - 1, -1, keyOnly));
                     renderMoment();
                     return true;
                 }
@@ -588,7 +603,7 @@ final class ReportRenderer
             }
 
             function playTick() {
-                if (!advanceMoment()) {
+                if (!advanceMoment(false)) {
                     stopPlaying();
                     return;
                 }
@@ -621,12 +636,12 @@ final class ReportRenderer
 
             els.prev.addEventListener('click', function () {
                 stopPlaying();
-                retreatMoment();
+                retreatMoment(true);
             });
 
             els.next.addEventListener('click', function () {
                 stopPlaying();
-                advanceMoment();
+                advanceMoment(true);
             });
 
             els.play.addEventListener('click', function () {

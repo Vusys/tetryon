@@ -28,6 +28,8 @@ final readonly class Moment
      * @param  int  $atMs  when this moment was captured, in ms since recording began — playback paces itself on the gaps
      * @param  array<string, mixed>|null  $overlay  the gesture about to act on this frame: its target's viewport rect
      *                                              (`x`,`y`,`w`,`h` within `vw`×`vh`) and, for a `<select>`, its `options` and `selected` label
+     * @param  bool  $key  a moment the story is told in (a beat's edges, a gesture, a proof, a failure), taken of a page at rest;
+     *                     false for an in-between frame sampled while waiting or settling, which only Play shows
      */
     public function __construct(
         public string $screenshot,
@@ -41,5 +43,6 @@ final readonly class Moment
         public array $assertions = [],
         public int $atMs = 0,
         public ?array $overlay = null,
+        public bool $key = true,
     ) {}
 }
