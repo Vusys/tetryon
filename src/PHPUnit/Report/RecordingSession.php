@@ -258,8 +258,15 @@ final class RecordingSession
         ?string $outcome = null,
         array $assertions = [],
     ): void {
+        // Firefox refuses a screenshot mid-navigation; recording must never fail the test.
+        try {
+            $screenshot = $this->shoot();
+        } catch (Throwable) {
+            return;
+        }
+
         $this->moments[] = new Moment(
-            screenshot: $this->shoot(),
+            screenshot: $screenshot,
             caption: $caption,
             stepIndex: $stepIndex,
             progress: max(0, $progress),
