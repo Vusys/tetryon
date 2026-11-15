@@ -40,6 +40,13 @@ use Vusys\Tetryon\PHPUnit\Report\TestRecording;
  */
 final readonly class Browser
 {
+    /** Inputs whose value is chosen from a widget rather than typed. */
+    private const array PICKER_INPUT_TYPES = ['date', 'datetime-local', 'month', 'week', 'time', 'color', 'range'];
+
+    private const string SET_PICKER_VALUE_SCRIPT = 'function(value){ this.value = value;'
+        .' this.dispatchEvent(new Event("input", { bubbles: true }));'
+        .' this.dispatchEvent(new Event("change", { bubbles: true })); return this.value; }';
+
     /**
      * Injected actionability probe. Rejects invisible / transparent /
      * pointer-event-deaf elements, waits for the bounding box to be stable
@@ -519,6 +526,19 @@ final readonly class Browser
     public function fill(string $field, string $value): self
     {
         [$element, $info] = $this->textControl('fill', $field);
+
+        // Firefox draws these as segmented pickers that drop typed text, which
+        // would leave the field silently empty. Set the value as a picker
+        // would, and refuse one the input sanitises away.
+        if ($info->tag === 'input' && in_array($info->type, self::PICKER_INPUT_TYPES, true)) {
+            $accepted = $this->driver->callFunctionOn($element, self::SET_PICKER_VALUE_SCRIPT, $value);
+            if ($accepted !== $value) {
+                throw UndrivableElementException::rejectedValue('fill', $field, $info->type, $value);
+            }
+
+            return $this;
+        }
+
         $this->driver->callFunctionOn($element, $this->clearTextScript($info));
         $this->driver->typeInto($element, $value);
 
