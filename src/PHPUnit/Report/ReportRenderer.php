@@ -199,7 +199,7 @@ final class ReportRenderer
         .summary-seg.is-passed { background: var(--passed); }
         .summary-seg.is-failed { background: var(--failed); }
         #layout { display: flex; min-height: calc(100vh - 49px); }
-        #sidebar { width: 280px; border-right: 1px solid var(--border); background: var(--panel); flex-shrink: 0; }
+        #sidebar { width: 340px; border-right: 1px solid var(--border); background: var(--panel); flex-shrink: 0; }
         #filter { width: 100%; padding: 10px 12px; border: none; border-bottom: 1px solid var(--border); background: transparent; color: var(--ink); font: inherit; outline: none; }
         .sidebar-list { overflow-y: auto; max-height: calc(100vh - 90px); }
         .sidebar-row {
@@ -207,7 +207,7 @@ final class ReportRenderer
             align-items: center;
             gap: 8px;
             width: 100%;
-            padding: 9px 12px;
+            padding: 9px 12px 9px calc(12px + var(--depth, 0) * 14px);
             border: none;
             border-bottom: 1px solid var(--border);
             background: transparent;
@@ -216,6 +216,25 @@ final class ReportRenderer
             text-align: left;
             cursor: pointer;
         }
+        .sidebar-group > summary {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px 8px calc(12px + var(--depth, 0) * 14px);
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+            list-style: none;
+            cursor: pointer;
+            user-select: none;
+        }
+        .sidebar-group > summary:hover { background: var(--paper); }
+        .sidebar-group > summary::before { content: '▸'; color: var(--muted); width: 10px; }
+        .sidebar-group[open] > summary::before { content: '▾'; }
+        .sidebar-group > summary::-webkit-details-marker { display: none; }
+        .sidebar-group.depth-0 > summary { background: var(--paper); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+        .sidebar-group .group-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .sidebar-group .group-count { flex-shrink: 0; color: var(--muted); font-size: 12px; font-weight: 400; text-transform: none; }
+        .sidebar-group .group-count .is-failed { color: var(--failed); font-weight: 700; }
         .sidebar-row:hover { background: var(--paper); }
         .sidebar-row.is-selected { background: var(--accent-light); }
         .sidebar-row .badge { flex-shrink: 0; font-weight: 700; }
@@ -357,7 +376,12 @@ final class ReportRenderer
             function escapeHtml(text) {
                 var div = document.createElement('div');
                 div.textContent = text == null ? '' : String(text);
-                return div.innerHTML;
+                // Quotes too: a data-set test id lands in an attribute.
+                return div.innerHTML.replace(/"/g, '&quot;');
+            }
+
+            function steps(count) {
+                return count + (count === 1 ? ' step' : ' steps');
             }
 
             function currentTest() {
@@ -382,6 +406,27 @@ final class ReportRenderer
                     + '<div class="summary-bar">' + bar + '</div>';
             }
 
+            // Folder, then class: each prefix of a test's group is a
+            // collapsible group, keyed by its path.
+            var groupStats = {};
+            var openGroups = {};
+
+            function groupKeys(t) {
+                return (t.group || []).map(function (_, d) { return t.group.slice(0, d + 1).join('/'); });
+            }
+
+            data.tests.forEach(function (t) {
+                groupKeys(t).forEach(function (key) {
+                    var stats = groupStats[key] || (groupStats[key] = { total: 0, failed: 0 });
+                    stats.total++;
+                    stats.failed += t.passed ? 0 : 1;
+                });
+            });
+
+            function revealTest(t) {
+                groupKeys(t).forEach(function (key) { openGroups[key] = true; });
+            }
+
             function renderSidebar() {
                 if (data.tests.length <= 1) {
                     return;
@@ -389,24 +434,47 @@ final class ReportRenderer
                 els.sidebar.hidden = false;
                 var needle = els.filter.value.trim().toLowerCase();
                 var html = '';
+                var path = [];
                 data.tests.forEach(function (t, i) {
-                    if (needle && t.title.toLowerCase().indexOf(needle) === -1) {
+                    var group = t.group || [];
+                    if (needle && (group.join(' ') + ' ' + t.title).toLowerCase().indexOf(needle) === -1) {
                         return;
                     }
+                    var same = 0;
+                    while (same < path.length && same < group.length && path[same] === group[same]) {
+                        same++;
+                    }
+                    html += '</details>'.repeat(path.length - same);
+                    var keys = groupKeys(t);
+                    for (var d = same; d < group.length; d++) {
+                        var stats = groupStats[keys[d]];
+                        html += '<details class="sidebar-group depth-' + d + '" data-group="' + escapeHtml(keys[d]) + '"'
+                            + (needle || openGroups[keys[d]] ? ' open' : '') + '>'
+                            + '<summary style="--depth:' + d + '"><span class="group-name">' + escapeHtml(group[d]) + '</span>'
+                            + '<span class="group-count">' + (stats.failed ? '<span class="is-failed">' + stats.failed + ' ✗</span> · ' : '')
+                            + stats.total + '</span></summary>';
+                    }
+                    path = group;
                     var cls = 'sidebar-row ' + (t.passed ? 'is-passed' : 'is-failed') + (i === state.testIndex ? ' is-selected' : '');
-                    html += '<button type="button" class="' + cls + '" data-test-index="' + i + '">'
+                    html += '<button type="button" class="' + cls + '" data-test-index="' + i + '" style="--depth:' + group.length + '" title="' + escapeHtml(t.id) + '">'
                         + '<span class="badge">' + (t.passed ? '✓' : '✗') + '</span>'
                         + '<span class="row-title">' + escapeHtml(t.title) + '</span>'
-                        + '<span class="row-steps">' + t.totalSteps + ' steps</span>'
+                        + '<span class="row-steps">' + steps(t.totalSteps) + '</span>'
                         + '</button>';
                 });
+                html += '</details>'.repeat(path.length);
                 els.sidebarList.innerHTML = html;
+                var selected = els.sidebarList.querySelector('.is-selected');
+                if (selected) {
+                    selected.scrollIntoView({ block: 'nearest' });
+                }
             }
 
             function selectTest(index, keepPlaying) {
                 if (!keepPlaying) {
                     stopPlaying();
                 }
+                revealTest(data.tests[index]);
                 state.testIndex = index;
                 state.momentIndex = 0;
                 renderSidebar();
@@ -416,9 +484,10 @@ final class ReportRenderer
             function renderTest() {
                 var test = currentTest();
                 els.testTitle.textContent = test.title;
-                els.testMeta.textContent = (test.passed ? 'Passed' : 'Failed')
+                els.testMeta.textContent = (test.group && test.group.length ? test.group.join(' › ') + ' · ' : '')
+                    + (test.passed ? 'Passed' : 'Failed')
                     + (data.tests.length > 1 ? ' · test ' + test.index + ' of ' + test.total : '')
-                    + ' · ' + test.totalSteps + ' steps';
+                    + ' · ' + steps(test.totalSteps);
 
                 // One thumbnail per change of picture among key moments;
                 // in-between frames are left to Play.
@@ -623,6 +692,14 @@ final class ReportRenderer
                 }
             });
 
+            // toggle doesn't bubble. A filter opens every group without
+            // that becoming the remembered state.
+            els.sidebarList.addEventListener('toggle', function (event) {
+                if (event.target.dataset.group && !els.filter.value.trim()) {
+                    openGroups[event.target.dataset.group] = event.target.open;
+                }
+            }, true);
+
             els.filter.addEventListener('input', renderSidebar);
 
             els.rail.addEventListener('click', function (event) {
@@ -672,6 +749,12 @@ final class ReportRenderer
 
             renderSummary();
             state.testIndex = initialTestIndex();
+            data.tests.forEach(function (t) {
+                if (!t.passed) {
+                    revealTest(t);
+                }
+            });
+            revealTest(currentTest());
             renderSidebar();
             renderTest();
         })();

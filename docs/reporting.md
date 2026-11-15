@@ -83,7 +83,7 @@ An ordinary test run pays nothing for this — accumulation and rendering are bo
 ## What's in the report
 
 - A header summary — pass/fail counts and a segmented progress bar.
-- A sidebar of every test, filterable by title.
+- A sidebar of every test, grouped by folder and then by class: `Tests\Browser\Auth\LoginFlowTest` sits under **Auth › Login flow**, below the namespace every test shares. Each group shows its test count, and any failures in red. A group opens when it holds a failure or the test on screen, and otherwise remembers whether you opened it. The filter matches titles and group names, and opens every group with a match.
 - A thumbnail rail (one thumbnail per change of picture among key moments) and a large current-moment view: screenshot, caption, step count, duration, a ring around the element a gesture is acting on, and a green checkmark on a verified assertion moment.
 - Player controls — Play/Pause, a 0.5×/1×/2×/4× speed selector, and Prev/Next between key moments (arrow keys, or Space to toggle play). Playback includes the in-between frames, follows the real gaps between frames, clamped at both ends — long enough to read a new caption, never more than a second and a half on a page where nothing was changing (the report says how much it skipped) — and flows from one test straight into the next, so pressing Play turns the whole suite into a watchable run instead of a screenshot wall. Pause and scrub anywhere at any point.
 - An assertions panel on any verified moment, listing the exact `Browser` calls that moment proved — e.g. `assertSee("1 item left")`.

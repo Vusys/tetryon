@@ -38,6 +38,30 @@ final class ReportManifestTest extends TestCase
         self::assertSame(2, $this->test($manifest, 0)['total']);
     }
 
+    public function test_it_groups_tests_by_folder_below_the_shared_namespace_then_class(): void
+    {
+        $manifest = ReportManifest::build([
+            $this->recording('Tests\Browser\Auth\LoginFlowTest::test_one'),
+            $this->recording('Tests\Browser\Schema\Fields\ApiKeysTest::test_two'),
+            $this->recording('not a method id'),
+        ], [['a.webp'], ['b.webp'], ['c.webp']], [null, null, null]);
+
+        self::assertSame(['Auth', 'Login flow'], $this->test($manifest, 0)['group']);
+        self::assertSame(['Schema / Fields', 'Api keys'], $this->test($manifest, 1)['group']);
+        self::assertSame([], $this->test($manifest, 2)['group']);
+    }
+
+    public function test_it_groups_one_folder_of_tests_by_class_alone(): void
+    {
+        $manifest = ReportManifest::build([
+            $this->recording('Tests\Browser\Auth\LoginFlowTest::test_one'),
+            $this->recording('Tests\Browser\Auth\LogoutTest::test_two'),
+        ], [['a.webp'], ['b.webp']], [null, null]);
+
+        self::assertSame(['Login flow'], $this->test($manifest, 0)['group']);
+        self::assertSame(['Logout'], $this->test($manifest, 1)['group']);
+    }
+
     public function test_it_attaches_the_screenshot_path_per_moment(): void
     {
         $manifest = ReportManifest::build(

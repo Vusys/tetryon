@@ -27,12 +27,15 @@ final class ReportManifest
         $total = count($recordings);
         $passed = count(array_filter($recordings, static fn (TestRecording $recording): bool => $recording->passed));
 
+        $groups = self::groups(array_map(static fn (TestRecording $recording): string => $recording->testId, $recordings));
+
         $tests = [];
         foreach ($recordings as $index => $recording) {
             $totalSteps = self::totalSteps($recording->moments);
             $tests[] = [
                 'id' => $recording->testId,
                 'title' => $recording->title,
+                'group' => $groups[$index],
                 'totalSteps' => $totalSteps,
                 'passed' => $recording->passed,
                 'index' => $index + 1,
@@ -47,6 +50,55 @@ final class ReportManifest
             'summary' => ['total' => $total, 'passed' => $passed, 'failed' => $total - $passed],
             'tests' => $tests,
         ];
+    }
+
+    /**
+     * Where each test sits in the sidebar: the folder its class lives in,
+     * below the namespace every test shares, then the class as a phrase —
+     * `Tests\Browser\Auth\LoginFlowTest::test_x` → `['Auth', 'Login flow']`
+     * when every test is under `Tests\Browser`. A test id that isn't
+     * `Class::method` gets no group.
+     *
+     * @param  list<string>  $testIds
+     * @return list<list<string>>
+     */
+    private static function groups(array $testIds): array
+    {
+        $namespaces = [];
+        foreach ($testIds as $index => $testId) {
+            $class = strstr($testId, '::', true);
+            if ($class !== false) {
+                $namespaces[$index] = explode('\\', $class);
+            }
+        }
+
+        // The class itself is never part of the shared prefix.
+        $shared = $namespaces === [] ? 0 : min(array_map(static fn (array $parts): int => count($parts) - 1, $namespaces));
+        $first = $namespaces === [] ? [] : reset($namespaces);
+        foreach ($namespaces as $parts) {
+            $depth = 0;
+            while ($depth < $shared && $parts[$depth] === $first[$depth]) {
+                $depth++;
+            }
+            $shared = $depth;
+        }
+
+        $groups = [];
+        foreach ($testIds as $index => $testId) {
+            if (! isset($namespaces[$index])) {
+                $groups[] = [];
+
+                continue;
+            }
+            $parts = $namespaces[$index];
+            $class = array_pop($parts);
+            $folder = implode(' / ', array_slice($parts, $shared));
+            $words = preg_split('/(?<=[a-z0-9])(?=[A-Z])/', preg_replace('/Test$/', '', $class) ?: $class) ?: [$class];
+            $phrase = ucfirst(strtolower(implode(' ', $words)));
+            $groups[] = $folder === '' ? [$phrase] : [$folder, $phrase];
+        }
+
+        return $groups;
     }
 
     /**
