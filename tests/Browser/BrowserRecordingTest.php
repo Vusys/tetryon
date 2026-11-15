@@ -200,6 +200,27 @@ final class BrowserRecordingTest extends TestCase
         self::assertGreaterThan(0, $overlays[0]['vw']);
     }
 
+    public function test_a_beat_inside_a_beat_is_part_of_the_outer_one(): void
+    {
+        $browser = $this->recordingBrowser('/recording.html');
+
+        $browser->beat('Pick colours', fn (Browser $b): Browser => $b
+            ->beat('Pick green', fn (Browser $inner): Browser => $inner->select('Colour', 'Green'))
+            ->select('Colour', 'Blue'));
+
+        $moments = $this->finished($browser)->moments;
+        $captions = array_map(static fn (Moment $moment): string => $moment->caption, $moments);
+
+        // One step, every frame under the outer label — including the
+        // gesture after the inner beat, which used to lose its label.
+        self::assertSame([1], array_values(array_unique(array_map(static fn (Moment $moment): int => $moment->stepIndex, $moments))));
+        self::assertSame([], array_values(array_filter($captions, static fn (string $caption): bool => str_contains($caption, 'Pick green'))));
+        self::assertSame('Pick colours', $moments[0]->caption);
+        $blue = array_values(array_filter($moments, static fn (Moment $moment): bool => ($moment->overlay['selected'] ?? null) === 'Blue'));
+        self::assertCount(1, $blue);
+        self::assertSame('Pick colours', $blue[0]->caption);
+    }
+
     public function test_a_gesture_outside_a_beat_is_not_measured(): void
     {
         $browser = $this->recordingBrowser('/recording.html');

@@ -82,11 +82,16 @@ final class RecordingSession
      * or not — recording only ever changes whether the beat is
      * photographed, never whether it happens.
      *
+     * A beat opened inside another runs its body as part of the outer one:
+     * the outer label is the step, and the inner label is dropped. So a
+     * helper can label its own work and still be called from inside a
+     * caller's beat.
+     *
      * @param  callable(): mixed  $body
      */
     public function runBeat(string $label, callable $body): void
     {
-        if (! $this->active) {
+        if (! $this->active || $this->currentLabel !== null) {
             $body();
 
             return;
