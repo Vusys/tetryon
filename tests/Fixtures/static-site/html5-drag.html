@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>HTML5 drag</title>
+    <style>
+        div { padding: 20px; margin: 20px; border: 1px solid #999; }
+    </style>
+</head>
+<body>
+    <!-- Native HTML5 drag and drop: the move happens on drop, not on dragover. -->
+    <div id="card" draggable="true">Card</div>
+    <div id="bin">Bin</div>
+    <p data-testid="log"></p>
+    <script>
+        const log = document.querySelector('[data-testid=log]');
+        const card = document.getElementById('card');
+        const bin = document.getElementById('bin');
+        card.addEventListener('dragstart', (e) => e.dataTransfer.setData('text/plain', 'card'));
+        card.addEventListener('dragend', () => { log.textContent += ' dragend'; });
+        bin.addEventListener('dragover', (e) => e.preventDefault());
+        bin.addEventListener('drop', (e) => { e.preventDefault(); log.textContent += 'dropped ' + e.dataTransfer.getData('text/plain'); });
+    </script>
+</body>
+</html>

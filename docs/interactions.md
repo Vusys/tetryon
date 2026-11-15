@@ -32,7 +32,9 @@ $this->browser()
 ->dragDown('@row-3', 120)           // by a pixel offset; also dragUp/dragLeft/dragRight
 ```
 
-The drag issues intermediate pointer moves (not a single jump), so pointer-drag libraries like Sortable.js / vuedraggable register the gesture and compute direction. This drives **pointer-based** DnD; HTML5-native `draggable` drag/drop events are out of scope.
+The drag issues intermediate pointer moves (not a single jump), so pointer-drag libraries like Sortable.js / vuedraggable register the gesture and compute direction.
+
+When `drag()`'s source is, or sits inside, a `draggable="true"` element, it does native HTML5 drag-and-drop instead: `dragstart`, `dragenter`, `dragover`, then `drop` if the target cancels `dragover`, and `dragend`, all sharing one `DataTransfer`. Firefox's pointer input starts an HTML5 drag but never delivers its `drop`, so these events are dispatched in the page. The offset verbs (`dragTo`, `dragUp` and friends) always use the pointer, because an HTML5 drop needs an element to land on.
 
 ## Scrolling
 

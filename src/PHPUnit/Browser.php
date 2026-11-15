@@ -528,13 +528,20 @@ final readonly class Browser
     }
 
     /**
-     * Drag the source element onto the target, with intermediate pointer moves so
-     * pointer-drag libraries (Sortable.js, vuedraggable, …) register the gesture.
-     * Targets pointer-based DnD, not HTML5 `draggable` drag events.
+     * Drag the source element onto the target. Inside a `draggable="true"`
+     * element this is native HTML5 drag-and-drop — dragstart through drop and
+     * dragend, which Firefox's pointer input never completes. Otherwise it is
+     * a pointer press-move-release with intermediate moves, the gesture
+     * pointer-drag libraries (Sortable.js, vuedraggable, …) register.
      */
     public function drag(string $source, string $target): self
     {
-        $this->driver->dragElement($this->actionable($source), $this->resolveWaiting($target));
+        $from = $this->actionable($source);
+        $onto = $this->resolveWaiting($target);
+
+        if (! $this->driver->dragHtml5($from, $onto)) {
+            $this->driver->dragElement($from, $onto);
+        }
 
         return $this;
     }
