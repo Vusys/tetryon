@@ -120,6 +120,10 @@ An ordinary test run pays nothing for this — accumulation and rendering are bo
 
 Screenshots are written as WebP when PHP's `ext-gd` is available (much smaller than PNG at report scale), falling back to PNG otherwise. Either way this is transparent — the report references whatever format got written. Each distinct image is written once, however many moments or tests show it.
 
+Encoding happens in the background, not in the test. Each new screenshot is saved once as a PNG in a temporary spool, and a separate, lower-priority PHP process encodes it while the test carries on. So the gap between two frames is the time to take a screenshot, not to compress one, and a suite's recordings wait on disk rather than in memory. Writing the report waits for the encoder to finish, and encodes anything it missed itself.
+
+The viewport's `device_pixel_ratio` (see [Configuration](configuration.md#viewport)) sets how sharp frames are: `2` matches a high-density screen, at four times the pixels to encode.
+
 ## Instrumenting once for many scenarios
 
 Because `recording()`/`beat()` live directly on `Browser`, a shared base class (or a helper method returning `Browser`) can instrument its scenarios once and have every subclass benefit — see `tests/TodoMvc/TodoMvcTestCase.php` for a real example spanning ten framework apps.

@@ -110,6 +110,19 @@ final class FirefoxBiDiDriver implements NodeLocator, VisibilityProbe
         private readonly BiDiTrace $trace = new BiDiTrace,
     ) {}
 
+    /**
+     * Size the page's viewport in CSS pixels, drawn at $devicePixelRatio
+     * device pixels each — what layout, breakpoints and screenshots see.
+     */
+    public function setViewport(int $width, int $height, float $devicePixelRatio = 1.0): void
+    {
+        $this->connection()->send('browsingContext.setViewport', [
+            'context' => $this->context(),
+            'viewport' => ['width' => $width, 'height' => $height],
+            'devicePixelRatio' => $devicePixelRatio,
+        ]);
+    }
+
     public function start(): void
     {
         if ($this->process instanceof FirefoxProcess) {

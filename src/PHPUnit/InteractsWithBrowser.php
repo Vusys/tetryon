@@ -50,6 +50,8 @@ trait InteractsWithBrowser
             $this->browserLogger(),
         );
         $this->tetryonDriver->start();
+        $viewport = $configuration->viewport;
+        $this->tetryonDriver->setViewport($viewport->width, $viewport->height, $viewport->devicePixelRatio);
 
         $browser = $this->tetryonBrowser = new Browser($this->tetryonDriver, $configuration);
         $record = $this->recordAttribute();

@@ -62,6 +62,7 @@ Configuration::fromArray([
     'viewport' => [
         'width' => 1280,
         'height' => 720,
+        'device_pixel_ratio' => 1,
     ],
 
     'artifacts' => [
@@ -73,6 +74,10 @@ Configuration::fromArray([
     ],
 ]);
 ```
+
+## Viewport
+
+The browser window's inner size in CSS pixels, applied when the browser starts, so layouts, breakpoints and screenshots are the same on every machine. `device_pixel_ratio` is how many device pixels draw each CSS pixel: `2` makes screenshots and recordings as sharp as a high-density screen, at four times the pixels, so encoding a recording takes longer.
 
 ## Selector test attributes
 

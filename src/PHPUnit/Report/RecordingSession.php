@@ -7,7 +7,6 @@ namespace Vusys\Tetryon\PHPUnit\Report;
 use Throwable;
 use Vusys\Tetryon\Core\Diagnostics\ArtifactBag;
 use Vusys\Tetryon\Core\Selector\ElementNotFoundException;
-use Vusys\Tetryon\Core\Support\ImageEncoder;
 use Vusys\Tetryon\Firefox\FirefoxBiDiDriver;
 use Vusys\Tetryon\PHPUnit\Browser;
 
@@ -37,7 +36,7 @@ final class RecordingSession
 
     private float $startedAt = 0.0;
 
-    /** md5 of the last raw screenshot, and the encoded bytes it produced. */
+    /** md5 of the last raw screenshot, and the spooled frame it became. */
     private ?string $lastHash = null;
 
     private string $lastImage = '';
@@ -359,9 +358,9 @@ final class RecordingSession
     }
 
     /**
-     * Screenshot the page and return report-ready bytes. An unchanged page
-     * returns the very same string as last time, so identical frames cost
-     * no extra memory and no re-encode.
+     * Screenshot the page and return its frame — a path in the
+     * {@see FrameSpool}, encoded in the background. An unchanged page returns
+     * the very same path as last time, so identical frames cost nothing.
      */
     private function shoot(): string
     {
@@ -370,7 +369,7 @@ final class RecordingSession
 
         if ($hash !== $this->lastHash) {
             $this->lastHash = $hash;
-            $this->lastImage = ImageEncoder::encode($png)->bytes;
+            $this->lastImage = FrameSpool::shared()->put($png);
         }
 
         return $this->lastImage;

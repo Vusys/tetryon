@@ -66,6 +66,7 @@ final class ReportRenderer
         $diagnosticsDirs = [];
         $diagnosticsReports = [];
 
+        $spool = FrameSpool::shared();
         foreach ($recordings as $recording) {
             $slug = Slug::forTestId($recording->testId);
 
@@ -73,7 +74,7 @@ final class ReportRenderer
             foreach ($recording->moments as $moment) {
                 // Named by content: a frame the page sat on for five moments
                 // — or that five tests all opened on — is written once.
-                $encoded = ImageEncoder::encode($moment->screenshot);
+                $encoded = $spool->owns($moment->screenshot) ? $spool->encoded($moment->screenshot) : ImageEncoder::encode($moment->screenshot);
                 $relative = sprintf('screenshots/%s.%s', md5($encoded->bytes), $encoded->extension);
                 if (! is_file("{$outputDirectory}/{$relative}")) {
                     file_put_contents("{$outputDirectory}/{$relative}", $encoded->bytes);

@@ -16,7 +16,7 @@ use Vusys\Tetryon\Core\Selector\ElementNotFoundException;
 final readonly class Moment
 {
     /**
-     * @param  string  $screenshot  image bytes — WebP when the recording could encode it, PNG otherwise
+     * @param  string  $screenshot  the frame: a {@see FrameSpool} path when recorded, or image bytes
      * @param  string  $caption  what this moment shows
      * @param  int  $stepIndex  the beat this moment belongs to; 0 for a moment before the first beat
      * @param  float  $progress  timeline position in whole-beat units (2.6 means beat 3 is 60% done)

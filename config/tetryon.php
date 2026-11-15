@@ -21,6 +21,8 @@ return [
     'viewport' => [
         'width' => 1280,
         'height' => 720,
+        // 2 for sharp, high-density screenshots and recordings (4× the pixels).
+        'device_pixel_ratio' => 1,
     ],
 
     'artifacts' => [
