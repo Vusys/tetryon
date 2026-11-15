@@ -229,6 +229,25 @@ final readonly class Browser
         return $this;
     }
 
+    /** Whether {@see recording()} (or a #[Record] attribute) turned recording on. */
+    public function isRecording(): bool
+    {
+        return $this->recording->isActive();
+    }
+
+    /**
+     * Run $body without photographing anything — setup that isn't part of
+     * the story. It still runs exactly as normal; recording resumes after.
+     *
+     * @param  callable(self): mixed  $body
+     */
+    public function unrecorded(callable $body): self
+    {
+        $this->recording->paused(fn (): mixed => $body($this));
+
+        return $this;
+    }
+
     /**
      * Run $body as a labelled beat of the recording — the one verb that
      * replaces the old note()/step()/type()/assert() split. Captures a

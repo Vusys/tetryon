@@ -24,6 +24,32 @@ public function test_guest_can_log_in(): void
 - `beat($label, $body)` — the one marker verb. Captures a "before" moment, runs `$body($browser)`, then captures a timed "after" moment. `$body` always runs — recording only ever changes whether a beat is photographed, never whether it happens — so a beat behaves identically whether or not `recording()` was called. Grouping several gestures under one beat (a compound filter, a multi-field form) is an editorial choice, not something counted for you. A beat opened inside another is part of the outer one: the outer label is the step, and the inner label is dropped. So a helper can label its own work with `beat()` and still be called from inside a caller's beat.
 - Assertions caption themselves — no verb, no label, and they don't need to be inside a beat's closure. Every `assertX()` call captures its own proof moment while recording is active, showing exactly which call ran and with what arguments, e.g. `assertSee("Dashboard")`.
 
+### Recording from the start, and setup helpers
+
+`recording()` sits in the chain, so anything a helper did before it (logging in, opening the page under test) goes unrecorded. Put `#[Record]` on the test method, or on the class to cover every test in it, and recording is on from the browser's first command:
+
+```php
+use Vusys\Tetryon\PHPUnit\Record;
+
+#[Record('A user reorders fields by dragging')]
+public function test_user_can_reorder_fields(): void
+{
+    $this->openSchemaEditor($user, $schema)          // recorded, and labelled by the helper
+        ->beat('Drag the second field to the top', fn (Browser $b) => $b->dragUp(...));
+}
+
+protected function openSchemaEditor(User $user, Schema $schema): Browser
+{
+    return $this->browser()->beat('Open the schema editor', fn (Browser $b) => $this
+        ->loginAs($user)
+        ->visit(route('schemas.edit', $schema, absolute: false)));
+}
+```
+
+A method's attribute wins over its class's; the title works like `recording()`'s. A helper labelling its own work this way is safe to call from inside a caller's beat too, since a beat inside a beat is part of the outer one.
+
+`unrecorded($body)` runs setup that isn't part of the story without photographing it. The Laravel `loginAs()` uses it, so the testing-only login route never appears in a recording. `isRecording()` says whether recording is on.
+
 The closure is the point, not ceremony: a gesture has to be lexically inside some beat's body to be captured at all, rather than "belongs to whatever beat came before it" being a convention you hold in your head. It isn't airtight — nothing stops a bare `$browser->click(...)` outside any beat, and that gesture will run exactly as normal but leave no trace in the report — but it makes the correct shape the natural one to reach for.
 
 The closing moment — passed or failed — is appended automatically once the test finishes; you don't call anything for that yourself. The step count shown in the report ("step 3/6") is derived from the beats actually reached, not a number you declare and keep in sync by hand.

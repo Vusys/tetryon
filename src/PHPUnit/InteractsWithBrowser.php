@@ -8,6 +8,8 @@ use PHPUnit\Framework\Attributes\After;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use ReflectionClass;
+use ReflectionMethod;
 use Vusys\Tetryon\Core\Config\Configuration;
 use Vusys\Tetryon\Core\Diagnostics\ArtifactBag;
 use Vusys\Tetryon\Core\Support\StreamLogger;
@@ -49,7 +51,23 @@ trait InteractsWithBrowser
         );
         $this->tetryonDriver->start();
 
-        return $this->tetryonBrowser = new Browser($this->tetryonDriver, $configuration);
+        $browser = $this->tetryonBrowser = new Browser($this->tetryonDriver, $configuration);
+        $record = $this->recordAttribute();
+
+        return $record instanceof Record ? $browser->recording($record->title) : $browser;
+    }
+
+    /** The test method's #[Record], else its class's (or a parent's). */
+    private function recordAttribute(): ?Record
+    {
+        $method = new ReflectionMethod($this, $this->name());
+        $attributes = $method->getAttributes(Record::class);
+
+        for ($class = new ReflectionClass($this); $attributes === [] && $class instanceof ReflectionClass; $class = $class->getParentClass() ?: null) {
+            $attributes = $class->getAttributes(Record::class);
+        }
+
+        return $attributes === [] ? null : $attributes[0]->newInstance();
     }
 
     protected function scenario(): Scenario

@@ -74,6 +74,24 @@ final class RecordingSession
     }
 
     /**
+     * Run $body with nothing photographed — setup the story shouldn't show,
+     * like the testing-only login route. Recording resumes after, as it was.
+     *
+     * @param  callable(): mixed  $body
+     */
+    public function paused(callable $body): void
+    {
+        $active = $this->active;
+        $this->active = false;
+
+        try {
+            $body();
+        } finally {
+            $this->active = $active;
+        }
+    }
+
+    /**
      * Run $body as a labelled beat: capture a "before" moment, invoke
      * $body, then capture a timed "after" moment — unless $body's own
      * failure already captured one (see {@see captureFailure()}), in which
