@@ -228,7 +228,7 @@ final class BrowserRecordingTest extends TestCase
         $browser->assertSelected('#colour', 'Red')    // a selector: captioned by its label
             ->assertSelected('Colour', 'Red')          // already a name: the call is clear as it is
             ->assertVisible('#panel')                  // no label: its own text
-            ->assertExpression('document.title === "Recording"', 'The page is titled Recording');
+            ->assertExpression('document.title === "Recording"', 'The title changed.', label: 'The page is titled Recording');
 
         $moments = $this->finished($browser)->moments;
 

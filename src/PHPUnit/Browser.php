@@ -304,7 +304,7 @@ final readonly class Browser
      * $target is a selector: $phrase given the element's own name, e.g.
      * `“Minimum” is "1"` for `assertValue("[data-option-field=min]", "1")`.
      * The exact call still heads the moment's assertions list. $caption,
-     * when given, is used as it is (an assertion's own message).
+     * when given, is used as it is (an assertion's own label).
      *
      * @param  callable(): mixed  $assert
      * @param  (callable(string): string)|null  $phrase
@@ -1257,9 +1257,10 @@ final readonly class Browser
     /**
      * Assert that a JavaScript expression evaluates truthy, retrying until it
      * does or the timeout elapses — the auto-wait counterpart to {@see evaluate()}
-     * for state the DOM doesn't render as text.
+     * for state the DOM doesn't render as text. $message explains a failure;
+     * $label is what the recording calls the proof, in place of the script.
      */
-    public function assertExpression(string $expression, string $message = ''): self
+    public function assertExpression(string $expression, string $message = '', ?string $label = null): self
     {
         $this->retry(fn (): bool => (bool) $this->evaluate($expression));
         $this->verifyAssertion(
@@ -1268,7 +1269,7 @@ final readonly class Browser
                 $message !== '' ? $message : "Expected this expression to be truthy: {$expression}",
             ),
             "assertExpression(\"{$expression}\")",
-            caption: $message !== '' ? $message : null,
+            caption: $label,
         );
 
         return $this;
@@ -1277,8 +1278,10 @@ final readonly class Browser
     /**
      * Assert that a JavaScript expression equals an expected (serialisable)
      * value, retrying until it matches — so a failure shows expected-vs-actual.
+     * $message explains a failure; $label is what the recording calls the
+     * proof, in place of the script.
      */
-    public function assertExpressionEquals(string $expression, mixed $expected, string $message = ''): self
+    public function assertExpressionEquals(string $expression, mixed $expected, string $message = '', ?string $label = null): self
     {
         $this->retry(fn (): bool => $this->evaluate($expression) == $expected);
         $this->verifyAssertion(
@@ -1288,7 +1291,7 @@ final readonly class Browser
                 $message !== '' ? $message : "Expression did not equal the expected value: {$expression}",
             ),
             "assertExpressionEquals(\"{$expression}\", ".$this->describeValue($expected).')',
-            caption: $message !== '' ? $message : null,
+            caption: $label,
         );
 
         return $this;
