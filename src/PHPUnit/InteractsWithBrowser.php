@@ -117,6 +117,13 @@ trait InteractsWithBrowser
 
         $bag = ($driver instanceof FirefoxBiDiDriver && $failed) ? FailureArtifacts::captureBag($driver) : null;
 
+        // A failure before any page loaded has no browser story to tell; the
+        // test's own error says it all, without a block of blank artifacts.
+        if ($bag instanceof ArtifactBag && $bag->isBlank()) {
+            fwrite(STDERR, "Tetryon: the browser had not loaded a page when the test failed, so there are no browser diagnostics.\n");
+            $bag = null;
+        }
+
         $browser = $this->tetryonBrowser;
         if ($browser instanceof Browser) {
             // "test_guest_can_log_in" / "testGuestCanLogIn" → "Guest can log in".
