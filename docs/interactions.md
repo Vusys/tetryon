@@ -55,6 +55,8 @@ Actions scroll on their own — `click()` brings its target into view, including
 
 `fill` / `type` / `clear` work on `<input>`/`<textarea>` **and** `contenteditable` editors (rich-text fields), and `value()` reads either back. On anything else they throw `UndrivableElementException` rather than silently no-opping.
 
+Date, time, `datetime-local`, month, week, colour and range inputs are pickers, not text boxes: Firefox drops typed text into them. `fill` sets their value directly and fires `input` and `change`, as choosing from the picker would. Pass the value in the format the HTML spec uses, whatever the browser displays: `fill('Start date', '2025-03-01')`, `fill('Alarm', '14:30')`, `fill('Accent', '#ff8800')`. A value the input rejects, such as a localised `01/03/2025`, throws `UndrivableElementException` instead of leaving the field empty.
+
 `pressKey` sends to the focused element. Named keys (`Enter`, `Tab`, `Escape`, `Backspace`, `Delete`, `ArrowUp`/`Down`/`Left`/`Right`, `Home`, `End`, `PageUp`/`PageDown`, …) are translated to the right key codes; a single character is sent literally.
 
 ### Committing on blur

@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Pickers</title>
+</head>
+<body>
+    <label for="start">Start date</label>
+    <input type="date" id="start">
+    <label for="alarm">Alarm</label>
+    <input type="time" id="alarm">
+    <label for="accent">Accent</label>
+    <input type="color" id="accent">
+    <div data-testid="changed"></div>
+    <script>
+        document.querySelectorAll('input').forEach((input) => input.addEventListener('change', () => {
+            document.querySelector('[data-testid=changed]').textContent = input.id + ' changed to ' + input.value;
+        }));
+    </script>
+</body>
+</html>

@@ -28,4 +28,16 @@ final class UndrivableElementException extends RuntimeException
 
         return new self(sprintf('%s("%s") resolved a <%s>, which %s.', $verb, $target, $resolved, $needs));
     }
+
+    /**
+     * A picker input (date, time, colour…) sanitised the value to something
+     * else — usually a format it doesn't take, like a localised date.
+     */
+    public static function rejectedValue(string $verb, string $target, string $type, string $value): self
+    {
+        return new self(sprintf(
+            '%s("%s", "%s") was rejected by an <input type="%s">, which takes its value in the format the HTML spec gives it (e.g. 2025-03-01 for a date, 14:30 for a time, #ff8800 for a colour).',
+            $verb, $target, $value, $type,
+        ));
+    }
 }
