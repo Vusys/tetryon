@@ -43,6 +43,16 @@ final readonly class Browser
     /** Inputs whose value is chosen from a widget rather than typed. */
     private const array PICKER_INPUT_TYPES = ['date', 'datetime-local', 'month', 'week', 'time', 'color', 'range'];
 
+    /** A target written as a selector (CSS, XPath, @test-id) rather than a name. */
+    private const string SELECTOR_PATTERN = '~^(\\[|//|\\(|@|#|\\.)|[\\[\\]=>]~';
+
+    private const string NAME_SCRIPT = 'function(){ const clean = (s) => (s || "").replace(/\\s+/g, " ").trim();'
+        .' const field = ["input", "select", "textarea"].includes(this.tagName.toLowerCase());'
+        .' const name = clean(this.getAttribute("aria-label")) || clean(this.labels && this.labels[0] ? this.labels[0].innerText : "")'
+        .' || clean(this.getAttribute("placeholder")) || clean(this.getAttribute("title"))'
+        .' || (field ? "" : clean(this.innerText)) || clean(this.getAttribute("name"));'
+        .' return name.length > 40 ? name.slice(0, 39) + "…" : name; }';
+
     private const string SET_PICKER_VALUE_SCRIPT = 'function(value){ this.value = value;'
         .' this.dispatchEvent(new Event("input", { bubbles: true }));'
         .' this.dispatchEvent(new Event("change", { bubbles: true })); return this.value; }';
@@ -277,10 +287,10 @@ final readonly class Browser
         return $this;
     }
 
-    private function logAssertion(string $description): void
+    private function logAssertion(string $description, ?string $caption = null): void
     {
         $this->assertionLog->record($description);
-        $this->recording->captureAssertion($description);
+        $this->recording->captureAssertion($description, $caption);
     }
 
     /**
@@ -290,9 +300,16 @@ final readonly class Browser
      * Every assertX() method funnels through this so a failure is never the
      * one moment the report has nothing to show for.
      *
+     * $target and $phrase give the proof a caption a person can read when
+     * $target is a selector: $phrase given the element's own name, e.g.
+     * `“Minimum” is "1"` for `assertValue("[data-option-field=min]", "1")`.
+     * The exact call still heads the moment's assertions list. $caption,
+     * when given, is used as it is (an assertion's own message).
+     *
      * @param  callable(): mixed  $assert
+     * @param  (callable(string): string)|null  $phrase
      */
-    private function verifyAssertion(callable $assert, string $description): void
+    private function verifyAssertion(callable $assert, string $description, ?string $target = null, ?callable $phrase = null, ?string $caption = null): void
     {
         try {
             $assert();
@@ -302,7 +319,38 @@ final readonly class Browser
             throw $e;
         }
 
-        $this->logAssertion($description);
+        $name = $target === null ? null : $this->nameOf($target);
+        if ($name !== null && $phrase !== null) {
+            $caption = $phrase('“'.$name.'”');
+        }
+
+        $this->logAssertion($description, $caption);
+    }
+
+    /**
+     * What a person would call the element $target resolves to — its
+     * aria-label, label, placeholder, title or short text — when $target is
+     * a selector rather than such a name already, and only while recording
+     * (it costs a round trip). Null when there's nothing better to say.
+     */
+    private function nameOf(string $target): ?string
+    {
+        if (! $this->recording->isActive() || preg_match(self::SELECTOR_PATTERN, $target) !== 1) {
+            return null;
+        }
+
+        $element = $this->resolveNow($target);
+        if (! $element instanceof ElementReference) {
+            return null;
+        }
+
+        try {
+            $name = $this->driver->callFunctionOn($element, self::NAME_SCRIPT);
+        } catch (Throwable) {
+            return null;
+        }
+
+        return is_string($name) && $name !== '' ? $name : null;
     }
 
     /**
@@ -1016,6 +1064,8 @@ final readonly class Browser
         $this->verifyAssertion(
             fn () => Assert::assertSame($expected, $this->value($field), "Field \"{$field}\" had an unexpected value."),
             "assertValue(\"{$field}\", \"{$expected}\")",
+            $field,
+            fn (string $name): string => "{$name} is \"{$expected}\"",
         );
 
         return $this;
@@ -1027,6 +1077,8 @@ final readonly class Browser
         $this->verifyAssertion(
             fn () => Assert::assertTrue($this->isVisibleNow($target), "Expected \"{$target}\" to be visible."),
             "assertVisible(\"{$target}\")",
+            $target,
+            fn (string $name): string => "{$name} is visible",
         );
 
         return $this;
@@ -1066,6 +1118,8 @@ final readonly class Browser
         $this->verifyAssertion(
             fn () => Assert::assertTrue($this->isChecked($target), "Expected \"{$target}\" to be checked."),
             "assertChecked(\"{$target}\")",
+            $target,
+            fn (string $name): string => "{$name} is checked",
         );
 
         return $this;
@@ -1077,6 +1131,8 @@ final readonly class Browser
         $this->verifyAssertion(
             fn () => Assert::assertFalse($this->isChecked($target), "Expected \"{$target}\" not to be checked."),
             "assertNotChecked(\"{$target}\")",
+            $target,
+            fn (string $name): string => "{$name} is not checked",
         );
 
         return $this;
@@ -1088,6 +1144,8 @@ final readonly class Browser
         $this->verifyAssertion(
             fn () => Assert::assertTrue($this->isFocused($target), "Expected \"{$target}\" to be focused."),
             "assertFocused(\"{$target}\")",
+            $target,
+            fn (string $name): string => "{$name} has focus",
         );
 
         return $this;
@@ -1099,6 +1157,8 @@ final readonly class Browser
         $this->verifyAssertion(
             fn () => Assert::assertFalse($this->isFocused($target), "Expected \"{$target}\" not to be focused."),
             "assertNotFocused(\"{$target}\")",
+            $target,
+            fn (string $name): string => "{$name} does not have focus",
         );
 
         return $this;
@@ -1120,6 +1180,8 @@ final readonly class Browser
         $this->verifyAssertion(
             fn () => Assert::assertSame($value, $this->selected($field), "Expected \"{$field}\" to have \"{$value}\" selected."),
             "assertSelected(\"{$field}\", \"{$value}\")",
+            $field,
+            fn (string $name): string => "{$name} has \"{$value}\" selected",
         );
 
         return $this;
@@ -1131,6 +1193,8 @@ final readonly class Browser
         $this->verifyAssertion(
             fn () => Assert::assertNotSame($value, $this->selected($field), "Expected \"{$field}\" not to have \"{$value}\" selected."),
             "assertNotSelected(\"{$field}\", \"{$value}\")",
+            $field,
+            fn (string $name): string => "{$name} does not have \"{$value}\" selected",
         );
 
         return $this;
@@ -1142,6 +1206,8 @@ final readonly class Browser
         $this->verifyAssertion(
             fn () => Assert::assertFalse($this->isDisabled($target), "Expected \"{$target}\" to be enabled."),
             "assertEnabled(\"{$target}\")",
+            $target,
+            fn (string $name): string => "{$name} is enabled",
         );
 
         return $this;
@@ -1153,6 +1219,8 @@ final readonly class Browser
         $this->verifyAssertion(
             fn () => Assert::assertTrue($this->isDisabled($target), "Expected \"{$target}\" to be disabled."),
             "assertDisabled(\"{$target}\")",
+            $target,
+            fn (string $name): string => "{$name} is disabled",
         );
 
         return $this;
@@ -1200,6 +1268,7 @@ final readonly class Browser
                 $message !== '' ? $message : "Expected this expression to be truthy: {$expression}",
             ),
             "assertExpression(\"{$expression}\")",
+            caption: $message !== '' ? $message : null,
         );
 
         return $this;
@@ -1219,6 +1288,7 @@ final readonly class Browser
                 $message !== '' ? $message : "Expression did not equal the expected value: {$expression}",
             ),
             "assertExpressionEquals(\"{$expression}\", ".$this->describeValue($expected).')',
+            caption: $message !== '' ? $message : null,
         );
 
         return $this;

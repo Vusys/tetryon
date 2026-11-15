@@ -233,15 +233,16 @@ final class RecordingSession
     /**
      * A self-captioned proof moment for an assertion that just passed —
      * doesn't advance the beat counter, since it belongs to whichever beat
-     * is currently open.
+     * is currently open. $caption replaces the exact call as the moment's
+     * caption; the call stays in its assertions list either way.
      */
-    public function captureAssertion(string $description): void
+    public function captureAssertion(string $description, ?string $caption = null): void
     {
         if (! $this->active) {
             return;
         }
 
-        $this->capture($description, $this->beatIndex, $this->beatIndex, 0, verified: true, assertions: [$description], settle: true);
+        $this->capture($caption ?? $description, $this->beatIndex, $this->beatIndex, 0, verified: true, assertions: [$description], settle: true);
     }
 
     /**

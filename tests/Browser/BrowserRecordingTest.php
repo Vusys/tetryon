@@ -221,6 +221,25 @@ final class BrowserRecordingTest extends TestCase
         self::assertSame('Pick colours', $blue[0]->caption);
     }
 
+    public function test_a_selector_assertion_is_captioned_with_the_element_name(): void
+    {
+        $browser = $this->recordingBrowser('/recording.html');
+
+        $browser->assertSelected('#colour', 'Red')    // a selector: captioned by its label
+            ->assertSelected('Colour', 'Red')          // already a name: the call is clear as it is
+            ->assertVisible('#panel')                  // no label: its own text
+            ->assertExpression('document.title === "Recording"', 'The page is titled Recording');
+
+        $moments = $this->finished($browser)->moments;
+
+        self::assertSame('“Colour” has "Red" selected', $moments[0]->caption);
+        self::assertSame(['assertSelected("#colour", "Red")'], $moments[0]->assertions);
+        self::assertSame('assertSelected("Colour", "Red")', $moments[1]->caption);
+        self::assertSame('“Revealed panel” is visible', $moments[2]->caption);
+        self::assertSame('The page is titled Recording', $moments[3]->caption);
+        self::assertSame(['assertExpression("document.title === "Recording"")'], $moments[3]->assertions);
+    }
+
     public function test_a_gesture_outside_a_beat_is_not_measured(): void
     {
         $browser = $this->recordingBrowser('/recording.html');
