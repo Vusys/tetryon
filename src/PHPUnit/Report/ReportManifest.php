@@ -55,7 +55,7 @@ final class ReportManifest
     /**
      * Where each test sits in the sidebar: the folder its class lives in,
      * below the namespace every test shares, then the class as a phrase —
-     * `Tests\Browser\Auth\LoginFlowTest::test_x` → `['Auth', 'Login flow']`
+     * `Tests\Browser\DataSets\DataSetShowTest::test_x` → `['Data sets', 'Data set show']`
      * when every test is under `Tests\Browser`. A test id that isn't
      * `Class::method` gets no group.
      *
@@ -92,13 +92,20 @@ final class ReportManifest
             }
             $parts = $namespaces[$index];
             $class = array_pop($parts);
-            $folder = implode(' / ', array_slice($parts, $shared));
-            $words = preg_split('/(?<=[a-z0-9])(?=[A-Z])/', preg_replace('/Test$/', '', $class) ?: $class) ?: [$class];
-            $phrase = ucfirst(strtolower(implode(' ', $words)));
+            $folder = implode(' / ', array_map(self::phrase(...), array_slice($parts, $shared)));
+            $phrase = self::phrase(preg_replace('/Test$/', '', $class) ?: $class);
             $groups[] = $folder === '' ? [$phrase] : [$folder, $phrase];
         }
 
         return $groups;
+    }
+
+    /** `DataSets` → `Data sets`. */
+    private static function phrase(string $name): string
+    {
+        $words = preg_split('/(?<=[a-z0-9])(?=[A-Z])/', $name) ?: [$name];
+
+        return ucfirst(strtolower(implode(' ', $words)));
     }
 
     /**

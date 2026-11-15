@@ -42,12 +42,12 @@ final class ReportManifestTest extends TestCase
     {
         $manifest = ReportManifest::build([
             $this->recording('Tests\Browser\Auth\LoginFlowTest::test_one'),
-            $this->recording('Tests\Browser\Schema\Fields\ApiKeysTest::test_two'),
+            $this->recording('Tests\Browser\DataSets\Fields\ApiKeysTest::test_two'),
             $this->recording('not a method id'),
         ], [['a.webp'], ['b.webp'], ['c.webp']], [null, null, null]);
 
         self::assertSame(['Auth', 'Login flow'], $this->test($manifest, 0)['group']);
-        self::assertSame(['Schema / Fields', 'Api keys'], $this->test($manifest, 1)['group']);
+        self::assertSame(['Data sets / Fields', 'Api keys'], $this->test($manifest, 1)['group']);
         self::assertSame([], $this->test($manifest, 2)['group']);
     }
 
