@@ -25,4 +25,14 @@ final readonly class ArtifactBag
         public string $trace,
         public string $browserStderr,
     ) {}
+
+    /**
+     * Whether there is nothing to diagnose: the browser never left its blank
+     * start page and logged nothing. A test that fails before it visits
+     * anything — a PHP error in the test itself — has no browser story.
+     */
+    public function isBlank(): bool
+    {
+        return $this->url === 'about:blank' && $this->consoleLines === [] && $this->networkLines === [];
+    }
 }

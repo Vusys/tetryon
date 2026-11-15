@@ -6,6 +6,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- **No browser diagnostics for a test that failed before loading a page** (#186). A plain PHP error in the test itself used to print the full diagnostics block and write artifacts describing a blank page. Now it prints one line saying there are none.
+
 ## [0.7.0] - 2026-11-15
 
 Recorded browser tests. A test can record itself as a browsable HTML report a person can step through or play back like a video: captioned, timed, settled frames with gesture rings and failure diagnostics, and one combined report for a whole suite. Along the way, the configured viewport is finally applied, and `drag()` completes native HTML5 drag-and-drop. Still beta and pre-1.0; see [`docs/compatibility.md`](docs/compatibility.md).
