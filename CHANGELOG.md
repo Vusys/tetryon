@@ -6,6 +6,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **`evaluate()` returns arrays and objects as PHP arrays.** Arrays and sets come back as lists, plain objects and maps as keyed arrays, recursively. They used to come back as raw WebDriver BiDi values (`['type' => 'number', 'value' => 800]` and so on), which meant reaching for `JSON.stringify` to get anything structured out. Values with no PHP equivalent (DOM nodes, windows, maps keyed by objects) keep their raw shape.
+
+### Fixed
+
+- **`fill()` on date, time, colour and range inputs** (#185). Firefox draws these as pickers that drop typed text, so `fill()` left them silently empty. It now sets the value and fires `input` and `change`, and throws `UndrivableElementException` when the input rejects the value's format.
+
 ## [0.6.0] - 2026-08-09
 
 Custom widgets, driven behaviourally. Two things the TodoMVC epic reached for and shadow-DOM work exposed: a first-class `chooseFromDropdown()` for the WAI-ARIA combobox pattern that component libraries ship instead of a native `<select>`, and shadow-aware focus assertions — enough for the behavioural suite to run against Lit, where every todo is its own shadow root. Still beta and pre-1.0 — see [`docs/compatibility.md`](docs/compatibility.md).

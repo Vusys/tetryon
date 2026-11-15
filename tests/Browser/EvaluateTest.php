@@ -26,6 +26,15 @@ final class EvaluateTest extends StaticSiteTestCase
         self::assertSame(3, $value);
     }
 
+    public function test_it_returns_arrays_and_objects_as_php_arrays(): void
+    {
+        $value = $this->browser()
+            ->visit('/index.html')
+            ->evaluate('[innerWidth > 0, { heading: document.querySelector("h1").textContent, links: [...document.links].length }]');
+
+        self::assertSame([true, ['heading' => 'Hello, Tetryon', 'links' => 1]], $value);
+    }
+
     public function test_it_can_mutate_page_state(): void
     {
         $browser = $this->browser()->visit('/index.html');
