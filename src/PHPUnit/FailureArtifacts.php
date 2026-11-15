@@ -6,6 +6,9 @@ namespace Vusys\Tetryon\PHPUnit;
 
 use Throwable;
 use Vusys\Tetryon\Core\Config\Configuration;
+use Vusys\Tetryon\Core\Diagnostics\ArtifactBag;
+use Vusys\Tetryon\Core\Diagnostics\FailureReport;
+use Vusys\Tetryon\Core\Support\Slug;
 use Vusys\Tetryon\Firefox\ConsoleMessage;
 use Vusys\Tetryon\Firefox\FirefoxBiDiDriver;
 use Vusys\Tetryon\Firefox\NetworkRecord;
@@ -15,39 +18,23 @@ use Vusys\Tetryon\Firefox\NetworkRecord;
  * HTML, current URL, console logs, the BiDi command trace, browser stderr, and
  * viewport — into a per-test artifact directory, and returns a human-readable
  * report pointing at them. Good errors are the product, not polish.
+ *
+ * Capture and writing are split so the same {@see ArtifactBag} can also back
+ * the HTML test report's diagnostics panel instead of querying the driver a
+ * second time — see {@see captureBag()}.
  */
-final readonly class FailureArtifacts
+final class FailureArtifacts
 {
-    public function __construct(private string $basePath) {}
-
-    public function capture(FirefoxBiDiDriver $driver, Configuration $configuration, string $testId): string
+    public static function captureBag(FirefoxBiDiDriver $driver): ArtifactBag
     {
-        $directory = self::directoryFor($this->basePath, $testId);
-        if (! is_dir($directory) && ! @mkdir($directory, 0o777, true) && ! is_dir($directory)) {
-            return "Tetryon: could not create the artifact directory \"{$directory}\".";
-        }
-
-        $url = $this->guard(static fn (): string => $driver->currentUrl()) ?? '(unknown)';
-        $paths = [];
-
-        $screenshot = $this->guard(static fn (): string => $driver->screenshot());
-        if (is_string($screenshot)) {
-            file_put_contents("{$directory}/screenshot.png", $screenshot);
-            $paths['Screenshot'] = "{$directory}/screenshot.png";
-        }
-
-        $html = $this->guard(static fn (): mixed => $driver->evaluateScript('document.documentElement.outerHTML'));
-        if (is_string($html)) {
-            file_put_contents("{$directory}/page.html", $html);
-            $paths['HTML'] = "{$directory}/page.html";
-        }
+        $url = self::guard(static fn (): string => $driver->currentUrl()) ?? '(unknown)';
+        $screenshot = self::guard(static fn (): string => $driver->screenshot());
+        $html = self::guard(static fn (): mixed => $driver->evaluateScript('document.documentElement.outerHTML'));
 
         $console = array_map(
             static fn (ConsoleMessage $message): string => "[{$message->level}] {$message->source}: {$message->text}",
-            $this->guard(static fn (): array => $driver->consoleMessages()) ?? [],
+            self::guard(static fn (): array => $driver->consoleMessages()) ?? [],
         );
-        file_put_contents("{$directory}/console.log", implode("\n", $console));
-        $paths['Console'] = "{$directory}/console.log";
 
         $network = array_map(
             static fn (NetworkRecord $record): string => sprintf(
@@ -56,43 +43,60 @@ final readonly class FailureArtifacts
                 $record->method,
                 $record->url,
             ),
-            $this->guard(static fn (): array => $driver->networkLog()) ?? [],
+            self::guard(static fn (): array => $driver->networkLog()) ?? [],
         );
-        file_put_contents("{$directory}/network.log", implode("\n", $network));
+
+        return new ArtifactBag(
+            url: $url,
+            screenshotPng: is_string($screenshot) ? $screenshot : null,
+            html: is_string($html) ? $html : null,
+            consoleLines: $console,
+            networkLines: $network,
+            trace: (string) $driver->trace(),
+            browserStderr: $driver->browserStderr(),
+        );
+    }
+
+    public static function write(ArtifactBag $bag, string $directory, Configuration $configuration): string
+    {
+        if (! is_dir($directory) && ! @mkdir($directory, 0o777, true) && ! is_dir($directory)) {
+            return "Tetryon: could not create the artifact directory \"{$directory}\".";
+        }
+
+        $paths = [];
+
+        if ($bag->screenshotPng !== null) {
+            file_put_contents("{$directory}/screenshot.png", $bag->screenshotPng);
+            $paths['Screenshot'] = "{$directory}/screenshot.png";
+        }
+
+        if ($bag->html !== null) {
+            file_put_contents("{$directory}/page.html", $bag->html);
+            $paths['HTML'] = "{$directory}/page.html";
+        }
+
+        file_put_contents("{$directory}/console.log", implode("\n", $bag->consoleLines));
+        $paths['Console'] = "{$directory}/console.log";
+
+        file_put_contents("{$directory}/network.log", implode("\n", $bag->networkLines));
         $paths['Network'] = "{$directory}/network.log";
 
-        file_put_contents("{$directory}/trace.log", (string) $driver->trace());
+        file_put_contents("{$directory}/trace.log", $bag->trace);
         $paths['Trace'] = "{$directory}/trace.log";
 
-        file_put_contents("{$directory}/browser-stderr.log", $driver->browserStderr());
+        file_put_contents("{$directory}/browser-stderr.log", $bag->browserStderr);
 
         file_put_contents(
             "{$directory}/info.txt",
-            "URL: {$url}\nViewport: {$configuration->viewport->width}x{$configuration->viewport->height}\n",
+            "URL: {$bag->url}\nViewport: {$configuration->viewport->width}x{$configuration->viewport->height}\n",
         );
 
-        return $this->report($url, $paths);
+        return FailureReport::render($bag, $paths);
     }
 
     public static function directoryFor(string $basePath, string $testId): string
     {
-        $safe = preg_replace('/[^A-Za-z0-9._-]+/', '_', $testId);
-        $safe = $safe === null ? '' : trim($safe, '_');
-
-        return rtrim($basePath, '/').'/'.($safe === '' ? 'test' : $safe);
-    }
-
-    /**
-     * @param  array<string, string>  $paths
-     */
-    private function report(string $url, array $paths): string
-    {
-        $lines = ['', 'Tetryon browser diagnostics', '', 'Current URL:', "  {$url}", '', 'Artifacts:'];
-        foreach ($paths as $label => $path) {
-            $lines[] = "  {$label}: {$path}";
-        }
-
-        return implode("\n", $lines);
+        return rtrim($basePath, '/').'/'.Slug::forTestId($testId);
     }
 
     /**
@@ -101,7 +105,7 @@ final readonly class FailureArtifacts
      * @param  callable(): T  $operation
      * @return T|null
      */
-    private function guard(callable $operation): mixed
+    private static function guard(callable $operation): mixed
     {
         try {
             return $operation();

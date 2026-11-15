@@ -31,7 +31,7 @@ final readonly class Configuration
     }
 
     /**
-     * @param  array{base_url?: string, headless?: bool, firefox_binary?: string|null, timeout?: array{default?: int, navigation?: int, assertion?: int}, viewport?: array{width?: int, height?: int}, selectors?: array{test_attributes?: list<string>}, artifacts?: array{path?: string}}  $config
+     * @param  array{base_url?: string, headless?: bool, firefox_binary?: string|null, timeout?: array{default?: int, navigation?: int, assertion?: int}, viewport?: array{width?: int, height?: int, device_pixel_ratio?: float|int}, selectors?: array{test_attributes?: list<string>}, artifacts?: array{path?: string}}  $config
      */
     public static function fromArray(array $config): self
     {

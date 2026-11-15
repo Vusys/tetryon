@@ -35,6 +35,12 @@ Add the artifacts directory to your `.gitignore`:
 /tests/Browser/Artifacts
 ```
 
+Under the hood, `Vusys\Tetryon\Core\Diagnostics\ArtifactBag` is the in-memory bundle a driver capture produces; `FailureArtifacts` writes it to disk and formats the printed report. The same bundle backs a failing test's diagnostics panel in a [recorded report](reporting.md) — captured once and reused, not queried from the driver twice.
+
+## Recording a test as a report
+
+For a richer, browsable record of what a test did — not just its failure — see [Reporting](reporting.md): step-by-step screenshots assembled into an interactive HTML report, optionally combined across a whole suite run.
+
 ## `tetryon doctor`
 
 Run a preflight check of the whole environment:

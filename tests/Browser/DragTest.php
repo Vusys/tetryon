@@ -18,6 +18,14 @@ final class DragTest extends StaticSiteTestCase
             ->assertSee('dropped after');
     }
 
+    public function test_drag_completes_a_native_html5_drop(): void
+    {
+        $this->browser()
+            ->visit('/html5-drag.html')
+            ->drag('Card', 'Bin')
+            ->assertSee('dropped card dragend');
+    }
+
     public function test_drag_down_by_offset_lands_on_the_zone(): void
     {
         $this->browser()

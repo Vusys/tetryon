@@ -10,7 +10,7 @@ It is **Firefox-first** and **PHPUnit-first**. You run your app however you
 like; Tetryon drives the browser.
 
 > [!NOTE]
-> **Status: 0.6.0 — beta, pre-1.0.** The API below ships and is exercised
+> **Status: 0.7.0 — beta, pre-1.0.** The API below ships and is exercised
 > against real Firefox on Linux and macOS in CI — including a real Vue 3
 > single-page app — but it may still change before 1.0. See
 > [compatibility](docs/compatibility.md).
@@ -165,6 +165,7 @@ Full docs live in [`docs/`](docs/README.md):
 | v0.4 | ✓ | Laravel integration — provider, `tetryon:install`, `loginAs()` |
 | v0.5 | … | CI hardening — GitHub Actions, GitLab, Docker, parallelism |
 | v0.6 | | Stabilisation & docs |
+| v0.7 | ✓ | Recorded browser tests — an interactive HTML report of every run |
 
 ## License
 

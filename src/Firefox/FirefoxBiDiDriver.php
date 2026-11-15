@@ -33,6 +33,22 @@ use Vusys\Tetryon\Firefox\Exception\FirefoxException;
  */
 final class FirefoxBiDiDriver implements NodeLocator, VisibilityProbe
 {
+    private const string HTML5_DRAG_SCRIPT = <<<'JS'
+        function (target) {
+            const source = this.closest('[draggable="true"]');
+            if (!source) { return false; }
+            const data = new DataTransfer();
+            const centre = (el) => { const r = el.getBoundingClientRect(); return { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }; };
+            const fire = (el, type) => el.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, composed: true, dataTransfer: data, ...centre(el) }));
+            fire(source, 'dragstart');
+            fire(target, 'dragenter');
+            // A drop target says yes by cancelling dragover.
+            if (!fire(target, 'dragover')) { fire(target, 'drop'); } else { fire(target, 'dragleave'); }
+            fire(source, 'dragend');
+            return true;
+        }
+        JS;
+
     /**
      * Probe for {@see self::visibility()}: `clickable` when the element is rendered,
      * on-screen and top-most at its own centre; `rendered` when it has a real box
@@ -109,6 +125,19 @@ final class FirefoxBiDiDriver implements NodeLocator, VisibilityProbe
         private readonly LoggerInterface $logger = new NullLogger,
         private readonly BiDiTrace $trace = new BiDiTrace,
     ) {}
+
+    /**
+     * Size the page's viewport in CSS pixels, drawn at $devicePixelRatio
+     * device pixels each — what layout, breakpoints and screenshots see.
+     */
+    public function setViewport(int $width, int $height, float $devicePixelRatio = 1.0): void
+    {
+        $this->connection()->send('browsingContext.setViewport', [
+            'context' => $this->context(),
+            'viewport' => ['width' => $width, 'height' => $height],
+            'devicePixelRatio' => $devicePixelRatio,
+        ]);
+    }
 
     public function start(): void
     {
@@ -418,6 +447,34 @@ final class FirefoxBiDiDriver implements NodeLocator, VisibilityProbe
     {
         $this->clickElement($element); // focus the field first
         $this->performActions(InputActions::typeText($text));
+    }
+
+    /**
+     * Drag $source onto $target with native HTML5 drag-and-drop events —
+     * dragstart, dragenter, dragover, then drop (when the target accepts it)
+     * and dragend — sharing one DataTransfer, dispatched in the page. Firefox's
+     * input actions start an HTML5 drag but never deliver its drop, so a
+     * `draggable` element can't be dropped by pointer alone. False, with
+     * nothing dispatched, when $source isn't inside a draggable element.
+     */
+    public function dragHtml5(ElementReference $source, ElementReference $target): bool
+    {
+        $result = $this->connection()->send('script.callFunction', [
+            'functionDeclaration' => self::HTML5_DRAG_SCRIPT,
+            'this' => ['sharedId' => $source->sharedId],
+            'arguments' => [['sharedId' => $target->sharedId]],
+            'target' => ['context' => $this->context()],
+            'awaitPromise' => true,
+        ]);
+
+        if (($result['type'] ?? null) === 'exception') {
+            throw new BiDiException('HTML5 drag threw: '.$this->exceptionText($result));
+        }
+
+        $this->collectConsole();
+        $this->reportDialogs();
+
+        return RemoteValue::toPhp($result['result'] ?? null) === true;
     }
 
     /**

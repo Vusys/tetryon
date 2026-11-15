@@ -47,7 +47,8 @@ abstract class BrowserTestCase extends FoundationTestCase
         $segment = rawurlencode(is_scalar($id) ? (string) $id : '');
         $path = '/_tetryon/login/'.$segment.($guard !== null ? '/'.rawurlencode($guard) : '');
 
-        return $this->browser()->visit($path);
+        // The testing-only login route is plumbing, never part of a recording.
+        return $this->browser()->unrecorded(fn (Browser $browser): Browser => $browser->visit($path));
     }
 
     protected function browserConfiguration(): Configuration

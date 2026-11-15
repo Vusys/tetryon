@@ -11,6 +11,8 @@ By default Tetryon reads its configuration from the environment. You can also ov
 | `TETRYON_FIREFOX_BINARY` | (auto) | explicit path to the Firefox executable |
 | `TETRYON_ARTIFACTS_PATH` | `tests/Browser/Artifacts` | where failure artifacts are written |
 | `TETRYON_DEBUG` | (unset) | stream the BiDi command log to stderr |
+| `TETRYON_SUITE_REPORT` | (unset) | combine every recording-instrumented test into one whole-suite HTML report (see [Reporting](reporting.md)) |
+| `TETRYON_SUITE_REPORT_PATH` | `tests/Browser/Artifacts/suite-report` | where the combined suite report is written |
 
 Set them in `phpunit.xml`:
 
@@ -60,6 +62,7 @@ Configuration::fromArray([
     'viewport' => [
         'width' => 1280,
         'height' => 720,
+        'device_pixel_ratio' => 1,
     ],
 
     'artifacts' => [
@@ -71,6 +74,10 @@ Configuration::fromArray([
     ],
 ]);
 ```
+
+## Viewport
+
+The browser window's inner size in CSS pixels, applied when the browser starts, so layouts, breakpoints and screenshots are the same on every machine. `device_pixel_ratio` is how many device pixels draw each CSS pixel: `2` makes screenshots and recordings as sharp as a high-density screen, at four times the pixels, so encoding a recording takes longer.
 
 ## Selector test attributes
 

@@ -6,12 +6,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-15
+
+Recorded browser tests. A test can record itself as a browsable HTML report a person can step through or play back like a video: captioned, timed, settled frames with gesture rings and failure diagnostics, and one combined report for a whole suite. Along the way, the configured viewport is finally applied, and `drag()` completes native HTML5 drag-and-drop. Still beta and pre-1.0; see [`docs/compatibility.md`](docs/compatibility.md).
+
+### Added
+
+- **Recorded browser tests** (#102). A test records as a browsable HTML report: a frame at each meaningful moment, captioned and timed, with a player that plays a whole suite back like a video. `#[Record]` on a test or class records from the browser's first command, or call `recording()`. `beat($label, $body)` labels a step; beats nest into the outer one. Assertions caption themselves, naming the element when the target is a selector, and `assertExpression*()` take `label:`. `unrecorded()` keeps setup out, and `loginAs()` uses it. `TETRYON_SUITE_REPORT=1` writes one report for a suite, with its sidebar grouped by folder and class. Frames wait for the page to load and settle, in-between frames keep animations watchable, and encoding runs in a background worker. See [`docs/reporting.md`](docs/reporting.md).
+- **`device_pixel_ratio`** in the viewport config, for sharp 2× screenshots and recordings.
+
 ### Changed
 
 - **`evaluate()` returns arrays and objects as PHP arrays.** Arrays and sets come back as lists, plain objects and maps as keyed arrays, recursively. They used to come back as raw WebDriver BiDi values (`['type' => 'number', 'value' => 800]` and so on), which meant reaching for `JSON.stringify` to get anything structured out. Values with no PHP equivalent (DOM nodes, windows, maps keyed by objects) keep their raw shape.
 
 ### Fixed
 
+- **The configured viewport is applied.** It was parsed and never sent, so every test ran at Firefox's default window size. It is now set when the browser starts.
+- **`drag()` completes native HTML5 drag-and-drop.** Firefox's input actions start an HTML5 drag but never deliver `drop` or `dragend`. When the source is inside a `draggable` element, `drag()` now dispatches the HTML5 sequence itself.
 - **`fill()` on date, time, colour and range inputs** (#185). Firefox draws these as pickers that drop typed text, so `fill()` left them silently empty. It now sets the value and fires `input` and `change`, and throws `UndrivableElementException` when the input rejects the value's format.
 
 ## [0.6.0] - 2026-08-09
@@ -246,7 +257,8 @@ first-class Laravel integration.
   and a writable artifact directory — and prints a report with fix hints,
   exiting non-zero if anything is wrong.
 
-[Unreleased]: https://github.com/Vusys/tetryon/compare/v0.6.0...master
+[Unreleased]: https://github.com/Vusys/tetryon/compare/v0.7.0...master
+[0.7.0]: https://github.com/Vusys/tetryon/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Vusys/tetryon/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Vusys/tetryon/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Vusys/tetryon/compare/v0.3.0...v0.4.0

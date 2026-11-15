@@ -29,6 +29,7 @@ final class LaravelConfiguration
             viewport: new Viewport(
                 self::int('tetryon.viewport.width', 1280),
                 self::int('tetryon.viewport.height', 720),
+                self::float('tetryon.viewport.device_pixel_ratio', 1.0),
             ),
             selectorTestAttributes: self::stringList('tetryon.selectors.test_attributes', ['data-testid', 'data-test', 'data-cy']),
             artifactsPath: self::string('tetryon.artifacts.path', 'tests/Browser/Artifacts'),
@@ -61,6 +62,13 @@ final class LaravelConfiguration
         $value = config($key, $default);
 
         return is_int($value) ? $value : $default;
+    }
+
+    private static function float(string $key, float $default): float
+    {
+        $value = config($key, $default);
+
+        return is_int($value) || is_float($value) ? (float) $value : $default;
     }
 
     /**

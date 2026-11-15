@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Vusys\Tetryon\PHPUnit;
 
 use PHPUnit\Framework\Assert;
+use Throwable;
 use Vusys\Tetryon\Core\Config\Configuration;
+use Vusys\Tetryon\Core\Diagnostics\ArtifactBag;
 use Vusys\Tetryon\Core\Dialog\DialogExpectation;
 use Vusys\Tetryon\Core\Dialog\UnhandledDialogException;
 use Vusys\Tetryon\Core\NaturalLanguage\StepParser;
@@ -17,11 +19,15 @@ use Vusys\Tetryon\Core\Selector\OptionNotFoundException;
 use Vusys\Tetryon\Core\Selector\SelectorResolver;
 use Vusys\Tetryon\Core\Selector\SelectorStrategy;
 use Vusys\Tetryon\Core\Selector\UndrivableElementException;
+use Vusys\Tetryon\Core\Support\AssertionLog;
 use Vusys\Tetryon\Core\Support\TimeoutException;
 use Vusys\Tetryon\Core\Support\Waiter;
 use Vusys\Tetryon\Firefox\Bidi\BiDiTrace;
 use Vusys\Tetryon\Firefox\FirefoxBiDiDriver;
 use Vusys\Tetryon\Firefox\NetworkRecord;
+use Vusys\Tetryon\PHPUnit\Report\RecordingSession;
+use Vusys\Tetryon\PHPUnit\Report\SuiteReport;
+use Vusys\Tetryon\PHPUnit\Report\TestRecording;
 
 /**
  * The fluent, user-facing browser API. Wraps the Firefox driver and turns its
@@ -36,6 +42,16 @@ final readonly class Browser
 {
     /** Inputs whose value is chosen from a widget rather than typed. */
     private const array PICKER_INPUT_TYPES = ['date', 'datetime-local', 'month', 'week', 'time', 'color', 'range'];
+
+    /** A target written as a selector (CSS, XPath, @test-id) rather than a name. */
+    private const string SELECTOR_PATTERN = '~^(\\[|//|\\(|@|#|\\.)|[\\[\\]=>]~';
+
+    private const string NAME_SCRIPT = 'function(){ const clean = (s) => (s || "").replace(/\\s+/g, " ").trim();'
+        .' const field = ["input", "select", "textarea"].includes(this.tagName.toLowerCase());'
+        .' const name = clean(this.getAttribute("aria-label")) || clean(this.labels && this.labels[0] ? this.labels[0].innerText : "")'
+        .' || clean(this.getAttribute("placeholder")) || clean(this.getAttribute("title"))'
+        .' || (field ? "" : clean(this.innerText)) || clean(this.getAttribute("name"));'
+        .' return name.length > 40 ? name.slice(0, 39) + "…" : name; }';
 
     private const string SET_PICKER_VALUE_SCRIPT = 'function(value){ this.value = value;'
         .' this.dispatchEvent(new Event("input", { bubbles: true }));'
@@ -179,17 +195,178 @@ final readonly class Browser
 
     private SelectorResolver $resolver;
 
+    private AssertionLog $assertionLog;
+
+    private RecordingSession $recording;
+
     public function __construct(
         private FirefoxBiDiDriver $driver,
         private Configuration $configuration,
         ?SelectorResolver $resolver = null,
         private ?ElementReference $scope = null,
+        ?RecordingSession $recording = null,
     ) {
         $this->resolver = $resolver ?? new SelectorResolver(
             $driver,
             new SelectorStrategy,
             $configuration->selectorTestAttributes,
         );
+        $this->assertionLog = new AssertionLog;
+        $this->recording = $recording ?? new RecordingSession($driver);
+    }
+
+    private function describeValue(mixed $value): string
+    {
+        return is_string($value) ? "\"{$value}\"" : (string) json_encode($value);
+    }
+
+    // ── Recording ────────────────────────────────────────────────────────
+
+    /**
+     * Turn on the browsable-report recording for this test (issue #102).
+     * Every {@see beat()} and passing assertion captures a screenshot from
+     * here on; a test that never calls this pays no screenshot cost and
+     * behaves exactly as before.
+     *
+     * $title is what the report shows for this test — usually worth writing
+     * by hand, since a good title is a sentence a teammate can skim. Left
+     * unset, it falls back to PHPUnit's own derived test name.
+     */
+    public function recording(?string $title = null): self
+    {
+        $this->recording->activate($title);
+
+        return $this;
+    }
+
+    /** Whether {@see recording()} (or a #[Record] attribute) turned recording on. */
+    public function isRecording(): bool
+    {
+        return $this->recording->isActive();
+    }
+
+    /**
+     * Run $body without photographing anything — setup that isn't part of
+     * the story. It still runs exactly as normal; recording resumes after.
+     *
+     * @param  callable(self): mixed  $body
+     */
+    public function unrecorded(callable $body): self
+    {
+        $this->recording->paused(fn (): mixed => $body($this));
+
+        return $this;
+    }
+
+    /**
+     * Run $body as a labelled beat of the recording — the one verb that
+     * replaces the old note()/step()/type()/assert() split. Captures a
+     * "before" moment, invokes $body with this browser, then captures a
+     * timed "after" moment; grouping several gestures under one beat is an
+     * editorial choice, not something this counts for you. $body always
+     * runs — recording only ever changes whether it's photographed, never
+     * whether it happens.
+     *
+     * The closure is the point: a gesture has to be inside some beat's body
+     * to be captured at all, rather than "belongs to whatever beat is
+     * chained before it" being a rule you hold in your head. It also folds
+     * away the old separate escape hatch for a non-browser wait — that's
+     * just a beat whose body doesn't happen to call a `Browser` method:
+     *
+     *     $this->browser()->recording()
+     *         ->beat('Answer the question', fn ($b) => $b->click('Yes'))
+     *         ->beat('Persist', fn () => $this->waitForAnswersPersisted($record, 1))
+     *         ->beat('Submit', fn ($b) => $b->click('Submit'));
+     *
+     * @param  callable(self): mixed  $body
+     */
+    public function beat(string $label, callable $body): self
+    {
+        $this->recording->runBeat($label, fn (): mixed => $body($this));
+
+        return $this;
+    }
+
+    private function logAssertion(string $description, ?string $caption = null): void
+    {
+        $this->assertionLog->record($description);
+        $this->recording->captureAssertion($description, $caption);
+    }
+
+    /**
+     * Run a PHPUnit assertion, capturing its outcome into the recording
+     * either way: a failure moment captioned with $description if it throws
+     * (rethrown afterwards), or a self-captioned proof moment if it passes.
+     * Every assertX() method funnels through this so a failure is never the
+     * one moment the report has nothing to show for.
+     *
+     * $target and $phrase give the proof a caption a person can read when
+     * $target is a selector: $phrase given the element's own name, e.g.
+     * `“Minimum” is "1"` for `assertValue("[data-option-field=min]", "1")`.
+     * The exact call still heads the moment's assertions list. $caption,
+     * when given, is used as it is (an assertion's own label).
+     *
+     * @param  callable(): mixed  $assert
+     * @param  (callable(string): string)|null  $phrase
+     */
+    private function verifyAssertion(callable $assert, string $description, ?string $target = null, ?callable $phrase = null, ?string $caption = null): void
+    {
+        try {
+            $assert();
+        } catch (Throwable $e) {
+            $this->recording->captureFailure($e, $description);
+
+            throw $e;
+        }
+
+        $name = $target === null ? null : $this->nameOf($target);
+        if ($name !== null && $phrase !== null) {
+            $caption = $phrase('“'.$name.'”');
+        }
+
+        $this->logAssertion($description, $caption);
+    }
+
+    /**
+     * What a person would call the element $target resolves to — its
+     * aria-label, label, placeholder, title or short text — when $target is
+     * a selector rather than such a name already, and only while recording
+     * (it costs a round trip). Null when there's nothing better to say.
+     */
+    private function nameOf(string $target): ?string
+    {
+        if (! $this->recording->isActive() || preg_match(self::SELECTOR_PATTERN, $target) !== 1) {
+            return null;
+        }
+
+        $element = $this->resolveNow($target);
+        if (! $element instanceof ElementReference) {
+            return null;
+        }
+
+        try {
+            $name = $this->driver->callFunctionOn($element, self::NAME_SCRIPT);
+        } catch (Throwable) {
+            return null;
+        }
+
+        return is_string($name) && $name !== '' ? $name : null;
+    }
+
+    /**
+     * This test's finished recording — the closing pass/fail moment
+     * appended, ready to hand off to
+     * {@see SuiteReport}. Null when
+     * {@see recording()} was never called. $fallbackTitle is used only when
+     * {@see recording()} was called without an explicit title.
+     */
+    public function finishedRecording(string $testId, bool $passed, ?ArtifactBag $diagnostics, string $fallbackTitle): ?TestRecording
+    {
+        if (! $this->recording->isActive()) {
+            return null;
+        }
+
+        return $this->recording->finish($testId, $passed, $diagnostics, $fallbackTitle);
     }
 
     // ── Navigation ──────────────────────────────────────────────────────────
@@ -259,7 +436,7 @@ final readonly class Browser
     public function within(string $target, callable $callback): self
     {
         $container = $this->resolveWaiting($target);
-        $callback(new self($this->driver, $this->configuration, $this->resolver->within($container), $container));
+        $callback(new self($this->driver, $this->configuration, $this->resolver->within($container), $container, $this->recording));
 
         return $this;
     }
@@ -351,13 +528,20 @@ final readonly class Browser
     }
 
     /**
-     * Drag the source element onto the target, with intermediate pointer moves so
-     * pointer-drag libraries (Sortable.js, vuedraggable, …) register the gesture.
-     * Targets pointer-based DnD, not HTML5 `draggable` drag events.
+     * Drag the source element onto the target. Inside a `draggable="true"`
+     * element this is native HTML5 drag-and-drop — dragstart through drop and
+     * dragend, which Firefox's pointer input never completes. Otherwise it is
+     * a pointer press-move-release with intermediate moves, the gesture
+     * pointer-drag libraries (Sortable.js, vuedraggable, …) register.
      */
     public function drag(string $source, string $target): self
     {
-        $this->driver->dragElement($this->actionable($source), $this->resolveWaiting($target));
+        $from = $this->actionable($source);
+        $onto = $this->resolveWaiting($target);
+
+        if (! $this->driver->dragHtml5($from, $onto)) {
+            $this->driver->dragElement($from, $onto);
+        }
 
         return $this;
     }
@@ -631,10 +815,13 @@ final readonly class Browser
     public function assertDialogMessage(string $expected): self
     {
         $this->retry(fn (): bool => str_contains($this->dialogMessage() ?? '', $expected));
-        Assert::assertStringContainsString(
-            $expected,
-            $this->dialogMessage() ?? '',
-            'The last dialog did not say what was expected.',
+        $this->verifyAssertion(
+            fn () => Assert::assertStringContainsString(
+                $expected,
+                $this->dialogMessage() ?? '',
+                'The last dialog did not say what was expected.',
+            ),
+            "assertDialogMessage(\"{$expected}\")",
         );
 
         return $this;
@@ -825,7 +1012,10 @@ final readonly class Browser
     public function assertSee(string $text): self
     {
         $this->retry(fn (): bool => str_contains($this->visibleText(), $text));
-        Assert::assertStringContainsString($text, $this->visibleText(), "Expected to see \"{$text}\" on the page.");
+        $this->verifyAssertion(
+            fn () => Assert::assertStringContainsString($text, $this->visibleText(), "Expected to see \"{$text}\" on the page."),
+            "assertSee(\"{$text}\")",
+        );
 
         return $this;
     }
@@ -833,7 +1023,10 @@ final readonly class Browser
     public function assertDontSee(string $text): self
     {
         $this->retry(fn (): bool => ! str_contains($this->visibleText(), $text));
-        Assert::assertStringNotContainsString($text, $this->visibleText(), "Did not expect to see \"{$text}\" on the page.");
+        $this->verifyAssertion(
+            fn () => Assert::assertStringNotContainsString($text, $this->visibleText(), "Did not expect to see \"{$text}\" on the page."),
+            "assertDontSee(\"{$text}\")",
+        );
 
         return $this;
     }
@@ -842,7 +1035,10 @@ final readonly class Browser
     {
         $expected = $this->configuration->resolveUrl($url);
         $this->retry(fn (): bool => $this->currentUrl() === $expected);
-        Assert::assertSame($expected, $this->currentUrl());
+        $this->verifyAssertion(
+            fn () => Assert::assertSame($expected, $this->currentUrl()),
+            "assertUrlIs(\"{$url}\")",
+        );
 
         return $this;
     }
@@ -850,7 +1046,10 @@ final readonly class Browser
     public function assertPathIs(string $path): self
     {
         $this->retry(fn (): bool => $this->currentPath() === $path);
-        Assert::assertSame($path, $this->currentPath());
+        $this->verifyAssertion(
+            fn () => Assert::assertSame($path, $this->currentPath()),
+            "assertPathIs(\"{$path}\")",
+        );
 
         return $this;
     }
@@ -858,7 +1057,10 @@ final readonly class Browser
     public function assertTitleIs(string $title): self
     {
         $this->retry(fn (): bool => $this->title() === $title);
-        Assert::assertSame($title, $this->title());
+        $this->verifyAssertion(
+            fn () => Assert::assertSame($title, $this->title()),
+            "assertTitleIs(\"{$title}\")",
+        );
 
         return $this;
     }
@@ -866,7 +1068,12 @@ final readonly class Browser
     public function assertValue(string $field, string $expected): self
     {
         $this->retry(fn (): bool => $this->value($field) === $expected);
-        Assert::assertSame($expected, $this->value($field), "Field \"{$field}\" had an unexpected value.");
+        $this->verifyAssertion(
+            fn () => Assert::assertSame($expected, $this->value($field), "Field \"{$field}\" had an unexpected value."),
+            "assertValue(\"{$field}\", \"{$expected}\")",
+            $field,
+            fn (string $name): string => "{$name} is \"{$expected}\"",
+        );
 
         return $this;
     }
@@ -874,7 +1081,12 @@ final readonly class Browser
     public function assertVisible(string $target): self
     {
         $this->retry(fn (): bool => $this->isVisibleNow($target));
-        Assert::assertTrue($this->isVisibleNow($target), "Expected \"{$target}\" to be visible.");
+        $this->verifyAssertion(
+            fn () => Assert::assertTrue($this->isVisibleNow($target), "Expected \"{$target}\" to be visible."),
+            "assertVisible(\"{$target}\")",
+            $target,
+            fn (string $name): string => "{$name} is visible",
+        );
 
         return $this;
     }
@@ -882,7 +1094,10 @@ final readonly class Browser
     public function assertMissing(string $target): self
     {
         $this->retry(fn (): bool => ! $this->isVisibleNow($target));
-        Assert::assertFalse($this->isVisibleNow($target), "Expected \"{$target}\" to be missing or hidden.");
+        $this->verifyAssertion(
+            fn () => Assert::assertFalse($this->isVisibleNow($target), "Expected \"{$target}\" to be missing or hidden."),
+            "assertMissing(\"{$target}\")",
+        );
 
         return $this;
     }
@@ -891,9 +1106,12 @@ final readonly class Browser
     {
         $script = $this->textNearScript($near, $text);
         $this->retry(fn (): bool => $this->driver->evaluateScript($script) === true);
-        Assert::assertTrue(
-            $this->driver->evaluateScript($script) === true,
-            "Expected to see \"{$text}\" near \"{$near}\".",
+        $this->verifyAssertion(
+            fn () => Assert::assertTrue(
+                $this->driver->evaluateScript($script) === true,
+                "Expected to see \"{$text}\" near \"{$near}\".",
+            ),
+            "assertTextNear(\"{$near}\", \"{$text}\")",
         );
 
         return $this;
@@ -904,7 +1122,12 @@ final readonly class Browser
     public function assertChecked(string $target): self
     {
         $this->retry(fn (): bool => $this->isChecked($target));
-        Assert::assertTrue($this->isChecked($target), "Expected \"{$target}\" to be checked.");
+        $this->verifyAssertion(
+            fn () => Assert::assertTrue($this->isChecked($target), "Expected \"{$target}\" to be checked."),
+            "assertChecked(\"{$target}\")",
+            $target,
+            fn (string $name): string => "{$name} is checked",
+        );
 
         return $this;
     }
@@ -912,7 +1135,12 @@ final readonly class Browser
     public function assertNotChecked(string $target): self
     {
         $this->retry(fn (): bool => ! $this->isChecked($target));
-        Assert::assertFalse($this->isChecked($target), "Expected \"{$target}\" not to be checked.");
+        $this->verifyAssertion(
+            fn () => Assert::assertFalse($this->isChecked($target), "Expected \"{$target}\" not to be checked."),
+            "assertNotChecked(\"{$target}\")",
+            $target,
+            fn (string $name): string => "{$name} is not checked",
+        );
 
         return $this;
     }
@@ -920,7 +1148,12 @@ final readonly class Browser
     public function assertFocused(string $target): self
     {
         $this->retry(fn (): bool => $this->isFocused($target));
-        Assert::assertTrue($this->isFocused($target), "Expected \"{$target}\" to be focused.");
+        $this->verifyAssertion(
+            fn () => Assert::assertTrue($this->isFocused($target), "Expected \"{$target}\" to be focused."),
+            "assertFocused(\"{$target}\")",
+            $target,
+            fn (string $name): string => "{$name} has focus",
+        );
 
         return $this;
     }
@@ -928,7 +1161,12 @@ final readonly class Browser
     public function assertNotFocused(string $target): self
     {
         $this->retry(fn (): bool => ! $this->isFocused($target));
-        Assert::assertFalse($this->isFocused($target), "Expected \"{$target}\" not to be focused.");
+        $this->verifyAssertion(
+            fn () => Assert::assertFalse($this->isFocused($target), "Expected \"{$target}\" not to be focused."),
+            "assertNotFocused(\"{$target}\")",
+            $target,
+            fn (string $name): string => "{$name} does not have focus",
+        );
 
         return $this;
     }
@@ -946,7 +1184,12 @@ final readonly class Browser
     public function assertSelected(string $field, string $value): self
     {
         $this->retry(fn (): bool => $this->selected($field) === $value);
-        Assert::assertSame($value, $this->selected($field), "Expected \"{$field}\" to have \"{$value}\" selected.");
+        $this->verifyAssertion(
+            fn () => Assert::assertSame($value, $this->selected($field), "Expected \"{$field}\" to have \"{$value}\" selected."),
+            "assertSelected(\"{$field}\", \"{$value}\")",
+            $field,
+            fn (string $name): string => "{$name} has \"{$value}\" selected",
+        );
 
         return $this;
     }
@@ -954,7 +1197,12 @@ final readonly class Browser
     public function assertNotSelected(string $field, string $value): self
     {
         $this->retry(fn (): bool => $this->selected($field) !== $value);
-        Assert::assertNotSame($value, $this->selected($field), "Expected \"{$field}\" not to have \"{$value}\" selected.");
+        $this->verifyAssertion(
+            fn () => Assert::assertNotSame($value, $this->selected($field), "Expected \"{$field}\" not to have \"{$value}\" selected."),
+            "assertNotSelected(\"{$field}\", \"{$value}\")",
+            $field,
+            fn (string $name): string => "{$name} does not have \"{$value}\" selected",
+        );
 
         return $this;
     }
@@ -962,7 +1210,12 @@ final readonly class Browser
     public function assertEnabled(string $target): self
     {
         $this->retry(fn (): bool => ! $this->isDisabled($target));
-        Assert::assertFalse($this->isDisabled($target), "Expected \"{$target}\" to be enabled.");
+        $this->verifyAssertion(
+            fn () => Assert::assertFalse($this->isDisabled($target), "Expected \"{$target}\" to be enabled."),
+            "assertEnabled(\"{$target}\")",
+            $target,
+            fn (string $name): string => "{$name} is enabled",
+        );
 
         return $this;
     }
@@ -970,7 +1223,12 @@ final readonly class Browser
     public function assertDisabled(string $target): self
     {
         $this->retry(fn (): bool => $this->isDisabled($target));
-        Assert::assertTrue($this->isDisabled($target), "Expected \"{$target}\" to be disabled.");
+        $this->verifyAssertion(
+            fn () => Assert::assertTrue($this->isDisabled($target), "Expected \"{$target}\" to be disabled."),
+            "assertDisabled(\"{$target}\")",
+            $target,
+            fn (string $name): string => "{$name} is disabled",
+        );
 
         return $this;
     }
@@ -978,7 +1236,10 @@ final readonly class Browser
     public function assertAttribute(string $target, string $name, string $expected): self
     {
         $this->retry(fn (): bool => $this->attribute($target, $name) === $expected);
-        Assert::assertSame($expected, $this->attribute($target, $name), "Attribute \"{$name}\" of \"{$target}\" had an unexpected value.");
+        $this->verifyAssertion(
+            fn () => Assert::assertSame($expected, $this->attribute($target, $name), "Attribute \"{$name}\" of \"{$target}\" had an unexpected value."),
+            "assertAttribute(\"{$target}\", \"{$name}\", \"{$expected}\")",
+        );
 
         return $this;
     }
@@ -986,10 +1247,13 @@ final readonly class Browser
     public function assertAttributeContains(string $target, string $name, string $needle): self
     {
         $this->retry(fn (): bool => str_contains($this->attribute($target, $name) ?? '', $needle));
-        Assert::assertStringContainsString(
-            $needle,
-            $this->attribute($target, $name) ?? '',
-            "Attribute \"{$name}\" of \"{$target}\" did not contain \"{$needle}\".",
+        $this->verifyAssertion(
+            fn () => Assert::assertStringContainsString(
+                $needle,
+                $this->attribute($target, $name) ?? '',
+                "Attribute \"{$name}\" of \"{$target}\" did not contain \"{$needle}\".",
+            ),
+            "assertAttributeContains(\"{$target}\", \"{$name}\", \"{$needle}\")",
         );
 
         return $this;
@@ -1000,14 +1264,19 @@ final readonly class Browser
     /**
      * Assert that a JavaScript expression evaluates truthy, retrying until it
      * does or the timeout elapses — the auto-wait counterpart to {@see evaluate()}
-     * for state the DOM doesn't render as text.
+     * for state the DOM doesn't render as text. $message explains a failure;
+     * $label is what the recording calls the proof, in place of the script.
      */
-    public function assertExpression(string $expression, string $message = ''): self
+    public function assertExpression(string $expression, string $message = '', ?string $label = null): self
     {
         $this->retry(fn (): bool => (bool) $this->evaluate($expression));
-        Assert::assertTrue(
-            (bool) $this->evaluate($expression),
-            $message !== '' ? $message : "Expected this expression to be truthy: {$expression}",
+        $this->verifyAssertion(
+            fn () => Assert::assertTrue(
+                (bool) $this->evaluate($expression),
+                $message !== '' ? $message : "Expected this expression to be truthy: {$expression}",
+            ),
+            "assertExpression(\"{$expression}\")",
+            caption: $label,
         );
 
         return $this;
@@ -1016,14 +1285,20 @@ final readonly class Browser
     /**
      * Assert that a JavaScript expression equals an expected (serialisable)
      * value, retrying until it matches — so a failure shows expected-vs-actual.
+     * $message explains a failure; $label is what the recording calls the
+     * proof, in place of the script.
      */
-    public function assertExpressionEquals(string $expression, mixed $expected, string $message = ''): self
+    public function assertExpressionEquals(string $expression, mixed $expected, string $message = '', ?string $label = null): self
     {
         $this->retry(fn (): bool => $this->evaluate($expression) == $expected);
-        Assert::assertEquals(
-            $expected,
-            $this->evaluate($expression),
-            $message !== '' ? $message : "Expression did not equal the expected value: {$expression}",
+        $this->verifyAssertion(
+            fn () => Assert::assertEquals(
+                $expected,
+                $this->evaluate($expression),
+                $message !== '' ? $message : "Expression did not equal the expected value: {$expression}",
+            ),
+            "assertExpressionEquals(\"{$expression}\", ".$this->describeValue($expected).')',
+            caption: $label,
         );
 
         return $this;
@@ -1060,16 +1335,22 @@ final readonly class Browser
     public function assertRequested(string $pattern): self
     {
         $this->retry(fn (): bool => $this->matchingRequests($pattern) !== []);
-        Assert::assertNotEmpty($this->matchingRequests($pattern), "Expected a request matching \"{$pattern}\".");
+        $this->verifyAssertion(
+            fn () => Assert::assertNotEmpty($this->matchingRequests($pattern), "Expected a request matching \"{$pattern}\"."),
+            "assertRequested(\"{$pattern}\")",
+        );
 
         return $this;
     }
 
     public function assertNotRequested(string $pattern): self
     {
-        Assert::assertEmpty(
-            $this->matchingRequests($pattern),
-            "Did not expect a request matching \"{$pattern}\".",
+        $this->verifyAssertion(
+            fn () => Assert::assertEmpty(
+                $this->matchingRequests($pattern),
+                "Did not expect a request matching \"{$pattern}\".",
+            ),
+            "assertNotRequested(\"{$pattern}\")",
         );
 
         return $this;
@@ -1110,16 +1391,54 @@ final readonly class Browser
         );
 
         if (! $ok) {
-            throw new TimeoutException("Timed out waiting for \"{$target}\" to become actionable ({$reason}).");
+            $exception = new TimeoutException("Timed out waiting for \"{$target}\" to become actionable ({$reason}).");
+            $this->recording->captureFailure($exception);
+
+            throw $exception;
         }
+
+        $this->recordGesture($element);
 
         return $element;
     }
 
+    /**
+     * While a beat is being recorded, photograph the page with the element a
+     * gesture is about to act on marked out — where it is, and for a
+     * `<select>` what it offers — so the report can show the gesture itself
+     * and not only its result. Measured, never drawn into the page under
+     * test; a failure to measure is swallowed rather than failing the test.
+     */
+    private function recordGesture(ElementReference $element): void
+    {
+        if (! $this->recording->isInBeat()) {
+            return;
+        }
+
+        try {
+            $json = $this->driver->callFunctionOn(
+                $element,
+                'function(){ const r = this.getBoundingClientRect(); const select = this.tagName === "SELECT";'
+                .' return JSON.stringify({ x: r.x, y: r.y, w: r.width, h: r.height, vw: innerWidth, vh: innerHeight,'
+                .' options: select ? Array.from(this.options, o => o.text.trim()) : null,'
+                .' selected: select && this.selectedIndex >= 0 ? this.options[this.selectedIndex].text.trim() : null }); }',
+            );
+            $overlay = is_string($json) ? json_decode($json, true) : null;
+        } catch (Throwable) {
+            return;
+        }
+
+        if (is_array($overlay)) {
+            /** @var array<string, mixed> $overlay */
+            $this->recording->sample($overlay);
+        }
+    }
+
     private function selectOption(string $field, string $value, bool $byValueOnly): self
     {
+        $select = $this->drivable('select', $field);
         $matched = $this->driver->callFunctionOn(
-            $this->drivable('select', $field),
+            $select,
             'function(v, byValue){'
             .' for (const o of this.options) {'
             .'  if (o.value === v || (byValue !== "1" && o.text.trim() === v)) {'
@@ -1132,6 +1451,11 @@ final readonly class Browser
         if ($matched !== true) {
             throw OptionNotFoundException::for($field, $value, $byValueOnly);
         }
+
+        // A second frame, now with the chosen option selected — the option
+        // list is set by script and never opens, so this pair is the only
+        // way a recording can show a choice being made.
+        $this->recordGesture($select);
 
         return $this;
     }
@@ -1252,9 +1576,19 @@ final readonly class Browser
             return $element instanceof ElementReference;
         });
 
+        if ($element instanceof ElementReference) {
+            return $element;
+        }
+
         // On timeout, resolve once more so the rich ElementNotFoundException (with
         // its attempt list) surfaces instead of a bare null.
-        return $element ?? $this->resolveElement($target, $preferInteractive);
+        try {
+            return $this->resolveElement($target, $preferInteractive);
+        } catch (Throwable $e) {
+            $this->recording->captureFailure($e);
+
+            throw $e;
+        }
     }
 
     private function resolveNow(string $target, bool $preferInteractive = false): ?ElementReference
@@ -1312,7 +1646,16 @@ final readonly class Browser
      */
     private function wait(int $timeoutMs, callable $condition): bool
     {
-        return new Waiter($timeoutMs)->until($condition);
+        return new Waiter($timeoutMs)->until(function () use ($condition): bool {
+            if ($condition()) {
+                return true;
+            }
+
+            // Still waiting — photograph what the page is doing meanwhile.
+            $this->recording->sample();
+
+            return false;
+        });
     }
 
     private function textNearScript(string $near, string $text): string
