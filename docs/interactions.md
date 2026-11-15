@@ -157,6 +157,8 @@ $status = $this->browser()->evaluate(
 $this->browser()->evaluate('window.localStorage.setItem("flag", "1")');
 ```
 
+The result comes back as plain PHP: strings, numbers, booleans and `null` as themselves, arrays and sets as lists, and plain objects and maps as keyed arrays, nested as deep as they go. `evaluate('[innerWidth, { title: document.title }]')` gives `[1280, ['title' => '…']]`. A DOM node, a window, or a map keyed by objects has no PHP equivalent and comes back as its raw WebDriver BiDi value.
+
 `evaluate()` is state, not an action — it does not auto-wait. Reach for it for in-page setup the verbs don't model — though for cookies prefer the [cookie API](#cookies) below, and for everything the verbs cover, the verbs.
 
 For the rare case a custom base class needs the driver primitives directly, `InteractsWithBrowser` exposes a `protected driver(): FirefoxBiDiDriver` accessor (it boots the browser if it hasn't started) — no reflection needed.
