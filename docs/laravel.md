@@ -83,7 +83,7 @@ With `TETRYON_MANAGED_SERVER=true`, each process starts its own server on the fi
 
 The server inherits the worker's environment. `env` adds to it, with `{token}`, `{port}` and `{host}` replaced, which is how a worker's server reaches the worker's database. Laravel's `ParallelTesting` creates and migrates `<name>_test_N` in the test process; Tetryon never creates databases itself. Laravel names that database only under `--parallel`, so turn the managed server on for parallel runs, for example `TETRYON_MANAGED_SERVER=true php artisan test --parallel`.
 
-With a file-based SQLite database, create the worker's file first. Laravel creates a missing test database only after a `QueryException`, and a missing SQLite file throws something else:
+With a file-based SQLite database, the base file (`database/tetryon.sqlite` here) must exist, because Laravel connects to it before switching each worker over. Create the worker's file first too. Laravel creates a missing test database only after a `QueryException`, and a missing SQLite file throws something else:
 
 ```php
 public static function setUpBeforeClass(): void
