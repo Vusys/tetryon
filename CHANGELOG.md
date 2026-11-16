@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-11-16
+
 ### Fixed
 
 - **One suite report for a parallel run** (#193). Under paratest each worker rendered its own tests into the same report directory, so the last worker to finish overwrote the others. Now each worker adds its part, and the report is re-rendered from all of them, so it holds every test in the run. See [`docs/reporting.md`](docs/reporting.md#combining-a-whole-suite-into-one-report).
@@ -277,7 +279,8 @@ first-class Laravel integration.
   and a writable artifact directory — and prints a report with fix hints,
   exiting non-zero if anything is wrong.
 
-[Unreleased]: https://github.com/Vusys/tetryon/compare/v0.8.0...master
+[Unreleased]: https://github.com/Vusys/tetryon/compare/v0.8.1...master
+[0.8.1]: https://github.com/Vusys/tetryon/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/Vusys/tetryon/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/Vusys/tetryon/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/Vusys/tetryon/compare/v0.6.0...v0.7.0
