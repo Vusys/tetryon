@@ -105,3 +105,38 @@ Read on:
 - [Interactions](interactions.md) — every action verb in detail.
 - [Waiting](waiting.md) — why you never write `sleep()`.
 - [Assertions](assertions.md) — every `assert*` method.
+
+## Reusing one browser across a class
+
+A fresh Firefox per test is the safest default, but each launch costs a second or two, and logging in costs more. To launch once per test class instead, mark the class with `#[ReuseBrowser]`, or use the `ReusesBrowser` trait if you prefer. Put whatever every test should start from in `authenticate()`:
+
+```php
+use Vusys\Tetryon\PHPUnit\Browser;
+use Vusys\Tetryon\PHPUnit\ReuseBrowser;
+
+#[ReuseBrowser]
+final class DashboardTest extends BrowserTestCase
+{
+    protected function authenticate(Browser $browser): void
+    {
+        $this->loginAs(User::where('email', 'admin@example.com')->firstOrFail());
+    }
+
+    public function test_admin_sees_the_dashboard(): void
+    {
+        $this->browser()->visit('/dashboard')->assertSee('Welcome back');
+    }
+}
+```
+
+- **When it runs:** `authenticate()` runs once, right after the class's browser launches. The browser's cookies are snapshotted the moment it returns.
+- **Before every test:** the cookies are restored to that snapshot, the console, network and dialog history is cleared, and the browser is left on `about:blank`. A test can't leave state behind for the next one.
+- **If the browser dies:** a browser that stops answering is relaunched, and `authenticate()` runs again.
+- **Storage:** `#[ReuseBrowser(storage: true)]` also snapshots the origin's `localStorage` and `sessionStorage`. The trait form is `snapshotsBrowserStorage()` returning `true`. Restoring storage needs a page on the origin, so each test then starts with one visit to the base URL.
+- **Teardown:** the browser is stopped after the class's last test.
+
+Limits:
+
+- **Not reset:** service workers, IndexedDB, caches and permissions. Leave reuse off for a test that needs those pristine.
+- **The user must outlive the class.** The snapshot holds a session for whoever `authenticate()` logged in. With `DatabaseTruncation`, keep that user's table out of the truncation (`protected $exceptTables = ['users'];`), or log in a user your seeders create for every test.
+- **The base URL is fixed for the class.** It's taken from the first test's configuration.
