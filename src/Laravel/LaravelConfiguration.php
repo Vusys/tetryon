@@ -7,6 +7,8 @@ namespace Vusys\Tetryon\Laravel;
 use Vusys\Tetryon\Core\Config\Configuration;
 use Vusys\Tetryon\Core\Config\Timeouts;
 use Vusys\Tetryon\Core\Config\Viewport;
+use Vusys\Tetryon\Core\Server\ManagedServer;
+use Vusys\Tetryon\Core\Server\ServerSettings;
 
 /**
  * Builds a {@see Configuration} from a Laravel app's `tetryon` config. Each
@@ -18,7 +20,9 @@ final class LaravelConfiguration
     public static function resolve(): Configuration
     {
         return new Configuration(
-            baseUrl: self::string('tetryon.base_url', 'http://127.0.0.1:8000'),
+            baseUrl: self::bool('tetryon.server.managed', false)
+                ? ManagedServer::ensure(self::serverSettings())
+                : self::string('tetryon.base_url', 'http://127.0.0.1:8000'),
             headless: self::bool('tetryon.headless', true),
             firefoxBinary: self::nullableString('tetryon.firefox_binary'),
             timeouts: new Timeouts(
@@ -33,6 +37,27 @@ final class LaravelConfiguration
             ),
             selectorTestAttributes: self::stringList('tetryon.selectors.test_attributes', ['data-testid', 'data-test', 'data-cy']),
             artifactsPath: self::string('tetryon.artifacts.path', 'tests/Browser/Artifacts'),
+        );
+    }
+
+    public static function serverSettings(): ServerSettings
+    {
+        $env = config('tetryon.server.env', []);
+        $strings = [];
+        foreach (is_array($env) ? $env : [] as $name => $value) {
+            if (is_string($name) && is_scalar($value)) {
+                $strings[$name] = (string) $value;
+            }
+        }
+
+        return new ServerSettings(
+            command: self::string('tetryon.server.command', 'php artisan serve --host={host} --port={port} --no-reload'),
+            host: self::string('tetryon.server.host', '127.0.0.1'),
+            basePort: self::int('tetryon.server.base_port', 8100),
+            readyPath: self::string('tetryon.server.ready_path', '/'),
+            readyTimeoutMs: self::int('tetryon.server.ready_timeout', 15000),
+            env: $strings,
+            workingDirectory: base_path(),
         );
     }
 

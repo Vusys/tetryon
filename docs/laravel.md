@@ -13,7 +13,7 @@ php artisan tetryon:install
 
 ## Configuration
 
-`config/tetryon.php` is the published config — `base_url` (falls back to `APP_URL`), `headless`, `firefox_binary`, `timeout`, `viewport`, `artifacts`, and `selectors`, all reading from env. See [Configuration](configuration.md).
+`config/tetryon.php` is the published config — `base_url` (falls back to `APP_URL`), `headless`, `firefox_binary`, `timeout`, `viewport`, `artifacts`, `selectors`, and `server` (see [Parallel browser tests](#parallel-browser-tests)), all reading from env. See [Configuration](configuration.md).
 
 ## Writing tests
 
@@ -23,12 +23,12 @@ Extend `Vusys\Tetryon\Laravel\BrowserTestCase`. It boots the application — so 
 namespace Tests\Browser;
 
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Vusys\Tetryon\Laravel\BrowserTestCase;
 
 final class DashboardTest extends BrowserTestCase
 {
-    use RefreshDatabase;
+    use DatabaseTruncation;
 
     public function test_a_user_sees_their_dashboard(): void
     {
@@ -40,6 +40,10 @@ final class DashboardTest extends BrowserTestCase
     }
 }
 ```
+
+## The database: truncate, don't roll back
+
+The browser drives a separately served app with its own database connection, so it only ever sees **committed** rows. `RefreshDatabase` and `DatabaseTransactions` wrap each test in a transaction that is rolled back, and the served app never sees what the test wrote. `BrowserTestCase` refuses them with an error that says so. Use `DatabaseTruncation` (or `DatabaseMigrations`), and point the test process and the served app at the same database. A file-based SQLite database works well.
 
 ## Serving the app
 
@@ -54,6 +58,30 @@ Point `base_url` at it (default `http://127.0.0.1:8000`), then:
 ```bash
 php artisan test --testsuite=Browser
 ```
+
+## Parallel browser tests
+
+Under `php artisan test --parallel` (paratest), every worker needs its own app server and database: a shared server would serialise the workers, and its database wouldn't be the worker's. Let Tetryon run the server:
+
+```php
+// config/tetryon.php
+'server' => [
+    'managed' => env('TETRYON_MANAGED_SERVER', false),
+    'command' => 'php artisan serve --host={host} --port={port} --no-reload',
+    'host' => '127.0.0.1',
+    'base_port' => 8100,
+    'ready_path' => '/',
+    'ready_timeout' => 15000,
+    // Laravel's parallel testing gives worker N the database "<name>_test_N".
+    'env' => ['DB_DATABASE' => database_path('tetryon.sqlite').'_test_{token}'],
+],
+```
+
+With `TETRYON_MANAGED_SERVER=true`, each process starts its own server on the first `browser()` call. It listens on `base_port + TEST_TOKEN`, so `8100` outside a parallel run and `8103` for worker 3. Tetryon waits until `ready_path` answers, uses it in place of `base_url`, reuses it for every test in that process, and stops it when the process exits.
+
+The server inherits the worker's environment. `env` adds to it, with `{token}`, `{port}` and `{host}` replaced, which is how a worker's server reaches the worker's database. Laravel's `ParallelTesting` creates and migrates `<name>_test_N` in the test process; Tetryon never creates databases itself.
+
+Each worker runs a PHP server and a Firefox, so the number of workers is bounded by memory. A handful of workers is realistic; dozens aren't.
 
 ## `loginAs()`
 
