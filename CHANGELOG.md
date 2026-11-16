@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-11-16
+
 ### Fixed
 
 - **No browser diagnostics for a test that failed before loading a page** (#186). A plain PHP error in the test itself used to print the full diagnostics block and write artifacts describing a blank page. Now it prints one line saying there are none.
@@ -261,7 +263,8 @@ first-class Laravel integration.
   and a writable artifact directory — and prints a report with fix hints,
   exiting non-zero if anything is wrong.
 
-[Unreleased]: https://github.com/Vusys/tetryon/compare/v0.7.0...master
+[Unreleased]: https://github.com/Vusys/tetryon/compare/v0.7.1...master
+[0.7.1]: https://github.com/Vusys/tetryon/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/Vusys/tetryon/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Vusys/tetryon/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Vusys/tetryon/compare/v0.4.0...v0.5.0
