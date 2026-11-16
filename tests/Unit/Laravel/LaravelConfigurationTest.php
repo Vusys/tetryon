@@ -8,6 +8,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
 use Orchestra\Testbench\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
+use Vusys\Tetryon\Core\Server\ManagedServer;
 use Vusys\Tetryon\Laravel\LaravelConfiguration;
 use Vusys\Tetryon\Laravel\TetryonServiceProvider;
 
@@ -50,5 +51,31 @@ final class LaravelConfigurationTest extends TestCase
 
         self::assertSame('http://127.0.0.1:8000', $configuration->baseUrl);
         self::assertTrue($configuration->headless);
+    }
+
+    public function test_a_managed_server_supplies_the_base_url(): void
+    {
+        $socket = stream_socket_server('tcp://127.0.0.1:0');
+        self::assertIsResource($socket);
+        $name = (string) stream_socket_get_name($socket, false);
+        fclose($socket);
+        $port = (int) substr($name, (int) strrpos($name, ':') + 1);
+
+        config([
+            'tetryon.base_url' => 'http://ignored.test',
+            'tetryon.server.managed' => true,
+            'tetryon.server.command' => PHP_BINARY.' -S {host}:{port} -t '.__DIR__.'/../../Fixtures/server-env',
+            'tetryon.server.base_port' => $port,
+            'tetryon.server.env' => ['TETRYON_PROBE' => 'laravel'],
+        ]);
+
+        try {
+            $configuration = LaravelConfiguration::resolve();
+
+            self::assertSame('http://127.0.0.1:'.$port, $configuration->baseUrl);
+            self::assertSame('laravel', file_get_contents($configuration->baseUrl));
+        } finally {
+            ManagedServer::stopRunning();
+        }
     }
 }

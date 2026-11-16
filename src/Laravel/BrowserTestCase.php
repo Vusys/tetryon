@@ -7,7 +7,10 @@ namespace Vusys\Tetryon\Laravel;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Application;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\TestCase as FoundationTestCase;
+use LogicException;
 use RuntimeException;
 use Vusys\Tetryon\Core\Config\Configuration;
 use Vusys\Tetryon\PHPUnit\Browser;
@@ -23,6 +26,35 @@ use Vusys\Tetryon\PHPUnit\InteractsWithBrowser;
 abstract class BrowserTestCase extends FoundationTestCase
 {
     use InteractsWithBrowser;
+
+    #[\Override]
+    protected function setUp(): void
+    {
+        self::refuseTransactionIsolation(static::class);
+
+        parent::setUp();
+    }
+
+    /**
+     * The served app reads the database over its own connection, so it never
+     * sees rows a test wrote inside a transaction that is rolled back later.
+     * Fail with the fix rather than let "my seeded user isn't there" puzzle
+     * someone (#74).
+     *
+     * @param  class-string  $class
+     */
+    public static function refuseTransactionIsolation(string $class): void
+    {
+        foreach ([RefreshDatabase::class, DatabaseTransactions::class] as $trait) {
+            if (in_array($trait, class_uses_recursive($class), true)) {
+                throw new LogicException(sprintf(
+                    '%s uses %s, which wraps each test in a transaction the served app can never see. Browser tests need committed data: use DatabaseTruncation (or DatabaseMigrations) instead.',
+                    $class,
+                    class_basename($trait),
+                ));
+            }
+        }
+    }
 
     #[\Override]
     public function createApplication(): Application

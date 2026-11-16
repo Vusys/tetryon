@@ -9,6 +9,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - **Reuse one browser across a test class** (#78). `#[ReuseBrowser]`, or the `ReusesBrowser` trait, launches Firefox once per class instead of once per test. An `authenticate()` hook runs once after launch, the cookies are snapshotted (plus localStorage and sessionStorage with `storage: true`), and every test starts from that snapshot on `about:blank` with empty diagnostics. A browser that stops answering is relaunched and authenticated again. A launch costs about 1.7s on a 2015 laptop; a restore costs about 70ms. See [`docs/writing-tests.md`](docs/writing-tests.md#reusing-one-browser-across-a-class).
+- **A managed app server per parallel worker** (#74). With `tetryon.server.managed` on (`TETRYON_MANAGED_SERVER=true`), each process starts its own server on `base_port + TEST_TOKEN` from a command template, waits for a ready path, and stops it on exit. The server inherits the worker's environment plus a configured `env` with `{token}`, `{port}` and `{host}` filled in, so each worker's server uses that worker's database. See [`docs/laravel.md`](docs/laravel.md#parallel-browser-tests).
+- **`Laravel\BrowserTestCase` refuses `RefreshDatabase` and `DatabaseTransactions`** (#74). The served app reads over its own connection and never sees rolled-back rows, so these traits used to fail confusingly with a missing seeded user. Now the test fails at once and says to use `DatabaseTruncation`.
 
 ## [0.7.1] - 2026-11-16
 
