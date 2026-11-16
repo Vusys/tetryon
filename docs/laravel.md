@@ -74,6 +74,8 @@ Under `php artisan test --parallel` (paratest), every worker needs its own app s
     'ready_timeout' => 15000,
     // Laravel's parallel testing gives worker N the database "<name>_test_N".
     'env' => ['DB_DATABASE' => database_path('tetryon.sqlite').'_test_{token}'],
+    // Where the command runs; null = the app's base path.
+    'working_directory' => null,
 ],
 ```
 

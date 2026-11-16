@@ -52,6 +52,24 @@ final class ManagedServerTest extends TestCase
         self::assertFalse(@file_get_contents($url, false, stream_context_create(['http' => ['timeout' => 1]])));
     }
 
+    public function test_stopping_also_stops_a_server_started_as_a_grandchild(): void
+    {
+        // artisan serve's shape: shell -> php -> the PHP server
+        $settings = new ServerSettings(
+            command: 'cd '.self::FIXTURE.' && '.PHP_BINARY.' -r \'passthru($argv[1]);\' "'.PHP_BINARY.' -S {host}:{port}"',
+            basePort: $this->freePort(),
+            readyTimeoutMs: 5000,
+        );
+
+        $url = ManagedServer::ensure($settings);
+        self::assertSame('unset', $this->get($url));
+
+        ManagedServer::stopRunning();
+        usleep(300_000);
+
+        self::assertFalse(@file_get_contents($url, false, stream_context_create(['http' => ['timeout' => 1]])));
+    }
+
     public function test_a_server_that_never_answers_fails_with_its_output(): void
     {
         $this->expectException(RuntimeException::class);

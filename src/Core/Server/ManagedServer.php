@@ -54,8 +54,7 @@ final class ManagedServer
 
         $stderrPath = (string) tempnam(sys_get_temp_dir(), 'tetryon-server-');
         $process = proc_open(
-            // exec: the shell is replaced, so stopping the process stops the server.
-            'exec '.$settings->expand($settings->command),
+            $settings->expand($settings->command),
             [0 => ['file', '/dev/null', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', $stderrPath, 'w']],
             $pipes,
             $settings->workingDirectory,
@@ -98,6 +97,24 @@ final class ManagedServer
         ));
     }
 
+    /**
+     * @return list<int> the process's descendants, parents before children
+     */
+    private static function descendants(int $pid): array
+    {
+        $found = [];
+        $output = [];
+        @exec('pgrep -P '.$pid.' 2>/dev/null', $output);
+        foreach ($output as $line) {
+            $child = (int) trim($line);
+            if ($child > 0) {
+                $found = [...$found, $child, ...self::descendants($child)];
+            }
+        }
+
+        return $found;
+    }
+
     private function isRunning(): bool
     {
         return is_resource($this->process) && proc_get_status($this->process)['running'];
@@ -106,9 +123,12 @@ final class ManagedServer
     private function stop(): void
     {
         if (is_resource($this->process)) {
-            $pid = proc_get_status($this->process)['pid'];
-            // artisan serve runs the PHP server as a child; stop that too.
-            @exec('pkill -TERM -P '.$pid.' 2>/dev/null');
+            // The command runs under a shell, and artisan serve runs the PHP
+            // server as its own child, so stop the whole tree, leaves first.
+            $pids = self::descendants(proc_get_status($this->process)['pid']);
+            foreach (array_reverse($pids) as $pid) {
+                @exec('kill -TERM '.$pid.' 2>/dev/null');
+            }
             proc_terminate($this->process);
             proc_close($this->process);
         }

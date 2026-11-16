@@ -57,7 +57,7 @@ final class LaravelConfiguration
             readyPath: self::string('tetryon.server.ready_path', '/'),
             readyTimeoutMs: self::int('tetryon.server.ready_timeout', 15000),
             env: $strings,
-            workingDirectory: base_path(),
+            workingDirectory: self::nullableString('tetryon.server.working_directory') ?? base_path(),
         );
     }
 

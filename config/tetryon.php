@@ -47,5 +47,7 @@ return [
         'ready_path' => '/',
         'ready_timeout' => 15000,
         'env' => [],
+        // Where the command runs; null = the app's base path.
+        'working_directory' => null,
     ],
 ];
