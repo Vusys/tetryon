@@ -623,6 +623,76 @@ final class FirefoxBiDiDriver implements NodeLocator, VisibilityProbe
     }
 
     /**
+     * Every cookie in the origin's partition, as BiDi partial cookies that
+     * {@see restoreCookies()} can write back: a reused browser's snapshot (#78).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function cookies(string $sourceOrigin): array
+    {
+        $result = $this->connection()->send('storage.getCookies', [
+            'partition' => $this->cookiePartition($sourceOrigin),
+        ]);
+
+        $cookies = [];
+        foreach (is_array($result['cookies'] ?? null) ? $result['cookies'] : [] as $cookie) {
+            if (is_array($cookie)) {
+                // setCookie takes a partial cookie; size and the like are read-only.
+                $cookies[] = array_intersect_key($cookie, array_flip(['name', 'value', 'domain', 'path', 'httpOnly', 'secure', 'sameSite', 'expiry']));
+            }
+        }
+
+        return $cookies;
+    }
+
+    /**
+     * Replace the origin's cookies with a {@see cookies()} snapshot.
+     *
+     * @param  list<array<string, mixed>>  $cookies
+     */
+    public function restoreCookies(array $cookies, string $sourceOrigin): void
+    {
+        $this->clearCookies($sourceOrigin);
+
+        foreach ($cookies as $cookie) {
+            $this->connection()->send('storage.setCookie', [
+                'cookie' => $cookie,
+                'partition' => $this->cookiePartition($sourceOrigin),
+            ]);
+        }
+    }
+
+    /**
+     * Forget the console, network and dialog history, so a reused browser
+     * starts each test's diagnostics empty (#78).
+     */
+    public function resetDiagnostics(): void
+    {
+        $this->collectConsole();
+        $this->console = [];
+        $this->network = [];
+        $this->dialogComplaints = [];
+        $this->expectation = null;
+        $this->lastDialog = null;
+    }
+
+    /** Whether the browser still answers, for reuse across tests. */
+    public function isResponsive(): bool
+    {
+        if (! $this->bidi instanceof BiDiConnection) {
+            return false;
+        }
+
+        try {
+            $this->evaluateScript('1');
+
+            return true;
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    /**
      * @return array{type: string, sourceOrigin: string}
      */
     private function cookiePartition(string $sourceOrigin): array

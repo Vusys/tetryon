@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Vusys\Tetryon\PHPUnit;
 
 use PHPUnit\Framework\Attributes\After;
+use PHPUnit\Framework\Attributes\AfterClass;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -38,25 +39,164 @@ trait InteractsWithBrowser
 
     private ?Configuration $tetryonConfiguration = null;
 
+    private bool $tetryonReusing = false;
+
+    /**
+     * One browser per test class that opted into reuse (#78), with the state
+     * snapshotted after authenticate().
+     *
+     * @var array<class-string, array{driver: FirefoxBiDiDriver, configuration: Configuration, cookies: list<array<string, mixed>>, storage: ?string}>
+     */
+    private static array $tetryonReused = [];
+
     protected function browser(): Browser
     {
         if ($this->tetryonBrowser instanceof Browser) {
             return $this->tetryonBrowser;
         }
 
-        $configuration = $this->tetryonConfiguration = $this->browserConfiguration();
-        $this->tetryonDriver = new FirefoxBiDiDriver(
-            new LaunchOptions(headless: $configuration->headless, binary: $configuration->firefoxBinary),
-            $this->browserLogger(),
-        );
-        $this->tetryonDriver->start();
-        $viewport = $configuration->viewport;
-        $this->tetryonDriver->setViewport($viewport->width, $viewport->height, $viewport->devicePixelRatio);
+        $reuse = $this->browserReuse();
+        if ($reuse instanceof ReuseBrowser) {
+            $this->startReusedBrowser($reuse);
+        } else {
+            $configuration = $this->tetryonConfiguration = $this->browserConfiguration();
+            $this->tetryonDriver = $this->launchBrowser($configuration);
+        }
 
-        $browser = $this->tetryonBrowser = new Browser($this->tetryonDriver, $configuration);
+        $driver = $this->tetryonDriver ?? throw new FirefoxException('Browser driver failed to start.');
+        $configuration = $this->tetryonConfiguration ?? throw new FirefoxException('Browser configuration was not resolved.');
+        $browser = $this->tetryonBrowser = new Browser($driver, $configuration);
         $record = $this->recordAttribute();
 
         return $record instanceof Record ? $browser->recording($record->title) : $browser;
+    }
+
+    /**
+     * Runs once per class when the browser is reused, after launch: log in or
+     * set whatever state every test should start from. The browser's cookies
+     * (and storage, if asked for) are snapshotted the moment it returns.
+     */
+    protected function authenticate(Browser $browser): void {}
+
+    /** The class's #[ReuseBrowser] (or a parent's), or the ReusesBrowser trait's equivalent. */
+    protected function browserReuse(): ?ReuseBrowser
+    {
+        for ($class = new ReflectionClass($this); $class instanceof ReflectionClass; $class = $class->getParentClass() ?: null) {
+            $attributes = $class->getAttributes(ReuseBrowser::class);
+            if ($attributes !== []) {
+                return $attributes[0]->newInstance();
+            }
+        }
+
+        if (method_exists($this, 'snapshotsBrowserStorage')) {
+            $storage = $this->snapshotsBrowserStorage();
+
+            return new ReuseBrowser(storage: $storage === true);
+        }
+
+        return null;
+    }
+
+    private function launchBrowser(Configuration $configuration): FirefoxBiDiDriver
+    {
+        $driver = new FirefoxBiDiDriver(
+            new LaunchOptions(headless: $configuration->headless, binary: $configuration->firefoxBinary),
+            $this->browserLogger(),
+        );
+        $driver->start();
+        $viewport = $configuration->viewport;
+        $driver->setViewport($viewport->width, $viewport->height, $viewport->devicePixelRatio);
+
+        return $driver;
+    }
+
+    /**
+     * Take the class's shared browser and restore its snapshot, or launch one,
+     * authenticate it and take the snapshot. A browser that stopped answering
+     * is replaced the same way.
+     */
+    private function startReusedBrowser(ReuseBrowser $reuse): void
+    {
+        $this->tetryonReusing = true;
+        $shared = self::$tetryonReused[static::class] ?? null;
+
+        if ($shared !== null && ! $shared['driver']->isResponsive()) {
+            $shared['driver']->stop();
+            $shared = null;
+        }
+
+        if ($shared !== null) {
+            $this->tetryonDriver = $shared['driver'];
+            $this->tetryonConfiguration = $shared['configuration'];
+            $origin = self::tetryonOrigin($shared['configuration']);
+
+            $shared['driver']->restoreCookies($shared['cookies'], $origin);
+            if ($shared['storage'] !== null) {
+                $shared['driver']->navigate($shared['configuration']->baseUrl);
+                $shared['driver']->evaluateScript(self::restoreStorageScript($shared['storage']));
+            }
+            $shared['driver']->navigate('about:blank');
+            $shared['driver']->resetDiagnostics();
+
+            return;
+        }
+
+        $configuration = $this->tetryonConfiguration = $this->browserConfiguration();
+        $driver = $this->tetryonDriver = $this->launchBrowser($configuration);
+        $origin = self::tetryonOrigin($configuration);
+
+        // authenticate() may call browser() itself (loginAs() does), so it gets this one.
+        $this->tetryonBrowser = new Browser($driver, $configuration);
+        $this->authenticate($this->tetryonBrowser);
+        $this->tetryonBrowser = null;
+
+        $storage = null;
+        if ($reuse->storage) {
+            if (! str_starts_with($driver->currentUrl(), $origin)) {
+                $driver->navigate($configuration->baseUrl);
+            }
+            $snapshot = $driver->evaluateScript('JSON.stringify({local: Object.assign({}, localStorage), session: Object.assign({}, sessionStorage)})');
+            $storage = is_string($snapshot) ? $snapshot : null;
+        }
+
+        self::$tetryonReused[static::class] = [
+            'driver' => $driver,
+            'configuration' => $configuration,
+            'cookies' => $driver->cookies($origin),
+            'storage' => $storage,
+        ];
+
+        $driver->navigate('about:blank');
+        $driver->resetDiagnostics();
+    }
+
+    private static function tetryonOrigin(Configuration $configuration): string
+    {
+        $parts = parse_url($configuration->baseUrl);
+        $scheme = is_array($parts) ? ($parts['scheme'] ?? 'http') : 'http';
+        $host = is_array($parts) ? ($parts['host'] ?? '127.0.0.1') : '127.0.0.1';
+        $port = is_array($parts) && isset($parts['port']) ? ':'.$parts['port'] : '';
+
+        return $scheme.'://'.$host.$port;
+    }
+
+    private static function restoreStorageScript(string $snapshot): string
+    {
+        return '(() => { const s = '.$snapshot.'; '
+            .'localStorage.clear(); sessionStorage.clear(); '
+            .'for (const [k, v] of Object.entries(s.local)) localStorage.setItem(k, v); '
+            .'for (const [k, v] of Object.entries(s.session)) sessionStorage.setItem(k, v); })()';
+    }
+
+    /** Stop the class's reused browser, if it had one. */
+    #[AfterClass]
+    public static function stopReusedTetryonBrowser(): void
+    {
+        $shared = self::$tetryonReused[static::class] ?? null;
+        unset(self::$tetryonReused[static::class]);
+        if ($shared !== null) {
+            $shared['driver']->stop();
+        }
     }
 
     /** The test method's #[Record], else its class's (or a parent's). */
@@ -143,10 +283,14 @@ trait InteractsWithBrowser
             fwrite(STDERR, $report."\n");
         }
 
-        $driver?->stop();
+        // A reused browser stays up for the class's next test; #[AfterClass] stops it.
+        if (! $this->tetryonReusing) {
+            $driver?->stop();
+        }
         $this->tetryonDriver = null;
         $this->tetryonBrowser = null;
         $this->tetryonConfiguration = null;
+        $this->tetryonReusing = false;
     }
 
     private function browserTestFailed(): bool
