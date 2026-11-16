@@ -53,6 +53,32 @@ final class ReportManifest
     }
 
     /**
+     * One manifest from the test entries of several {@see build()} calls, such
+     * as each parallel worker's part (#193): renumbered, regrouped against the
+     * whole suite, and summarised again.
+     *
+     * @param  list<array<string, mixed>>  $tests
+     * @return array{summary: array{total: int, passed: int, failed: int}, tests: list<array<string, mixed>>}
+     */
+    public static function combine(array $tests): array
+    {
+        $total = count($tests);
+        $passed = count(array_filter($tests, static fn (array $test): bool => ($test['passed'] ?? false) === true));
+        $groups = self::groups(array_map(static fn (array $test): string => is_string($test['id'] ?? null) ? $test['id'] : '', $tests));
+
+        foreach ($tests as $index => $test) {
+            $tests[$index]['group'] = $groups[$index];
+            $tests[$index]['index'] = $index + 1;
+            $tests[$index]['total'] = $total;
+        }
+
+        return [
+            'summary' => ['total' => $total, 'passed' => $passed, 'failed' => $total - $passed],
+            'tests' => $tests,
+        ];
+    }
+
+    /**
      * Where each test sits in the sidebar: the folder its class lives in,
      * below the namespace every test shares, then the class as a phrase —
      * `Tests\Browser\DataSets\DataSetShowTest::test_x` → `['Data sets', 'Data set show']`
