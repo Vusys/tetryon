@@ -6,6 +6,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- **One suite report for a parallel run** (#193). Under paratest each worker rendered its own tests into the same report directory, so the last worker to finish overwrote the others. Now each worker adds its part, and the report is re-rendered from all of them, so it holds every test in the run. See [`docs/reporting.md`](docs/reporting.md#combining-a-whole-suite-into-one-report).
+
 ## [0.8.0] - 2026-11-16
 
 Faster browser suites. A test class can reuse one browser instead of launching Firefox for every test, and parallel runs can let Tetryon start one app server per worker. One change can break existing suites: `Laravel\BrowserTestCase` now refuses `RefreshDatabase` and `DatabaseTransactions`, whose rolled-back rows the served app never sees, so switch those tests to `DatabaseTruncation`.

@@ -41,6 +41,25 @@ final class ReportRenderer
     }
 
     /**
+     * One parallel worker's share of a suite report (#193). Its images and
+     * diagnostics go into the shared output directory, where they're named by
+     * content or by test so workers never collide, and its manifest entries go
+     * to `parts/<run>/<worker>.json`. Then, holding a lock, it renders
+     * `index.html` from every part of the run so far, so the last worker to
+     * finish writes the whole suite.
+     *
+     * @param  list<TestRecording>  $recordings
+     */
+    public static function renderPart(array $recordings, string $outputDirectory, Configuration $configuration, string $runId, string $worker): ?string
+    {
+        try {
+            return self::renderPartOrThrow($recordings, $outputDirectory, $configuration, $runId, $worker);
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    /**
      * @param  array<string, mixed>  $manifest
      */
     public static function renderHtml(array $manifest): string
@@ -60,6 +79,97 @@ final class ReportRenderer
         }
 
         $outputDirectory = rtrim($outputDirectory, '/');
+        [$screenshotPaths, $diagnosticsDirs, $diagnosticsReports] = self::writeAssets($recordings, $outputDirectory, $configuration);
+
+        // Images are named by content, so a re-render into the same
+        // directory would otherwise keep every frame of every earlier run.
+        self::pruneScreenshots($outputDirectory, array_merge(...$screenshotPaths));
+
+        $manifest = ReportManifest::build($recordings, $screenshotPaths, $diagnosticsDirs, $diagnosticsReports);
+
+        $indexPath = "{$outputDirectory}/index.html";
+        file_put_contents($indexPath, self::renderHtml($manifest));
+
+        return $indexPath;
+    }
+
+    /**
+     * @param  list<TestRecording>  $recordings
+     */
+    private static function renderPartOrThrow(array $recordings, string $outputDirectory, Configuration $configuration, string $runId, string $worker): string
+    {
+        if ($recordings === []) {
+            throw new ReportException('Nothing was recorded — no test called recording().');
+        }
+
+        $outputDirectory = rtrim($outputDirectory, '/');
+        $runDirectory = "{$outputDirectory}/parts/{$runId}";
+        self::ensureDirectory($runDirectory);
+
+        [$screenshotPaths, $diagnosticsDirs, $diagnosticsReports] = self::writeAssets($recordings, $outputDirectory, $configuration);
+        $part = ReportManifest::build($recordings, $screenshotPaths, $diagnosticsDirs, $diagnosticsReports);
+        file_put_contents("{$runDirectory}/{$worker}.json", json_encode($part['tests'], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+
+        $lock = fopen("{$outputDirectory}/parts/.lock", 'c');
+        if ($lock === false || ! flock($lock, LOCK_EX)) {
+            throw new ReportException('Could not lock the suite report for a combined render.');
+        }
+
+        try {
+            $tests = [];
+            $parts = glob("{$runDirectory}/*.json") ?: [];
+            natsort($parts);
+            foreach ($parts as $file) {
+                $decoded = json_decode((string) file_get_contents($file), true, flags: JSON_THROW_ON_ERROR);
+                foreach (is_array($decoded) ? $decoded : [] as $test) {
+                    if (is_array($test)) {
+                        $tests[] = $test;
+                    }
+                }
+            }
+
+            /** @var list<array<string, mixed>> $tests */
+            $manifest = ReportManifest::combine($tests);
+
+            // Another worker may still be writing images it hasn't listed yet,
+            // so only images older than this run are fair game.
+            $referenced = [];
+            foreach ($manifest['tests'] as $test) {
+                foreach (is_array($test['moments'] ?? null) ? $test['moments'] : [] as $moment) {
+                    if (is_array($moment) && is_string($moment['src'] ?? null)) {
+                        $referenced[] = $moment['src'];
+                    }
+                }
+            }
+            self::pruneScreenshots($outputDirectory, $referenced, (int) filemtime($runDirectory));
+
+            // Parts left behind by earlier runs.
+            foreach (glob("{$outputDirectory}/parts/*", GLOB_ONLYDIR) ?: [] as $directory) {
+                if ($directory !== $runDirectory && (int) filemtime($directory) < (int) filemtime($runDirectory)) {
+                    array_map(unlink(...), glob("{$directory}/*") ?: []);
+                    @rmdir($directory);
+                }
+            }
+
+            $indexPath = "{$outputDirectory}/index.html";
+            file_put_contents($indexPath, self::renderHtml($manifest));
+
+            return $indexPath;
+        } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+        }
+    }
+
+    /**
+     * Write each recording's images and failure diagnostics into the report
+     * directory.
+     *
+     * @param  list<TestRecording>  $recordings
+     * @return array{list<list<string>>, list<string|null>, list<string|null>}
+     */
+    private static function writeAssets(array $recordings, string $outputDirectory, Configuration $configuration): array
+    {
         self::ensureDirectory("{$outputDirectory}/screenshots");
 
         $screenshotPaths = [];
@@ -78,6 +188,10 @@ final class ReportRenderer
                 $relative = sprintf('screenshots/%s.%s', md5($encoded->bytes), $encoded->extension);
                 if (! is_file("{$outputDirectory}/{$relative}")) {
                     file_put_contents("{$outputDirectory}/{$relative}", $encoded->bytes);
+                } else {
+                    // Reused from an earlier run: mark it current, so a parallel
+                    // worker's prune (#193) doesn't take it as stale.
+                    @touch("{$outputDirectory}/{$relative}");
                 }
                 $paths[] = $relative;
             }
@@ -96,21 +210,26 @@ final class ReportRenderer
             }
         }
 
-        // Images are named by content, so a re-render into the same
-        // directory would otherwise keep every frame of every earlier run.
-        $current = array_flip(array_merge(...$screenshotPaths));
+        return [$screenshotPaths, $diagnosticsDirs, $diagnosticsReports];
+    }
+
+    /**
+     * Delete images no test refers to; with $olderThan, only those last
+     * written before it.
+     *
+     * @param  list<string>  $referenced  relative paths, e.g. "screenshots/ab12.webp"
+     */
+    private static function pruneScreenshots(string $outputDirectory, array $referenced, ?int $olderThan = null): void
+    {
+        $current = array_flip($referenced);
         foreach (glob("{$outputDirectory}/screenshots/*") ?: [] as $file) {
-            if (! isset($current['screenshots/'.basename($file)])) {
+            if (isset($current['screenshots/'.basename($file)])) {
+                continue;
+            }
+            if ($olderThan === null || (int) filemtime($file) < $olderThan) {
                 @unlink($file);
             }
         }
-
-        $manifest = ReportManifest::build($recordings, $screenshotPaths, $diagnosticsDirs, $diagnosticsReports);
-
-        $indexPath = "{$outputDirectory}/index.html";
-        file_put_contents($indexPath, self::renderHtml($manifest));
-
-        return $indexPath;
     }
 
     /**

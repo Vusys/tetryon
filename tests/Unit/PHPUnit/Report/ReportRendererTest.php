@@ -135,10 +135,74 @@ final class ReportRendererTest extends TestCase
         self::assertSame(2, substr_count($html, '</script>'));
     }
 
-    private function onePixelPng(): string
+    public function test_parallel_workers_combine_into_one_report(): void
+    {
+        $red = $this->onePixelPng(255, 0, 0);
+        $blue = $this->onePixelPng(0, 0, 255);
+
+        ReportRenderer::renderPart([
+            new TestRecording('Tests\\Browser\\ChartTest::test_one', 'One', true, [new Moment(screenshot: $red, caption: 'A', stepIndex: 1, progress: 1, durationMs: 0)]),
+        ], $this->outputDirectory, new Configuration, 'run-1', '1');
+        $indexPath = ReportRenderer::renderPart([
+            new TestRecording('Tests\\Browser\\PersonTest::test_two', 'Two', false, [new Moment(screenshot: $blue, caption: 'B', stepIndex: 1, progress: 1, durationMs: 0)]),
+        ], $this->outputDirectory, new Configuration, 'run-1', '2');
+
+        self::assertSame("{$this->outputDirectory}/index.html", $indexPath);
+        $manifest = $this->manifest();
+        self::assertSame(['total' => 2, 'passed' => 1, 'failed' => 1], $manifest['summary']);
+        self::assertSame(['One', 'Two'], array_column($manifest['tests'], 'title'));
+        self::assertSame([1, 2], array_column($manifest['tests'], 'index'));
+        self::assertSame([['Chart'], ['Person']], array_column($manifest['tests'], 'group'));
+        self::assertCount(2, (array) glob("{$this->outputDirectory}/screenshots/*"), "worker 2 kept worker 1's image");
+    }
+
+    public function test_a_worker_prunes_only_images_and_parts_from_earlier_runs(): void
+    {
+        mkdir("{$this->outputDirectory}/screenshots", recursive: true);
+        mkdir("{$this->outputDirectory}/parts/run-0", recursive: true);
+        file_put_contents("{$this->outputDirectory}/screenshots/old.webp", 'earlier run');
+        touch("{$this->outputDirectory}/screenshots/old.webp", time() - 3600);
+        file_put_contents("{$this->outputDirectory}/parts/run-0/1.json", '[]');
+        touch("{$this->outputDirectory}/parts/run-0", time() - 3600);
+        // a worker still running wrote this, but hasn't listed it in a part yet
+        file_put_contents("{$this->outputDirectory}/screenshots/in-flight.webp", 'this run');
+
+        ReportRenderer::renderPart([
+            new TestRecording('A::test_one', 'One', true, [new Moment(screenshot: $this->onePixelPng(), caption: 'A', stepIndex: 1, progress: 1, durationMs: 0)]),
+        ], $this->outputDirectory, new Configuration, 'run-1', '1');
+
+        self::assertFileDoesNotExist("{$this->outputDirectory}/screenshots/old.webp");
+        self::assertFileExists("{$this->outputDirectory}/screenshots/in-flight.webp");
+        self::assertDirectoryDoesNotExist("{$this->outputDirectory}/parts/run-0");
+        self::assertCount(1, $this->manifest()['tests']);
+    }
+
+    /**
+     * @return array{summary: array<string, int>, tests: list<array<string, mixed>>}
+     */
+    private function manifest(): array
+    {
+        $html = (string) file_get_contents("{$this->outputDirectory}/index.html");
+        preg_match('#<script[^>]*type="application/json"[^>]*>(.*?)</script>#s', $html, $match);
+        $manifest = json_decode($match[1] ?? self::fail('index.html has no manifest'), true, flags: JSON_THROW_ON_ERROR);
+        self::assertIsArray($manifest);
+
+        /** @var array{summary: array<string, int>, tests: list<array<string, mixed>>} $manifest */
+        return $manifest;
+    }
+
+    /**
+     * @param  int<0, 255>  $red
+     * @param  int<0, 255>  $green
+     * @param  int<0, 255>  $blue
+     */
+    private function onePixelPng(int $red = 0, int $green = 0, int $blue = 0): string
     {
         $image = imagecreatetruecolor(1, 1);
         self::assertNotFalse($image);
+        $colour = imagecolorallocate($image, $red, $green, $blue);
+        self::assertNotFalse($colour);
+        imagesetpixel($image, 0, 0, $colour);
         ob_start();
         imagepng($image);
         $png = ob_get_clean();

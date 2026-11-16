@@ -73,6 +73,22 @@ final class SuiteReport
         self::$shutdownRegistered = false;
     }
 
+    /**
+     * Under paratest: this run's id (the paratest process every worker shares
+     * as a parent, or null without ext-posix) and this worker's token.
+     *
+     * @return array{?string, string}|null
+     */
+    private static function parallelWorker(): ?array
+    {
+        $token = getenv('TEST_TOKEN');
+        if (! is_string($token) || $token === '' || ! ctype_digit($token)) {
+            return null;
+        }
+
+        return [function_exists('posix_getppid') ? (string) posix_getppid() : null, $token];
+    }
+
     private static function registerShutdownRender(): void
     {
         if (self::$shutdownRegistered || ! self::enabled()) {
@@ -90,12 +106,28 @@ final class SuiteReport
             }
 
             $path = getenv('TETRYON_SUITE_REPORT_PATH');
+            $directory = is_string($path) && $path !== '' ? $path : 'tests/Browser/Artifacts/suite-report';
             $count = count(self::$recordings);
-            $result = self::render(is_string($path) && $path !== '' ? $path : 'tests/Browser/Artifacts/suite-report');
+            $worker = self::parallelWorker();
+
+            if ($worker === null) {
+                $result = self::render($directory);
+                fwrite(STDERR, $result === null
+                    ? "\nTetryon: suite report failed to render.\n"
+                    : sprintf("\nTetryon: suite report (%d tests) written to %s\n", $count, $result));
+
+                return;
+            }
+
+            [$runId, $token] = $worker;
+            $result = $runId === null
+                // No way to tell this run's workers apart: one report each.
+                ? self::render("{$directory}/worker-{$token}")
+                : ReportRenderer::renderPart(self::$recordings, $directory, Configuration::fromEnvironment(), $runId, $token);
 
             fwrite(STDERR, $result === null
-                ? "\nTetryon: suite report failed to render.\n"
-                : sprintf("\nTetryon: suite report (%d tests) written to %s\n", $count, $result));
+                ? "\nTetryon: worker {$token}'s part of the suite report failed to render.\n"
+                : sprintf("\nTetryon: worker %s added %d tests to the suite report at %s\n", $token, $count, $result));
         });
     }
 }
