@@ -6,6 +6,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-16
+
+Faster browser suites. A test class can reuse one browser instead of launching Firefox for every test, and parallel runs can let Tetryon start one app server per worker. One change can break existing suites: `Laravel\BrowserTestCase` now refuses `RefreshDatabase` and `DatabaseTransactions`, whose rolled-back rows the served app never sees, so switch those tests to `DatabaseTruncation`.
+
 ### Added
 
 - **Reuse one browser across a test class** (#78). `#[ReuseBrowser]`, or the `ReusesBrowser` trait, launches Firefox once per class instead of once per test. An `authenticate()` hook runs once after launch, the cookies are snapshotted (plus localStorage and sessionStorage with `storage: true`), and every test starts from that snapshot on `about:blank` with empty diagnostics. A browser that stops answering is relaunched and authenticated again. A launch costs about 1.7s on a 2015 laptop; a restore costs about 70ms. See [`docs/writing-tests.md`](docs/writing-tests.md#reusing-one-browser-across-a-class).
@@ -269,7 +273,8 @@ first-class Laravel integration.
   and a writable artifact directory — and prints a report with fix hints,
   exiting non-zero if anything is wrong.
 
-[Unreleased]: https://github.com/Vusys/tetryon/compare/v0.7.1...master
+[Unreleased]: https://github.com/Vusys/tetryon/compare/v0.8.0...master
+[0.8.0]: https://github.com/Vusys/tetryon/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/Vusys/tetryon/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/Vusys/tetryon/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Vusys/tetryon/compare/v0.5.0...v0.6.0
