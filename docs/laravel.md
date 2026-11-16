@@ -81,7 +81,22 @@ Under `php artisan test --parallel` (paratest), every worker needs its own app s
 
 With `TETRYON_MANAGED_SERVER=true`, each process starts its own server on the first `browser()` call. It listens on `base_port + TEST_TOKEN`, so `8100` outside a parallel run and `8103` for worker 3. Tetryon waits until `ready_path` answers, uses it in place of `base_url`, reuses it for every test in that process, and stops it when the process exits.
 
-The server inherits the worker's environment. `env` adds to it, with `{token}`, `{port}` and `{host}` replaced, which is how a worker's server reaches the worker's database. Laravel's `ParallelTesting` creates and migrates `<name>_test_N` in the test process; Tetryon never creates databases itself.
+The server inherits the worker's environment. `env` adds to it, with `{token}`, `{port}` and `{host}` replaced, which is how a worker's server reaches the worker's database. Laravel's `ParallelTesting` creates and migrates `<name>_test_N` in the test process; Tetryon never creates databases itself. Laravel names that database only under `--parallel`, so turn the managed server on for parallel runs, for example `TETRYON_MANAGED_SERVER=true php artisan test --parallel`.
+
+With a file-based SQLite database, create the worker's file first. Laravel creates a missing test database only after a `QueryException`, and a missing SQLite file throws something else:
+
+```php
+public static function setUpBeforeClass(): void
+{
+    parent::setUpBeforeClass();
+
+    // The app hasn't booted yet, so no database_path(): this is tests/Browser/.
+    $token = getenv('TEST_TOKEN');
+    if (is_string($token) && $token !== '') {
+        touch(dirname(__DIR__, 2).'/database/tetryon.sqlite_test_'.$token);
+    }
+}
+```
 
 Each worker runs a PHP server and a Firefox, so the number of workers is bounded by memory. A handful of workers is realistic; dozens aren't.
 
