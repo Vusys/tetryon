@@ -22,7 +22,9 @@ $this->browser()
 ->hover('Account menu');
 ```
 
-`click()` / `press()` prefer an **interactive** target (button, link, input, …) when more than one element matches — so pressing `'Log in'` clicks the submit button, not a heading that happens to share its text. When nothing interactive matches, the first match still wins, so a `<div>` with a click handler is fine.
+`click()` prefers an **interactive** target (button, link, input, …) when more than one element matches, so clicking `'Log in'` hits the submit button, not a heading that happens to share its text. When nothing interactive matches, the first match still wins, so a `<div>` with a click handler is fine.
+
+`press()` is stricter: it only ever presses a **button**. That means a `<button>`, an `<input type="submit|button|reset|image">`, or a `[role=button]` element, found by its text, value, `aria-label`, `title`, test attribute or `name`. A search field labelled "Search" can't take `press('Search')` from the "Search" button beside it. For links and other clickable elements, use `click()`.
 
 ### Drag and drop
 
