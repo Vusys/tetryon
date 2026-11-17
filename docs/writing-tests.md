@@ -135,6 +135,31 @@ final class DashboardTest extends BrowserTestCase
 - **Storage:** `#[ReuseBrowser(storage: true)]` also snapshots the origin's `localStorage` and `sessionStorage`. The trait form is `snapshotsBrowserStorage()` returning `true`. Restoring storage needs a page on the origin, so each test then starts with one visit to the base URL.
 - **Teardown:** the browser is stopped after the class's last test.
 
+### Checkpointing the database (Laravel)
+
+With `Vusys\Tetryon\Laravel\BrowserTestCase`, `#[ReuseBrowser(database: true)]` (or `snapshotsDatabase()` returning `true` on the trait) also checkpoints the database. A class can then seed and log in once:
+
+```php
+#[ReuseBrowser(database: true)]
+final class ChartTest extends BrowserTestCase
+{
+    use DatabaseTruncation;
+
+    protected function authenticate(Browser $browser): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $this->loginAs(User::where('email', 'admin@example.com')->firstOrFail());
+    }
+}
+```
+
+- **Timing:** in this mode the browser starts in `setUp()`, after `DatabaseTruncation` has run. The first test runs `authenticate()` there, and the database is checkpointed when it returns. Every later test's `setUp()` puts the checkpoint back before the browser is restored, so nothing a test writes reaches the next test, and nothing it writes before calling `browser()` is lost.
+- **SQLite:** checkpointed with `VACUUM INTO` a temp file, and restored from it table by table.
+- **MySQL and MariaDB:** shadow copies of each table in the same database (`tetryon_cp_*`), restored with foreign keys off and dropped after the class.
+- **Who restores:** the test process does the restore on its own connection, and the writes are committed, so the served app sees them on its next request.
+- **What's restored:** table contents only. A table created after the checkpoint, or a schema change, is left as it is.
+- **Speed:** in a real app, a three-test class that seeded in every `setUp()` went from 81–114s to 46–47s.
+
 Limits:
 
 - **Not reset:** service workers, IndexedDB, caches and permissions. Leave reuse off for a test that needs those pristine.

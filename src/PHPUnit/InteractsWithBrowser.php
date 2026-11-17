@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Vusys\Tetryon\PHPUnit;
 
+use LogicException;
 use PHPUnit\Framework\Attributes\After;
 use PHPUnit\Framework\Attributes\AfterClass;
 use PHPUnit\Framework\TestCase;
@@ -90,8 +91,9 @@ trait InteractsWithBrowser
 
         if (method_exists($this, 'snapshotsBrowserStorage')) {
             $storage = $this->snapshotsBrowserStorage();
+            $database = method_exists($this, 'snapshotsDatabase') ? $this->snapshotsDatabase() : false;
 
-            return new ReuseBrowser(storage: $storage === true);
+            return new ReuseBrowser(storage: $storage === true, database: $database === true);
         }
 
         return null;
@@ -165,9 +167,22 @@ trait InteractsWithBrowser
             'cookies' => $driver->cookies($origin),
             'storage' => $storage,
         ];
+        $this->captureBrowserCheckpoint($reuse);
 
         $driver->navigate('about:blank');
         $driver->resetDiagnostics();
+    }
+
+    /**
+     * Called once authenticate() has run and the browser state is snapshotted,
+     * for a framework layer to checkpoint what lives outside the browser.
+     * Laravel's BrowserTestCase checkpoints the database here.
+     */
+    protected function captureBrowserCheckpoint(ReuseBrowser $reuse): void
+    {
+        if ($reuse->database) {
+            throw new LogicException('#[ReuseBrowser(database: true)] needs Vusys\Tetryon\Laravel\BrowserTestCase, which knows the app\'s database.');
+        }
     }
 
     private static function tetryonOrigin(Configuration $configuration): string

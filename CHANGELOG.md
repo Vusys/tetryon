@@ -6,6 +6,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **A database checkpoint for reused browsers** (#78, Phase 2). With `Laravel\BrowserTestCase`, `#[ReuseBrowser(database: true)]` (or the trait's `snapshotsDatabase()`) checkpoints the database after `authenticate()` and puts it back before every test, so a class seeds and logs in once. SQLite uses `VACUUM INTO` and a table-by-table restore; MySQL and MariaDB use shadow tables. The test process restores the committed rows, which the served app then reads. See [`docs/writing-tests.md`](docs/writing-tests.md#checkpointing-the-database-laravel).
+
 ## [0.8.1] - 2026-11-16
 
 ### Fixed

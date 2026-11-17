@@ -32,6 +32,25 @@ jobs:
 
     name: "PHP ${{ matrix.php }} / PHPUnit ${{ matrix.phpunit }}"
 
+    # For DatabaseCheckpointTest's MySQL cases; SQLite needs no service.
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: tetryon_test
+          MYSQL_ROOT_PASSWORD: tetryon
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -ptetryon"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=20
+
+    env:
+      TETRYON_TEST_MYSQL_DSN: mysql:host=127.0.0.1;port=3306;dbname=tetryon_test
+      TETRYON_TEST_MYSQL_USER: root
+      TETRYON_TEST_MYSQL_PASSWORD: tetryon
+
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -39,7 +58,7 @@ jobs:
         uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: ${{ matrix.php }}
-          extensions: mbstring
+          extensions: mbstring, pdo_mysql
           coverage: ${{ matrix.coverage && 'pcov' || 'none' }}
           tools: composer:v2
 

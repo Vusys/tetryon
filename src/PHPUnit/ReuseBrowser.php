@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Vusys\Tetryon\PHPUnit;
 
 use Attribute;
+use Vusys\Tetryon\Laravel\BrowserTestCase;
 
 /**
  * Launch one browser for the whole test class instead of one per test (#78).
@@ -29,10 +30,15 @@ use Attribute;
  * }
  * ```
  *
+ * `database: true` (Laravel's {@see BrowserTestCase}
+ * only) also checkpoints the database right after `authenticate()` and
+ * restores it before every test, so a class can seed and log in once. SQLite
+ * and MySQL/MariaDB are supported.
+ *
  * The {@see ReusesBrowser} trait does the same, for those who prefer a trait.
  */
 #[Attribute(Attribute::TARGET_CLASS)]
 final readonly class ReuseBrowser
 {
-    public function __construct(public bool $storage = false) {}
+    public function __construct(public bool $storage = false, public bool $database = false) {}
 }

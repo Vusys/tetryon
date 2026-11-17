@@ -11,10 +11,12 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\TestCase as FoundationTestCase;
 use LogicException;
+use PHPUnit\Framework\Attributes\AfterClass;
 use RuntimeException;
 use Vusys\Tetryon\Core\Config\Configuration;
 use Vusys\Tetryon\PHPUnit\Browser;
 use Vusys\Tetryon\PHPUnit\InteractsWithBrowser;
+use Vusys\Tetryon\PHPUnit\ReuseBrowser;
 
 /**
  * Laravel-flavoured browser test case. Boots the application (so factories, the
@@ -27,12 +29,44 @@ abstract class BrowserTestCase extends FoundationTestCase
 {
     use InteractsWithBrowser;
 
+    /** @var array<class-string, DatabaseCheckpoint> */
+    private static array $tetryonCheckpoints = [];
+
     #[\Override]
     protected function setUp(): void
     {
         self::refuseTransactionIsolation(static::class);
 
         parent::setUp();
+
+        // With a database checkpoint (#78), the database is put back and the
+        // browser started here, before the test body, so nothing the test
+        // writes can leak into the checkpoint or be wiped by a late restore.
+        $reuse = $this->browserReuse();
+        if ($reuse instanceof ReuseBrowser && $reuse->database) {
+            (self::$tetryonCheckpoints[static::class] ?? null)?->restore();
+            $this->browser();
+        }
+    }
+
+    /** The database checkpoint, taken once authenticate() has run. */
+    protected function captureBrowserCheckpoint(ReuseBrowser $reuse): void
+    {
+        if (! $reuse->database) {
+            return;
+        }
+
+        (self::$tetryonCheckpoints[static::class] ?? null)?->drop();
+        self::$tetryonCheckpoints[static::class] = DatabaseCheckpoint::capture($this->app->make('db')->connection());
+    }
+
+    /** Drop the class's database checkpoint, if it had one. */
+    #[AfterClass]
+    public static function dropTetryonDatabaseCheckpoint(): void
+    {
+        $checkpoint = self::$tetryonCheckpoints[static::class] ?? null;
+        unset(self::$tetryonCheckpoints[static::class]);
+        $checkpoint?->drop();
     }
 
     /**
