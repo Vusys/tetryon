@@ -87,6 +87,40 @@ final class SelectorStrategy
     }
 
     /**
+     * The candidates for press(): buttons only (#199). An explicit selector or
+     * test attribute is taken as given.
+     *
+     * @param  list<string>  $testAttributes
+     * @return list<Locator>
+     */
+    public function pressableCandidates(string $target, array $testAttributes): array
+    {
+        $explicit = $this->explicit($target, $testAttributes);
+        if ($explicit instanceof Locator) {
+            return [$explicit];
+        }
+
+        $css = $this->cssString($target);
+        $xpath = $this->xpathString($target);
+
+        $candidates = [];
+        foreach ($testAttributes as $attribute) {
+            $candidates[] = Locator::css("[{$attribute}]", '['.$attribute.'='.$css.']');
+        }
+
+        $candidates[] = Locator::xpath('button text', $this->buttonExpression($xpath), $this->buttonPierce($target));
+        $candidates[] = Locator::xpath(
+            'button name',
+            ".//button[@aria-label={$xpath} or @title={$xpath}]"
+            ." | .//*[@role='button'][@aria-label={$xpath} or normalize-space()={$xpath}]"
+            ." | .//input[(@type='submit' or @type='button' or @type='reset' or @type='image') and (@aria-label={$xpath} or @alt={$xpath} or @title={$xpath})]",
+        );
+        $candidates[] = Locator::css('name', 'button[name='.$css.'], input[type=submit][name='.$css.'], input[type=button][name='.$css.']');
+
+        return $candidates;
+    }
+
+    /**
      * @param  list<string>  $testAttributes
      */
     private function explicit(string $target, array $testAttributes): ?Locator

@@ -10,6 +10,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - **A database checkpoint for reused browsers** (#78, Phase 2). With `Laravel\BrowserTestCase`, `#[ReuseBrowser(database: true)]` (or the trait's `snapshotsDatabase()`) checkpoints the database after `authenticate()` and puts it back before every test, so a class seeds and logs in once. SQLite uses `VACUUM INTO` and a table-by-table restore; MySQL and MariaDB use shadow tables. The test process restores the committed rows, which the served app then reads. See [`docs/writing-tests.md`](docs/writing-tests.md#checkpointing-the-database-laravel).
 
+### Changed
+
+- **`press()` only presses buttons** (#199). It was `click()` under another name, so it resolved its text against labels, placeholders and any visible text first. A field labelled "Search" took `press('Search')` from the "Search" button beside it, and the form never submitted. Now it considers only `<button>`, `<input type="submit|button|reset|image">` and `[role=button]` elements, by text, value, `aria-label`, `title`, test attribute or `name`. Code that used `press()` on a link or another non-button element should use `click()`.
+
 ## [0.8.1] - 2026-11-16
 
 ### Fixed

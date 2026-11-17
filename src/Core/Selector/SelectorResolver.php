@@ -86,6 +86,28 @@ final readonly class SelectorResolver
     }
 
     /**
+     * Resolve for press(): a button the target names, by text, accessible name,
+     * value, test attribute or `name`. Labels, placeholders and visible text in
+     * general aren't candidates, so a field sharing the button's text can't take
+     * the press (#199).
+     */
+    public function resolvePressable(string $target): ElementReference
+    {
+        $attempts = [];
+        foreach ($this->strategy->pressableCandidates($target, $this->testAttributes) as $candidate) {
+            $matches = $this->nodeLocator->locateAll($candidate, $this->root);
+            $attempts[] = new ResolutionAttempt($candidate->description, count($matches));
+
+            $picked = $this->preferVisible($matches);
+            if ($picked instanceof ElementReference) {
+                return $picked;
+            }
+        }
+
+        throw new ElementNotFoundException($target, $attempts);
+    }
+
+    /**
      * Resolve for check()/uncheck(): the checkbox or radio a target names,
      * including one a text label is associated with by wrapping, `for=`, or
      * adjacency. Uses a dedicated candidate list so that association never

@@ -40,6 +40,13 @@ use Vusys\Tetryon\PHPUnit\Report\TestRecording;
  */
 final readonly class Browser
 {
+    /** How an action resolves its target: any match, an interactive one, or a button. */
+    private const string RESOLVE_ANY = 'any';
+
+    private const string RESOLVE_INTERACTIVE = 'interactive';
+
+    private const string RESOLVE_PRESSABLE = 'pressable';
+
     /** Inputs whose value is chosen from a widget rather than typed. */
     private const array PICKER_INPUT_TYPES = ['date', 'datetime-local', 'month', 'week', 'time', 'color', 'range'];
 
@@ -403,14 +410,21 @@ final readonly class Browser
 
     public function click(string $target): self
     {
-        $this->driver->clickElement($this->actionable($target, preferInteractive: true));
+        $this->driver->clickElement($this->actionable($target, self::RESOLVE_INTERACTIVE));
 
         return $this;
     }
 
+    /**
+     * Press a button: only a `<button>`, a submit/button/reset/image input or a
+     * `[role=button]` element is considered, so a field labelled with the same
+     * text can't take the press (#199). For anything else, use click().
+     */
     public function press(string $button): self
     {
-        return $this->click($button);
+        $this->driver->clickElement($this->actionable($button, self::RESOLVE_PRESSABLE));
+
+        return $this;
     }
 
     /**
@@ -443,14 +457,14 @@ final readonly class Browser
 
     public function doubleClick(string $target): self
     {
-        $this->driver->doubleClickElement($this->actionable($target, preferInteractive: true));
+        $this->driver->doubleClickElement($this->actionable($target, self::RESOLVE_INTERACTIVE));
 
         return $this;
     }
 
     public function rightClick(string $target): self
     {
-        $this->driver->rightClickElement($this->actionable($target, preferInteractive: true));
+        $this->driver->rightClickElement($this->actionable($target, self::RESOLVE_INTERACTIVE));
 
         return $this;
     }
@@ -1366,9 +1380,9 @@ final readonly class Browser
      * (e.g. `occluded:.modal-backdrop`, `unstable`, `transparent`) so a
      * swallowed click surfaces as a useful error instead of a silent no-op.
      */
-    private function actionable(string $target, bool $preferInteractive = false): ElementReference
+    private function actionable(string $target, string $mode = self::RESOLVE_ANY): ElementReference
     {
-        return $this->awaitActionable($this->resolveWaiting($target, $preferInteractive), $target);
+        return $this->awaitActionable($this->resolveWaiting($target, $mode), $target);
     }
 
     /**
@@ -1567,11 +1581,11 @@ final readonly class Browser
         return ElementInfo::fromJson(is_string($json) ? $json : '');
     }
 
-    private function resolveWaiting(string $target, bool $preferInteractive = false): ElementReference
+    private function resolveWaiting(string $target, string $mode = self::RESOLVE_ANY): ElementReference
     {
         $element = null;
-        $this->wait($this->configuration->timeouts->default, function () use ($target, $preferInteractive, &$element): bool {
-            $element = $this->resolveNow($target, $preferInteractive);
+        $this->wait($this->configuration->timeouts->default, function () use ($target, $mode, &$element): bool {
+            $element = $this->resolveNow($target, $mode);
 
             return $element instanceof ElementReference;
         });
@@ -1583,7 +1597,7 @@ final readonly class Browser
         // On timeout, resolve once more so the rich ElementNotFoundException (with
         // its attempt list) surfaces instead of a bare null.
         try {
-            return $this->resolveElement($target, $preferInteractive);
+            return $this->resolveElement($target, $mode);
         } catch (Throwable $e) {
             $this->recording->captureFailure($e);
 
@@ -1591,20 +1605,22 @@ final readonly class Browser
         }
     }
 
-    private function resolveNow(string $target, bool $preferInteractive = false): ?ElementReference
+    private function resolveNow(string $target, string $mode = self::RESOLVE_ANY): ?ElementReference
     {
         try {
-            return $this->resolveElement($target, $preferInteractive);
+            return $this->resolveElement($target, $mode);
         } catch (ElementNotFoundException) {
             return null;
         }
     }
 
-    private function resolveElement(string $target, bool $preferInteractive): ElementReference
+    private function resolveElement(string $target, string $mode): ElementReference
     {
-        return $preferInteractive
-            ? $this->resolver->resolveInteractive($target)
-            : $this->resolver->resolve($target);
+        return match ($mode) {
+            self::RESOLVE_INTERACTIVE => $this->resolver->resolveInteractive($target),
+            self::RESOLVE_PRESSABLE => $this->resolver->resolvePressable($target),
+            default => $this->resolver->resolve($target),
+        };
     }
 
     private function isVisibleNow(string $target): bool

@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Press</title></head>
+<body>
+<!-- A field and the button that submits it share the name "Search" (#199). -->
+<form onsubmit="event.preventDefault(); document.getElementById('result').textContent = 'searched for ' + this.q.value;">
+    <label>Search <input type="search" name="q"></label>
+    <button type="submit">Search</button>
+</form>
+<p id="result"></p>
+
+<button aria-label="Close dialog" onclick="document.getElementById('result').textContent = 'closed'">×</button>
+<div role="button" tabindex="0" onclick="document.getElementById('result').textContent = 'custom pressed'">Custom</div>
+<h2>Archive</h2>
+</body>
+</html>
