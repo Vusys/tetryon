@@ -7,12 +7,18 @@ on:
       - docs/**
       - mkdocs.yml
       - .github/workflows/docs.yml
+  # Republish when master's TodoMVC run finishes, so the live demo stays current.
+  workflow_run:
+    workflows: [TodoMVC]
+    types: [completed]
+    branches: [master]
   workflow_dispatch:
 
 permissions:
   contents: read
   pages: write
   id-token: write
+  actions: read
 
 concurrency:
   group: pages
@@ -33,6 +39,22 @@ jobs:
       - run: pip install -r docs/requirements.txt
 
       - run: mkdocs build --strict
+
+      # The TodoMVC live demo: the recorded report from master's latest
+      # successful TodoMVC run, served at /demo/todomvc/. Best effort: a site
+      # without it still deploys, and the docs page says where it comes from.
+      - name: Add the TodoMVC live demo
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run_id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow todomvc.yml --branch master \
+            --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+          if [ -z "$run_id" ]; then
+            echo "::warning::No successful TodoMVC run on master yet; publishing without the demo."
+            exit 0
+          fi
+          gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name todomvc-report --dir site/demo/todomvc \
+            || echo "::warning::TodoMVC run $run_id has no report artifact; publishing without the demo."
 
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
