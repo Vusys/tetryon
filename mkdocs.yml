@@ -91,6 +91,7 @@ nav:
   - Assertions: assertions.md
   - Configuration: configuration.md
   - Diagnostics: diagnostics.md
+  - Recorded reports: reporting.md
   - Laravel: laravel.md
   - Continuous integration: ci.md
   - Compatibility: compatibility.md
