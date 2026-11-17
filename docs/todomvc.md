@@ -11,6 +11,20 @@ composer todomvc:fetch     # sparse-checkout the ten built apps (~9.5 MB, no npm
 composer test:todomvc      # run the suite (needs Firefox)
 ```
 
+## Watch it run
+
+**[Open the live demo →](https://vusys.github.io/tetryon/demo/todomvc/)**
+
+Every scenario in the suite records itself, so each run also writes a [recorded report](reporting.md): one page with every test against every app, each step's screenshot, and the action that produced it. The demo is that report from the latest successful run on `master`. CI builds it in the TodoMVC workflow and publishes it with these docs, so it always shows the current selector strategy against the real apps.
+
+To build the same report locally:
+
+```bash
+composer todomvc:fetch
+TETRYON_SUITE_REPORT=1 TETRYON_SUITE_REPORT_PATH=build/todomvc-report composer test:todomvc
+# open build/todomvc-report/index.html
+```
+
 ## The matrix
 
 Every cell is a behavioural scenario from upstream's `app-spec.md`, driven the way the docs sell Tetryon. ✅ passes; ⊘ is a documented skip (see the key). No cell is a silent failure — a skip is a `knownIssues` entry on the app's profile with a reason.

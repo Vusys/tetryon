@@ -50,10 +50,23 @@ jobs:
       - name: Show Firefox version
         run: firefox --version
 
+      # The suite records every scenario, so this also writes one combined
+      # report: the live demo the docs link to (docs.yml publishes master's).
       - name: Run TodoMVC suite
         run: vendor/bin/phpunit --testsuite TodoMvc
         env:
           TETRYON_HEADLESS: true
+          TETRYON_SUITE_REPORT: 1
+          TETRYON_SUITE_REPORT_PATH: build/todomvc-report
+
+      - name: Upload the recorded report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: todomvc-report
+          path: build/todomvc-report
+          if-no-files-found: ignore
+          retention-days: 30
 
       # On failure, ship the diagnostic bundle (screenshot, HTML, console,
       # command trace) so a red build is debuggable without a local repro.

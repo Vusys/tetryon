@@ -104,6 +104,8 @@ TETRYON_SUITE_REPORT=1 vendor/bin/phpunit --testsuite Browser
 
 By default it's written to `tests/Browser/Artifacts/suite-report`; override the path with `TETRYON_SUITE_REPORT_PATH`. The combined report's sidebar lists every test with its pass/fail state, and opens on the first failure if there is one.
 
+To see one, open the [TodoMVC live demo](https://vusys.github.io/tetryon/demo/todomvc/): Tetryon's own TodoMVC suite, recorded in CI against ten frameworks. See [Watch it run](todomvc.md#watch-it-run).
+
 Parallel runs (paratest, `php artisan test --parallel`) produce one report too. Each worker writes its images into the shared directory and its tests into `parts/<run>/<worker>.json`. As it exits it re-renders `index.html` from every part of the run so far, holding a lock, so the last worker to finish leaves the whole suite. A run is told apart from the last one by the paratest process its workers share, which needs `ext-posix`; without it, each worker writes its own report to `suite-report/worker-<N>/`.
 
 An ordinary test run pays nothing for this — accumulation and rendering are both no-ops unless `TETRYON_SUITE_REPORT` is set, and a test that never calls `recording()` contributes nothing to it either way.
