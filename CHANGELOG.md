@@ -6,6 +6,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-17
+
+A reused browser can now checkpoint the database too, so a test class seeds and logs in once. One change can break existing suites: `press()` only presses buttons now, so use `click()` for links and other elements.
+
 ### Added
 
 - **A database checkpoint for reused browsers** (#78, Phase 2). With `Laravel\BrowserTestCase`, `#[ReuseBrowser(database: true)]` (or the trait's `snapshotsDatabase()`) checkpoints the database after `authenticate()` and puts it back before every test, so a class seeds and logs in once. SQLite uses `VACUUM INTO` and a table-by-table restore; MySQL and MariaDB use shadow tables. The test process restores the committed rows, which the served app then reads. See [`docs/writing-tests.md`](docs/writing-tests.md#checkpointing-the-database-laravel).
@@ -287,7 +291,8 @@ first-class Laravel integration.
   and a writable artifact directory — and prints a report with fix hints,
   exiting non-zero if anything is wrong.
 
-[Unreleased]: https://github.com/Vusys/tetryon/compare/v0.8.1...master
+[Unreleased]: https://github.com/Vusys/tetryon/compare/v0.9.0...master
+[0.9.0]: https://github.com/Vusys/tetryon/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/Vusys/tetryon/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/Vusys/tetryon/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/Vusys/tetryon/compare/v0.7.0...v0.7.1
